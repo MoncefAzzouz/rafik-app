@@ -23,19 +23,15 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: _pages[_currentIndex],
-        ),
+      backgroundColor: AppColors.backgroundLight,
+      body: SafeArea(
+        child: _pages[_currentIndex],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.black.withAlpha(12), // Very subtle shadow
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),

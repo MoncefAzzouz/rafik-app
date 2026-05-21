@@ -6,16 +6,16 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.backgroundLight,
-      primaryColor: AppColors.teal,
+      scaffoldBackgroundColor: AppColors.backgroundWhite,
+      primaryColor: AppColors.primary,
       colorScheme: const ColorScheme.light(
-        primary: AppColors.teal,
-        secondary: AppColors.mintGreen,
-        surface: AppColors.surfaceWhite,
+        primary: AppColors.primary,
+        secondary: AppColors.primaryLight,
+        surface: AppColors.backgroundWhite,
       ),
       textTheme: GoogleFonts.poppinsTextTheme().copyWith(
-        displayLarge: GoogleFonts.poppins(color: AppColors.deepBlue, fontWeight: FontWeight.bold),
-        displayMedium: GoogleFonts.poppins(color: AppColors.deepBlue, fontWeight: FontWeight.bold),
+        displayLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+        displayMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         displaySmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         headlineMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         headlineSmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
@@ -28,23 +28,30 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.deepBlue),
-        titleTextStyle: TextStyle(color: AppColors.deepBlue, fontSize: 20, fontWeight: FontWeight.bold),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        titleTextStyle: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent, // Uses Ink for gradient
-          foregroundColor: AppColors.surfaceWhite,
-          shadowColor: Colors.transparent,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.backgroundWhite,
+          shadowColor: AppColors.primary.withAlpha(76), // 0.3 opacity
+          elevation: 5,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
       ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          textStyle: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceWhite,
+        fillColor: AppColors.backgroundLight,
         hintStyle: const TextStyle(color: AppColors.textSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -56,7 +63,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.teal, width: 2),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -64,8 +71,8 @@ class AppTheme {
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surfaceWhite,
-        selectedItemColor: AppColors.teal,
+        backgroundColor: AppColors.backgroundWhite,
+        selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         elevation: 10,

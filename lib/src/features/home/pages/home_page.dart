@@ -15,17 +15,17 @@ class HomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.surfaceWhite,
+                color: AppColors.backgroundWhite,
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: AppColors.primary.withAlpha(25), // 0.1 opacity
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: const Icon(FontAwesomeIcons.user, color: AppColors.teal, size: 20),
+              child: const Icon(FontAwesomeIcons.user, color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Column(
@@ -37,7 +37,7 @@ class HomePage extends StatelessWidget {
                 ),
                 const Text(
                   'Moncef',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.deepBlue),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
               ],
             ),
@@ -64,7 +64,7 @@ class HomePage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.teal,
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -110,12 +110,12 @@ class HomePage extends StatelessWidget {
   Widget _buildCategoryItem(IconData icon, String title) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceWhite,
+        color: AppColors.backgroundWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.grey.shade100, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
+            color: Colors.black.withAlpha(8), // Very subtle shadow
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -135,10 +135,10 @@ class HomePage extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.surfaceWhite,
+                    color: AppColors.backgroundWhite,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.teal.withOpacity(0.15),
+                        color: AppColors.primary.withAlpha(25), // 0.1 opacity
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
@@ -155,7 +155,7 @@ class HomePage extends StatelessWidget {
                   title,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: AppColors.deepBlue,
+                    color: AppColors.textPrimary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
