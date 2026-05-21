@@ -15,14 +15,17 @@ class HomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.backgroundLight,
+                color: AppColors.surfaceWhite,
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                FontAwesomeIcons.user,
-                color: AppColors.teal,
-                size: 20,
-              ),
+              child: const Icon(FontAwesomeIcons.user, color: AppColors.teal, size: 20),
             ),
             const SizedBox(width: 12),
             Column(
@@ -30,14 +33,11 @@ class HomePage extends StatelessWidget {
               children: [
                 const Text(
                   'Bonjour,',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const Text(
                   'Moncef',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.deepBlue),
                 ),
               ],
             ),
@@ -45,10 +45,7 @@ class HomePage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              FontAwesomeIcons.bell,
-              color: AppColors.textPrimary,
-            ),
+            icon: const Icon(FontAwesomeIcons.bell, color: AppColors.textPrimary),
             onPressed: () {},
           ),
         ],
@@ -101,10 +98,7 @@ class HomePage extends StatelessWidget {
                 _buildCategoryItem(FontAwesomeIcons.borderAll, 'Plaquiste'),
                 _buildCategoryItem(Icons.kitchen, 'Électroménager'),
                 _buildCategoryItem(FontAwesomeIcons.broom, 'Nettoyage'),
-                _buildCategoryItem(
-                  FontAwesomeIcons.carBattery,
-                  'Électricien auto',
-                ),
+                _buildCategoryItem(FontAwesomeIcons.carBattery, 'Électricien auto'),
               ],
             ),
           ],
@@ -116,12 +110,12 @@ class HomePage extends StatelessWidget {
   Widget _buildCategoryItem(IconData icon, String title) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.backgroundLight.withOpacity(0.5),
+        color: AppColors.surfaceWhite,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.teal.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
         boxShadow: [
           BoxShadow(
-            color: AppColors.backgroundDark.withOpacity(0.5),
+            color: Colors.grey.withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -141,23 +135,27 @@ class HomePage extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: AppColors.primaryGradient,
+                    color: AppColors.surfaceWhite,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.teal.withOpacity(0.2),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                        color: AppColors.teal.withOpacity(0.15),
+                        blurRadius: 10,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: AppColors.backgroundDark, size: 24),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (Rect bounds) => AppColors.primaryGradient.createShader(bounds),
+                    child: Icon(icon, size: 24),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   title,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: AppColors.textPrimary,
+                    color: AppColors.deepBlue,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),

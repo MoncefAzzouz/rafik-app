@@ -27,7 +27,9 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: const BoxDecoration(
+          gradient: AppColors.backgroundGradient,
+        ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -42,30 +44,33 @@ class _LoginPageState extends State<LoginPage> {
                     width: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: AppColors.primaryGradient,
+                      color: AppColors.surfaceWhite,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.teal.withOpacity(0.3),
+                          color: AppColors.teal.withOpacity(0.2),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      FontAwesomeIcons.houseUser,
-                      size: 50,
-                      color: AppColors.backgroundDark,
+                    child: ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (Rect bounds) => AppColors.primaryGradient.createShader(bounds),
+                      child: const Icon(
+                        FontAwesomeIcons.houseUser,
+                        size: 50,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
-
+                  
                   const Text(
                     'Welcome Back',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: AppColors.deepBlue,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -78,7 +83,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 40),
-
+                  
                   // Email Field
                   TextField(
                     controller: _emailController,
@@ -86,14 +91,11 @@ class _LoginPageState extends State<LoginPage> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       hintText: 'Email Address',
-                      prefixIcon: Icon(
-                        Icons.email_outlined,
-                        color: AppColors.textSecondary,
-                      ),
+                      prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
                     ),
                   ),
                   const SizedBox(height: 20),
-
+                  
                   // Password Field
                   TextField(
                     controller: _passwordController,
@@ -101,15 +103,10 @@ class _LoginPageState extends State<LoginPage> {
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       hintText: 'Password',
-                      prefixIcon: const Icon(
-                        Icons.lock_outline,
-                        color: AppColors.textSecondary,
-                      ),
+                      prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondary),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
                           color: AppColors.textSecondary,
                         ),
                         onPressed: () {
@@ -121,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
+                  
                   // Forgot password
                   Align(
                     alignment: Alignment.centerRight,
@@ -129,15 +126,12 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () {},
                       child: const Text(
                         'Forgot Password?',
-                        style: TextStyle(
-                          color: AppColors.teal,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
                   const SizedBox(height: 30),
-
+                  
                   // Login Button
                   Container(
                     height: 55,
@@ -166,14 +160,14 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.backgroundDark,
+                          color: AppColors.surfaceWhite,
                           letterSpacing: 1.5,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 30),
-
+                  
                   // Sign up
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -186,10 +180,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: () {},
                         child: const Text(
                           'Sign Up',
-                          style: TextStyle(
-                            color: AppColors.teal,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

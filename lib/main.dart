@@ -14,7 +14,7 @@ class RafikApp extends StatelessWidget {
     return MaterialApp(
       title: 'Rafik App',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       home: const OnboardingPage(),
     );
   }

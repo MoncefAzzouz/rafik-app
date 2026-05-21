@@ -15,29 +15,27 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const Center(
-      child: Text('Demandes', style: TextStyle(color: AppColors.textPrimary)),
-    ),
-    const Center(
-      child: Text('Messages', style: TextStyle(color: AppColors.textPrimary)),
-    ),
-    const Center(
-      child: Text('Profil', style: TextStyle(color: AppColors.textPrimary)),
-    ),
+    const Center(child: Text('Demandes', style: TextStyle(color: AppColors.textPrimary))),
+    const Center(child: Text('Messages', style: TextStyle(color: AppColors.textPrimary))),
+    const Center(child: Text('Profil', style: TextStyle(color: AppColors.textPrimary))),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
-        child: SafeArea(child: _pages[_currentIndex]),
+        decoration: const BoxDecoration(
+          gradient: AppColors.backgroundGradient,
+        ),
+        child: SafeArea(
+          child: _pages[_currentIndex],
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: AppColors.backgroundDark.withOpacity(0.5),
+              color: Colors.grey.withOpacity(0.1),
               blurRadius: 20,
               offset: const Offset(0, -5),
             ),
