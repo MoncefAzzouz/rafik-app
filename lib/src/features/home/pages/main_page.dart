@@ -1,7 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import 'home_page.dart';
+import 'offers_page.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -15,51 +16,127 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const Center(child: Text('Demandes', style: TextStyle(color: AppColors.textPrimary))),
-    const Center(child: Text('Messages', style: TextStyle(color: AppColors.textPrimary))),
-    const Center(child: Text('Profil', style: TextStyle(color: AppColors.textPrimary))),
+    const Center(child: Text('History', style: TextStyle(color: AppColors.textPrimary))),
+    const OffersPage(),
+    const Center(child: Text('Profile', style: TextStyle(color: AppColors.textPrimary))),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      extendBody: true, // Allows body to flow under the floating nav bar
       body: SafeArea(
+        bottom: false,
         child: _pages[_currentIndex],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(12), // Very subtle shadow
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+      bottomNavigationBar: SafeArea(
+        bottom: false,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(20), // 0.08 opacity approx
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                height: 72,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                color: Colors.white.withAlpha(102), // 0.4 opacity approx
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: _buildNavItem(
+                        label: 'Home',
+                        activeIconPath: 'assets/icons/Home-color.png',
+                        inactiveIconPath: 'assets/icons/Home.png',
+                        index: 0,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildNavItem(
+                        label: 'History',
+                        activeIconPath: 'assets/icons/Paper-color.png',
+                        inactiveIconPath: 'assets/icons/Paper.png',
+                        index: 1,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildNavItem(
+                        label: 'Promo',
+                        activeIconPath: 'assets/icons/promo-color.png',
+                        inactiveIconPath: 'assets/icons/promo.png',
+                        index: 2,
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildNavItem(
+                        label: 'Profile',
+                        activeIconPath: 'assets/icons/Profile-color.png',
+                        inactiveIconPath: 'assets/icons/Profile.png',
+                        index: 3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(FontAwesomeIcons.house),
-              label: 'Accueil',
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required String label,
+    required String activeIconPath,
+    required String inactiveIconPath,
+    required int index,
+  }) {
+    final isActive = _currentIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        margin: EdgeInsets.symmetric(vertical: isActive ? 8 : 12, horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary.withAlpha(30) : Colors.transparent, // ~0.12 opacity
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              isActive ? activeIconPath : inactiveIconPath,
+              width: 24,
+              height: 24,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(FontAwesomeIcons.briefcase),
-              label: 'Demandes',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(FontAwesomeIcons.message),
-              label: 'Messages',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(FontAwesomeIcons.user),
-              label: 'Profil',
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? AppColors.primary : AppColors.textSecondary,
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

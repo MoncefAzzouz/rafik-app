@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Brand Colors
+  // static const Color primary = Color(0xFF7C3AED); // Vibrant Purple
+  // static const Color primaryLight = Color(0xFFA78BFA); // Lighter Purple for gradients
   static const Color primary = Color(0xFFFD6B22); // Main Orange
-  static const Color primaryLight = Color(0xFFFF9457); // Lighter Orange for gradients
-
+  static const Color primaryLight = Color(0xFFFF9457);
   // Background Colors
   static const Color backgroundWhite = Color(0xFFFFFFFF);
   static const Color backgroundLight = Color(0xFFF9FAFB);
-  
+
   // Text Colors
-  static const Color textPrimary = Color(0xFF111827); // Very dark gray for headings
+  static const Color textPrimary = Color(
+    0xFF111827,
+  ); // Very dark gray for headings
   static const Color textSecondary = Color(0xFF6B7280); // Gray for descriptions
 
   // Gradients
