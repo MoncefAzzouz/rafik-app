@@ -11,7 +11,7 @@ class OffersPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
