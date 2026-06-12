@@ -16,8 +16,8 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     const HomePage(),
-    const Center(child: Text('History', style: TextStyle(color: AppColors.textPrimary))),
     const OffersPage(),
+    const Center(child: Text('Activities', style: TextStyle(color: AppColors.textPrimary))),
     const Center(child: Text('Profile', style: TextStyle(color: AppColors.textPrimary))),
   ];
 
@@ -26,10 +26,7 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       extendBody: true, // Allows body to flow under the floating nav bar
-      body: SafeArea(
-        bottom: false,
-        child: _pages[_currentIndex],
-      ),
+      body: _pages[_currentIndex],
       bottomNavigationBar: SafeArea(
         bottom: false,
         child: Container(
@@ -65,17 +62,17 @@ class _MainPageState extends State<MainPage> {
                     ),
                     Expanded(
                       child: _buildNavItem(
-                        label: 'History',
-                        activeIconPath: 'assets/icons/Paper-color.png',
-                        inactiveIconPath: 'assets/icons/Paper.png',
+                        label: 'Promos',
+                        activeIconPath: 'assets/icons/promo-color.png',
+                        inactiveIconPath: 'assets/icons/promo.png',
                         index: 1,
                       ),
                     ),
                     Expanded(
                       child: _buildNavItem(
-                        label: 'Promo',
-                        activeIconPath: 'assets/icons/promo-color.png',
-                        inactiveIconPath: 'assets/icons/promo.png',
+                        label: 'Activities',
+                        activeIconPath: 'assets/icons/Paper-color.png',
+                        inactiveIconPath: 'assets/icons/Paper.png',
                         index: 2,
                       ),
                     ),
