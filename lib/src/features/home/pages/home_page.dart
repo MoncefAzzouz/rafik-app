@@ -2,8 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final PageController _bannerController = PageController();
+  int _currentBannerIndex = 0;
+
+  final List<String> _banners = [
+    'assets/imagesss/banner.PNG',
+    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg',
+    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg',
+  ];
+
+  @override
+  void dispose() {
+    _bannerController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,84 +48,87 @@ class HomePage extends StatelessWidget {
                 gradient: AppColors.headerGradient,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: MediaQuery.of(context).padding.top + 16),
-                  
-                  // Top Row: Logo & Icons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      SizedBox(
-                        height: 40,
-                        width: 120,
-                        child: Image.asset(
-                          'assets/imagesss/IMG_0046.PNG',
-                          fit: BoxFit.contain,
-                          alignment: Alignment.centerLeft,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          _buildHeaderButton(
-                            icon: Icons.notifications_none_rounded,
-                            hasBadge: true,
-                            onTap: () {},
-                          ),
-                          const SizedBox(width: 12),
-                          _buildHeaderButton(
-                            icon: Icons.person_outline_rounded,
-                            hasBadge: false,
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Greeting & Location
-                  const Text(
-                    'Hello, Yassir',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    onTap: () {},
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    
+                    // Top Row: Logo & Icons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          color: AppColors.cyan,
-                          size: 16,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Setif, Algeria',
-                          style: TextStyle(
-                            color: AppColors.cyan,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                        SizedBox(
+                          height: 40,
+                          width: 120,
+                          child: Image.asset(
+                            'assets/imagesss/IMG_0046.PNG',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.centerLeft,
                           ),
                         ),
-                        SizedBox(width: 2),
-                        Icon(
-                          Icons.keyboard_arrow_right_rounded,
-                          color: AppColors.cyan,
-                          size: 16,
+                        Row(
+                          children: [
+                            _buildHeaderButton(
+                              icon: Icons.notifications_none_rounded,
+                              hasBadge: true,
+                              onTap: () {},
+                            ),
+                            const SizedBox(width: 12),
+                            _buildHeaderButton(
+                              icon: Icons.person_outline_rounded,
+                              hasBadge: false,
+                              onTap: () {},
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 8),
+                    
+                    // Greeting & Location
+                    const Text(
+                      'Hello, Moncef',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () {},
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_on_rounded,
+                            color: AppColors.cyan,
+                            size: 12,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Setif, Algeria',
+                            style: TextStyle(
+                              color: AppColors.cyan,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(width: 2),
+                          Icon(
+                            Icons.keyboard_arrow_right_rounded,
+                            color: AppColors.cyan,
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
             
@@ -119,7 +142,7 @@ class HomePage extends StatelessWidget {
                   topRight: Radius.circular(32),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -173,7 +196,7 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   // Reorder Section
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -298,51 +321,53 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   
-                  // Promotional Banner Section
-                  const SizedBox(height: 28),
+                  // Promotional Banner Section (Swipable PageView)
+                  const SizedBox(height: 16),
                   Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.asset(
-                          'assets/imagesss/banner.PNG',
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                      SizedBox(
+                        height: 180,
+                        width: double.infinity,
+                        child: PageView.builder(
+                          controller: _bannerController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentBannerIndex = index;
+                            });
+                          },
+                          itemCount: _banners.length,
+                          itemBuilder: (context, index) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.asset(
+                                _banners[index],
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            );
+                          },
                         ),
                       ),
                       Positioned(
                         bottom: 12,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 12,
+                          children: List.generate(
+                            _banners.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: _currentBannerIndex == index ? 12 : 6,
                               height: 6,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: _currentBannerIndex == index
+                                    ? Colors.white
+                                    : Colors.white.withAlpha(128),
                                 borderRadius: BorderRadius.circular(3),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(128),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(128),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
