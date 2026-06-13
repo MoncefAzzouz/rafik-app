@@ -123,6 +123,7 @@ class _MainPageState extends State<MainPage> {
               isActive ? activeIconPath : inactiveIconPath,
               width: 24,
               height: 24,
+              color: isActive ? AppColors.primary : AppColors.textSecondary,
             ),
             const SizedBox(height: 4),
             Text(

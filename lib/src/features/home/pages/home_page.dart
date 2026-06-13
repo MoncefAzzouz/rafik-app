@@ -104,64 +104,7 @@ class HomePage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  
-                  // Search Bar
-                  Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(20),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.only(left: 18, right: 6),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 24),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: TextField(
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              hintText: 'What do you need today?',
-                              hintStyle: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: AppColors.qrButtonGradient,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: const Icon(
-                              Icons.qr_code_scanner_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -183,7 +126,7 @@ class HomePage extends StatelessWidget {
                   
                   // Services Grid Container (White Card style)
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(28),
@@ -204,53 +147,31 @@ class HomePage extends StatelessWidget {
                             _buildServiceItem('assets/imagesss/IMG_0038.PNG', 'Taxi'),
                             _buildServiceItem('assets/imagesss/IMG_0039.PNG', 'Supermarket'),
                             _buildServiceItem('assets/imagesss/IMG_0040.PNG', 'Home Service'),
-                            _buildServiceItem('assets/imagesss/IMG_0044.PNG', 'Parcel\nDelivery'),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _buildServiceItem('assets/imagesss/IMG_0044.PNG', 'Parcel\nDelivery'),
                             _buildServiceItem('assets/imagesss/IMG_0041.PNG', 'Electricity'),
                             _buildServiceItem('assets/imagesss/IMG_0042.PNG', 'Bricolage\n(DIY)'),
                             _buildServiceItem('assets/imagesss/IMG_0045.PNG', 'Plumbing'),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             _buildServiceItem('assets/imagesss/IMG_0043.PNG', 'Parcel\nTransport'),
                             _buildServiceItem('', 'More', isCustomMore: true),
+                            const Expanded(child: SizedBox()),
+                            const Expanded(child: SizedBox()),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  
-                  // Quick Actions Card
-                  Container(
-                    margin: const EdgeInsets.only(top: 24),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.shade100, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(8),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(child: _buildQuickActionItem(Icons.local_offer_outlined, 'Promos', 'View all offers')),
-                        _buildVerticalDivider(),
-                        Expanded(child: _buildQuickActionItem(Icons.star_outline_rounded, 'Favorites', 'Your saved items')),
-                        _buildVerticalDivider(),
-                        Expanded(child: _buildQuickActionItem(Icons.access_time_rounded, 'Recent', 'Your activity')),
-                        _buildVerticalDivider(),
-                        Expanded(child: _buildQuickActionItem(Icons.payment_rounded, 'Payments', 'Manage cards')),
-                      ],
-                    ),
-                  ),
-                  
                   // Reorder Section
                   const SizedBox(height: 28),
                   Row(
@@ -483,8 +404,8 @@ class HomePage extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 68,
+            height: 68,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: const Color(0xFFF6F8FD),
@@ -502,7 +423,7 @@ class HomePage extends StatelessWidget {
                       child: Icon(
                         Icons.more_horiz_rounded,
                         color: AppColors.royalBlue,
-                        size: 28,
+                        size: 32,
                       ),
                     )
                   : Padding(
@@ -520,8 +441,8 @@ class HomePage extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
               height: 1.2,
             ),
             maxLines: 2,
@@ -531,46 +452,4 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-
-  // Quick Action Item Builder
-  Widget _buildQuickActionItem(IconData icon, String title, String subtitle) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: AppColors.royalBlue, size: 22),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 10.5,
-            fontWeight: FontWeight.bold,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 8,
-            fontWeight: FontWeight.w500,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-
-  // Divider Helper
-  Widget _buildVerticalDivider() {
-    return Container(
-      height: 36,
-      width: 1,
-      color: Colors.grey.shade100,
-    );
-  }
 }
-
