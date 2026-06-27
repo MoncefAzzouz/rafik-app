@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
+import '../../electricity/pages/electrician_list_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,6 +16,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController();
   int _currentBannerIndex = 0;
+  Timer? _bannerTimer;
 
   final List<String> _banners = [
     'assets/imagesss/banner.PNG',
@@ -22,7 +25,30 @@ class _HomePageState extends State<HomePage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _startBannerTimer();
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_bannerController.hasClients) {
+        int nextIndex = _currentBannerIndex + 1;
+        if (nextIndex >= _banners.length) {
+          nextIndex = 0;
+        }
+        _bannerController.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
   }
@@ -121,6 +147,58 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Promotional Banner Section (Swipable PageView)
+                  Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      SizedBox(
+                        height: 180,
+                        width: double.infinity,
+                        child: PageView.builder(
+                          controller: _bannerController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentBannerIndex = index;
+                            });
+                          },
+                          itemCount: _banners.length,
+                          itemBuilder: (context, index) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.asset(
+                                _banners[index],
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _banners.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: _currentBannerIndex == index ? 12 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _currentBannerIndex == index
+                                    ? Colors.white
+                                    : Colors.white.withAlpha(128),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
                   // Services Grid Container (White Card style)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -188,6 +266,14 @@ class _HomePageState extends State<HomePage> {
                             _buildServiceItem(
                               'assets/imagesss/IMG_0041.PNG',
                               'Electricity',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ElectricianListPage(),
+                                  ),
+                                );
+                              },
                             ),
                             _buildServiceItem(
                               'assets/imagesss/IMG_0042.PNG',
@@ -355,57 +441,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
 
-                  // Promotional Banner Section (Swipable PageView)
-                  const SizedBox(height: 16),
-                  Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      SizedBox(
-                        height: 180,
-                        width: double.infinity,
-                        child: PageView.builder(
-                          controller: _bannerController,
-                          onPageChanged: (index) {
-                            setState(() {
-                              _currentBannerIndex = index;
-                            });
-                          },
-                          itemCount: _banners.length,
-                          itemBuilder: (context, index) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Image.asset(
-                                _banners[index],
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 12,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            _banners.length,
-                            (index) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: _currentBannerIndex == index ? 12 : 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: _currentBannerIndex == index
-                                    ? Colors.white
-                                    : Colors.white.withAlpha(128),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
 
                   const SizedBox(
                     height: 120,
