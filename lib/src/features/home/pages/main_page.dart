@@ -17,8 +17,12 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     const HomePage(),
     const OffersPage(),
-    const Center(child: Text('Activities', style: TextStyle(color: AppColors.textPrimary))),
-    const Center(child: Text('Profile', style: TextStyle(color: AppColors.textPrimary))),
+    const Center(
+      child: Text('Activities', style: TextStyle(color: AppColors.textPrimary)),
+    ),
+    const Center(
+      child: Text('Profile', style: TextStyle(color: AppColors.textPrimary)),
+    ),
   ];
 
   @override
@@ -48,7 +52,7 @@ class _MainPageState extends State<MainPage> {
               child: Container(
                 height: 72,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                color: Colors.white.withAlpha(102), // 0.4 opacity approx
+                color: Colors.white,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -110,10 +114,15 @@ class _MainPageState extends State<MainPage> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        margin: EdgeInsets.symmetric(vertical: isActive ? 8 : 12, horizontal: 4),
+        margin: EdgeInsets.symmetric(
+          vertical: isActive ? 8 : 12,
+          horizontal: 4,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary.withAlpha(30) : Colors.transparent, // ~0.12 opacity
+          color: isActive
+              ? AppColors.primary.withAlpha(30)
+              : Colors.transparent, // ~0.12 opacity
           borderRadius: BorderRadius.circular(30),
         ),
         child: Column(

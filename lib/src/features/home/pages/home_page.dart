@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../restaurant/pages/food_page.dart';
+import '../../taxi/pages/taxi_booking_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -54,39 +56,7 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    
-                    // Top Row: Logo & Icons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SizedBox(
-                          height: 40,
-                          width: 120,
-                          child: Image.asset(
-                            'assets/imagesss/IMG_0046.PNG',
-                            fit: BoxFit.contain,
-                            alignment: Alignment.centerLeft,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            _buildHeaderButton(
-                              icon: Icons.notifications_none_rounded,
-                              hasBadge: true,
-                              onTap: () {},
-                            ),
-                            const SizedBox(width: 12),
-                            _buildHeaderButton(
-                              icon: Icons.person_outline_rounded,
-                              hasBadge: false,
-                              onTap: () {},
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    
+
                     // Greeting & Location
                     const Text(
                       'Hello, Moncef',
@@ -131,7 +101,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            
+
             // 2. White Rounded Container (Rest of the Page Content)
             Container(
               width: double.infinity,
@@ -142,14 +112,21 @@ class _HomePageState extends State<HomePage> {
                   topRight: Radius.circular(32),
                 ),
               ),
-              padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 24),
+              padding: const EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: 24,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  
                   // Services Grid Container (White Card style)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 20,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(28),
@@ -166,27 +143,70 @@ class _HomePageState extends State<HomePage> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildServiceItem('assets/imagesss/food icon.PNG', 'Food'),
-                            _buildServiceItem('assets/imagesss/IMG_0038.PNG', 'Taxi'),
-                            _buildServiceItem('assets/imagesss/IMG_0039.PNG', 'Supermarket'),
-                            _buildServiceItem('assets/imagesss/IMG_0040.PNG', 'Home Service'),
+                            _buildServiceItem(
+                              'assets/imagesss/food icon.PNG',
+                              'Food',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const FoodPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0038.PNG',
+                              'Taxi',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TaxiBookingPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0039.PNG',
+                              'Supermarket',
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0040.PNG',
+                              'Home Service',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildServiceItem('assets/imagesss/IMG_0044.PNG', 'Parcel\nDelivery'),
-                            _buildServiceItem('assets/imagesss/IMG_0041.PNG', 'Electricity'),
-                            _buildServiceItem('assets/imagesss/IMG_0042.PNG', 'Bricolage\n(DIY)'),
-                            _buildServiceItem('assets/imagesss/IMG_0045.PNG', 'Plumbing'),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0044.PNG',
+                              'Parcel\nDelivery',
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0041.PNG',
+                              'Electricity',
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0042.PNG',
+                              'Bricolage\n(DIY)',
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0045.PNG',
+                              'Plumbing',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildServiceItem('assets/imagesss/IMG_0043.PNG', 'Parcel\nTransport'),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0043.PNG',
+                              'Parcel\nTransport',
+                            ),
                             _buildServiceItem('', 'More', isCustomMore: true),
                             const Expanded(child: SizedBox()),
                             const Expanded(child: SizedBox()),
@@ -202,7 +222,11 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.refresh_rounded, color: AppColors.royalBlue, size: 22),
+                          Icon(
+                            Icons.refresh_rounded,
+                            color: AppColors.royalBlue,
+                            size: 22,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Reorder your favorite meals',
@@ -226,7 +250,11 @@ class _HomePageState extends State<HomePage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Icon(Icons.chevron_right_rounded, color: AppColors.royalBlue, size: 16),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.royalBlue,
+                              size: 16,
+                            ),
                           ],
                         ),
                       ),
@@ -238,7 +266,10 @@ class _HomePageState extends State<HomePage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade100, width: 1.5),
+                      border: Border.all(
+                        color: Colors.grey.shade100,
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withAlpha(8),
@@ -261,7 +292,10 @@ class _HomePageState extends State<HomePage> {
                                 width: 72,
                                 height: 72,
                                 color: Colors.grey.shade200,
-                                child: const Icon(Icons.restaurant_rounded, color: AppColors.textSecondary),
+                                child: const Icon(
+                                  Icons.restaurant_rounded,
+                                  color: AppColors.textSecondary,
+                                ),
                               );
                             },
                           ),
@@ -320,7 +354,7 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  
+
                   // Promotional Banner Section (Swipable PageView)
                   const SizedBox(height: 16),
                   Stack(
@@ -372,8 +406,10 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 120), // Spacing for floating bottom nav
+
+                  const SizedBox(
+                    height: 120,
+                  ), // Spacing for floating bottom nav
                 ],
               ),
             ),
@@ -383,97 +419,65 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Header Button Helper (Notification/Profile)
-  Widget _buildHeaderButton({
-    required IconData icon,
-    required bool hasBadge,
-    required VoidCallback onTap,
+  // Service Grid Item Builder
+  Widget _buildServiceItem(
+    String assetPath,
+    String title, {
+    bool isCustomMore = false,
+    VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withAlpha(30),
-              border: Border.all(color: Colors.white.withAlpha(45), width: 1),
-            ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          if (hasBadge)
-            Positioned(
-              top: 2,
-              right: 2,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: AppColors.cyan,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.deepNavy, width: 1.5),
-                ),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFF6F8FD),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(8),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: isCustomMore
+                    ? const Center(
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          color: AppColors.royalBlue,
+                          size: 32,
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(
+                          4.0,
+                        ), // Padding to keep premium borders
+                        child: Image.asset(assetPath, fit: BoxFit.contain),
+                      ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  // Service Grid Item Builder
-  Widget _buildServiceItem(String assetPath, String title, {bool isCustomMore = false}) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 68,
-            height: 68,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFF6F8FD),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(8),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                height: 1.2,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            child: ClipOval(
-              child: isCustomMore
-                  ? const Center(
-                      child: Icon(
-                        Icons.more_horiz_rounded,
-                        color: AppColors.royalBlue,
-                        size: 32,
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.all(4.0), // Padding to keep premium borders
-                      child: Image.asset(
-                        assetPath,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
