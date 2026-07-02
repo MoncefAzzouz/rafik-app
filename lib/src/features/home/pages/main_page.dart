@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import 'home_page.dart';
 import 'offers_page.dart';
+import 'activities_page.dart';
+import '../../profile/pages/profile_page.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -17,12 +19,8 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     const HomePage(),
     const OffersPage(),
-    const Center(
-      child: Text('Activities', style: TextStyle(color: AppColors.textPrimary)),
-    ),
-    const Center(
-      child: Text('Profile', style: TextStyle(color: AppColors.textPrimary)),
-    ),
+    const ActivitiesPage(),
+    const ProfilePage(),
   ];
 
   @override

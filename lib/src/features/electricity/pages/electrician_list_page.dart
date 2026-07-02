@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_colors.dart';
 import 'electrician_detail_page.dart';
 
@@ -36,6 +37,24 @@ class ElectricianListPage extends StatefulWidget {
 }
 
 class _ElectricianListPageState extends State<ElectricianListPage> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _simulateLoading();
+  }
+
+  void _simulateLoading() {
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    });
+  }
+
   final List<Electrician> _electricians = [
     Electrician(
       name: 'Sofiane Rahmani',
@@ -161,7 +180,9 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
 
           // Electricians List
           Expanded(
-            child: ListView.builder(
+            child: _isLoading
+                ? _buildShimmerLoading()
+                : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _electricians.length,
               itemBuilder: (context, index) {
@@ -346,6 +367,27 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 3,
+        itemBuilder: (context, index) {
+          return Container(
+            height: 120,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          );
+        },
       ),
     );
   }
