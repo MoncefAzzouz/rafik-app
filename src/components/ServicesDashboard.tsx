@@ -347,6 +347,8 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   
   // Modal states
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
 
@@ -461,7 +463,64 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`📝 Booking ${newBooking.id} registered manually!`, "success");
   };
 
-  // 3. Edit existing booking details (from the Edit modal)
+  // 3. Add Worker (Professional)
+  const handleAddWorker = (fields: {
+    name: string;
+    phone: string;
+    category: string;
+    rate: string;
+    experience: string;
+    bio: string;
+  }) => {
+    const newWorker: Professional = {
+      id: `PRO-${professionals.length + 1}`,
+      name: fields.name,
+      phone: fields.phone,
+      category: fields.category,
+      rate: fields.rate,
+      experience: fields.experience,
+      bio: fields.bio,
+      status: "online",
+      verified: false,
+      jobs: 0,
+      rating: 5.0,
+      joined: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      portfolio: ["https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&q=80"],
+      reviews: []
+    };
+
+    setProfessionals([...professionals, newWorker]);
+    
+    // Update active workers stats in categories
+    setCategories(prev =>
+      prev.map(c => (c.name === fields.category ? { ...c, pros: c.pros + 1 } : c))
+    );
+
+    setShowAddWorkerModal(false);
+    showToast(`👷 New worker ${fields.name} added under category ${fields.category}!`, "success");
+  };
+
+  // 4. Add Category
+  const handleAddCategory = (name: string, icon: string) => {
+    // Check if category already exists
+    if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      alert("Category already exists.");
+      return;
+    }
+
+    const newCategory = {
+      name,
+      pros: 0,
+      bookings: 0,
+      icon: icon || "🛠️"
+    };
+
+    setCategories([...categories, newCategory]);
+    setShowAddCategoryModal(false);
+    showToast(`🗂️ Category ${name} successfully added!`, "success");
+  };
+
+  // 5. Edit existing booking details
   const handleEditBooking = (id: string, updatedFields: Partial<Booking>) => {
     setBookings(prev =>
       prev.map(b => {
@@ -483,7 +542,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`Booking ${id} updated successfully!`, "success");
   };
 
-  // 4. Update Booking Status (direct inline transitions)
+  // 6. Update Booking Status (direct inline transitions)
   const handleUpdateBookingStatus = (bookingId: string, nextStatus: Booking["status"]) => {
     const timeStr = "Just now";
     setBookings(prev =>
@@ -501,7 +560,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`Booking ${bookingId} transitioned to ${STATUS_DETAILS[nextStatus].label}`, "success");
   };
 
-  // 5. Reassign worker
+  // 7. Reassign worker
   const handleReassignWorker = (bookingId: string, workerId: string) => {
     const worker = professionals.find(p => p.id === workerId);
     if (!worker) return;
@@ -521,7 +580,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`Assigned worker updated to ${worker.name}`, "success");
   };
 
-  // 6. Verify / Unverify Professional
+  // 8. Verify / Unverify Professional
   const handleToggleVerifyWorker = (workerId: string) => {
     setProfessionals(prev =>
       prev.map(p => {
@@ -535,7 +594,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     );
   };
 
-  // 7. Change worker active status
+  // 9. Change worker active status
   const handleChangeWorkerStatus = (workerId: string, nextStatus: Professional["status"]) => {
     setProfessionals(prev =>
       prev.map(p => {
@@ -547,6 +606,11 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     );
     showToast(`${professionals.find(p => p.id === workerId)?.name} is now ${nextStatus}`, "success");
   };
+
+  // Trigger modal controls from any subpage header
+  const openManualBooking = () => setShowRegisterModal(true);
+  const openAddWorker = () => setShowAddWorkerModal(true);
+  const openAddCategory = () => setShowAddCategoryModal(true);
 
   // Dynamic values
   const activeBookings = bookings.filter(b => b.status !== "completed" && b.status !== "cancelled").length;
@@ -569,6 +633,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onBack={() => setSelectedCategory(null)}
           onSelectWorker={setSelectedWorker}
           onToggleVerify={handleToggleVerifyWorker}
+          onOpenBooking={openManualBooking}
+          onOpenWorker={openAddWorker}
+          onOpenCategory={openAddCategory}
         />
       );
     }
@@ -577,7 +644,12 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       return (
         <CategoriesPage
           categories={categories}
+          bookings={bookings}
+          professionals={professionals}
           onSelectCategory={setSelectedCategory}
+          onOpenBooking={openManualBooking}
+          onOpenWorker={openAddWorker}
+          onOpenCategory={openAddCategory}
         />
       );
     }
@@ -588,6 +660,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onSelectWorker={setSelectedWorker}
           onToggleVerify={handleToggleVerifyWorker}
           onChangeStatus={handleChangeWorkerStatus}
+          onOpenBooking={openManualBooking}
+          onOpenWorker={openAddWorker}
+          onOpenCategory={openAddCategory}
         />
       );
     }
@@ -598,6 +673,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           professionals={professionals}
           onSelectBooking={setSelectedBooking}
           onEditBooking={setEditingBooking}
+          onOpenBooking={openManualBooking}
+          onOpenWorker={openAddWorker}
+          onOpenCategory={openAddCategory}
         />
       );
     }
@@ -613,7 +691,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         professionals={professionals}
         onSelectCategory={setSelectedCategory}
         onSelectBooking={setSelectedBooking}
-        onOpenManualModal={() => setShowRegisterModal(true)}
+        onOpenBooking={openManualBooking}
+        onOpenWorker={openAddWorker}
+        onOpenCategory={openAddCategory}
       />
     );
   };
@@ -643,13 +723,28 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         <span className="text-[10px] font-black uppercase tracking-widest">Simulate Client Order ⚡</span>
       </button>
 
-      {/* Modals & Drawers */}
+      {/* Creation & Edit Modals */}
       {showRegisterModal && (
         <RegisterBookingModal
           professionals={professionals}
           categories={categories}
           onClose={() => setShowRegisterModal(false)}
           onSubmit={handleCreateManualBooking}
+        />
+      )}
+
+      {showAddWorkerModal && (
+        <AddWorkerModal
+          categories={categories}
+          onClose={() => setShowAddWorkerModal(false)}
+          onSubmit={handleAddWorker}
+        />
+      )}
+
+      {showAddCategoryModal && (
+        <AddCategoryModal
+          onClose={() => setShowAddCategoryModal(false)}
+          onSubmit={handleAddCategory}
         />
       )}
 
@@ -690,6 +785,65 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
 }
 
 // ==========================================
+// REUSABLE PAGE HEADER WITH QUICK ACTIONS
+// ==========================================
+
+interface PageHeaderWithActionsProps {
+  title: string;
+  subtitle: string;
+  badgeText: string;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
+}
+
+function PageHeaderWithActions({
+  title,
+  subtitle,
+  badgeText,
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
+}: PageHeaderWithActionsProps) {
+  return (
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6">
+      <div className="space-y-2 text-left">
+        <div className="inline-flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
+          <Activity size={14} className="text-primary animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">{badgeText}</span>
+        </div>
+        <h1 className="text-4xl font-black tracking-tighter text-slate-800 uppercase italic">
+          {title}
+        </h1>
+        <p className="text-sm text-slate-400 font-medium font-inter">{subtitle}</p>
+      </div>
+
+      {/* Unified Quick Actions row */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={onOpenBooking}
+          className="px-4 py-3 bg-primary hover:bg-primary/95 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+        >
+          <Plus size={12} /> booking
+        </button>
+        <button
+          onClick={onOpenWorker}
+          className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+        >
+          <Plus size={12} /> professional
+        </button>
+        <button
+          onClick={onOpenCategory}
+          className="px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+        >
+          <Plus size={12} /> specialty
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // SUB-VIEWS COMPONENTS
 // ==========================================
 
@@ -700,7 +854,9 @@ interface DashboardOverviewProps {
   professionals: Professional[];
   onSelectCategory: (cat: string) => void;
   onSelectBooking: (b: Booking) => void;
-  onOpenManualModal: () => void;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
 }
 
 function DashboardOverview({
@@ -710,32 +866,20 @@ function DashboardOverview({
   professionals,
   onSelectCategory,
   onSelectBooking,
-  onOpenManualModal
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
 }: DashboardOverviewProps) {
   return (
     <div className="space-y-10 max-w-7xl mx-auto animate-fadeIn pb-16">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-full border border-primary/10">
-            <Activity size={14} className="text-primary animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Live Services Control</span>
-          </div>
-          <h1 className="text-4xl font-black tracking-tighter text-slate-800 uppercase italic">
-            Services <span className="text-primary">Dashboard</span>
-          </h1>
-          <p className="text-sm text-slate-400 font-medium font-inter">Manage on-demand listings, category filters, and verify incoming client jobs.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={onOpenManualModal}
-            className="px-5 py-3 bg-primary hover:bg-primary/95 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-[0.98] flex items-center gap-2 cursor-pointer"
-            style={{ boxShadow: `0 8px 24px color-mix(in srgb, var(--primary) 15%, transparent)` }}
-          >
-            <Plus size={14} /> Register New Booking
-          </button>
-        </div>
-      </div>
+      <PageHeaderWithActions
+        title="Services Overview"
+        subtitle="Manage on-demand listings, category filters, and verify incoming client jobs."
+        badgeText="Live Services Hub"
+        onOpenBooking={onOpenBooking}
+        onOpenWorker={onOpenWorker}
+        onOpenCategory={onOpenCategory}
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -766,7 +910,7 @@ function DashboardOverview({
       {/* Service Categories Grid */}
       <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
         <div className="flex items-center justify-between mb-6">
-          <div className="space-y-1">
+          <div className="space-y-1 text-left">
             <h2 className="text-lg font-black uppercase tracking-tight text-slate-800">Service Categories</h2>
             <p className="text-xs text-slate-400 font-bold font-inter">Click a specialty to view enrolled workers profiles</p>
           </div>
@@ -855,6 +999,9 @@ interface CategoryWorkersPageProps {
   onBack: () => void;
   onSelectWorker: (p: Professional) => void;
   onToggleVerify: (id: string) => void;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
 }
 
 function CategoryWorkersPage({
@@ -862,9 +1009,24 @@ function CategoryWorkersPage({
   professionals,
   onBack,
   onSelectWorker,
-  onToggleVerify
+  onToggleVerify,
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
 }: CategoryWorkersPageProps) {
   const filtered = professionals.filter(p => p.category.toLowerCase() === category.toLowerCase());
+
+  // Statistics calculation for filtered category workers
+  const categoryBookings = 290 + filtered.length * 15; // mock calculated stats
+  const onlinePros = filtered.filter(p => p.status === "online").length;
+  const verifiedPros = filtered.filter(p => p.verified).length;
+
+  const categoryStats = [
+    { label: "Active Workers", value: String(filtered.length), sub: "Pros", color: "blue", icon: Users },
+    { label: "Online Now", value: String(onlinePros), sub: "Ready", color: "emerald", icon: Check },
+    { label: "Verified Crew", value: `${verifiedPros}/${filtered.length}`, sub: "Checked", color: "amber", icon: Shield },
+    { label: "Jobs Completed", value: String(categoryBookings), sub: "Orders", color: "purple", icon: Briefcase }
+  ];
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
@@ -875,9 +1037,36 @@ function CategoryWorkersPage({
         >
           ← Categories
         </button>
-        <h1 className="text-2xl font-black text-slate-800 uppercase">
-          {category} <span className="text-primary">Workers</span>
-        </h1>
+      </div>
+
+      <PageHeaderWithActions
+        title={`${category} Specialists`}
+        subtitle={`Roster configuration and validation panels for ${category} providers.`}
+        badgeText={`${category} Directory`}
+        onOpenBooking={onOpenBooking}
+        onOpenWorker={onOpenWorker}
+        onOpenCategory={onOpenCategory}
+      />
+
+      {/* Category Worker stats block */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {categoryStats.map((s, i) => {
+          const Icon = s.icon;
+          const c = COLOR_MAP[s.color] || COLOR_MAP.blue;
+          return (
+            <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex items-center justify-between group transition-all">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{s.label}</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight block">
+                  {s.value} <span className="text-xs font-bold text-slate-400">{s.sub}</span>
+                </span>
+              </div>
+              <div className={`w-12 h-12 ${c.bg} ${c.text} rounded-2xl flex items-center justify-center transition-colors ${c.hover}`}>
+                <Icon size={20} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm">
@@ -898,7 +1087,7 @@ function CategoryWorkersPage({
                     <div className="w-12 h-12 bg-primary/10 text-primary font-black uppercase rounded-2xl flex items-center justify-center text-sm">
                       {p.name.split(" ").map(n => n[0]).join("")}
                     </div>
-                    <div>
+                    <div className="text-left">
                       <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
                         {p.name}
                         {p.verified && <Shield size={12} className="text-primary fill-primary" />}
@@ -935,20 +1124,71 @@ function CategoryWorkersPage({
 }
 
 // ==========================================
-// CATEGORIES PAGE
+// CATEGORIES PAGE WITH STATS
 // ==========================================
 
 interface CategoriesPageProps {
   categories: any[];
+  bookings: Booking[];
+  professionals: Professional[];
   onSelectCategory: (name: string) => void;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
 }
 
-function CategoriesPage({ categories, onSelectCategory }: CategoriesPageProps) {
+function CategoriesPage({
+  categories,
+  bookings,
+  professionals,
+  onSelectCategory,
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
+}: CategoriesPageProps) {
+  // Statistics Calculations
+  const totalSpecialties = categories.length;
+  const totalBookings = categories.reduce((sum, c) => sum + c.bookings, 0);
+  const avgPros = (professionals.length / categories.length).toFixed(1);
+  const mostBooked = categories.reduce((prev, curr) => (prev.bookings > curr.bookings ? prev : curr), categories[0])?.name || "None";
+
+  const categoriesStats = [
+    { label: "Total Specialties", value: String(totalSpecialties), sub: "Categories", color: "blue", icon: Wrench },
+    { label: "Specialties Bookings", value: String(totalBookings), sub: "Total", color: "emerald", icon: CalendarCheck },
+    { label: "Avg Workers/Category", value: String(avgPros), sub: "Pros", color: "amber", icon: Users },
+    { label: "Top Service Type", value: mostBooked, sub: "Popular", color: "purple", icon: TrendingUp }
+  ];
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Service Specialties</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Active client-facing categories on the mobile client</p>
+      <PageHeaderWithActions
+        title="Specialties Manager"
+        subtitle="Configure client-facing categories, icons, and worker capacities."
+        badgeText="Categories Configuration"
+        onOpenBooking={onOpenBooking}
+        onOpenWorker={onOpenWorker}
+        onOpenCategory={onOpenCategory}
+      />
+
+      {/* Categories stats block */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {categoriesStats.map((s, i) => {
+          const Icon = s.icon;
+          const c = COLOR_MAP[s.color] || COLOR_MAP.blue;
+          return (
+            <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex items-center justify-between group transition-all">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{s.label}</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight block truncate max-w-[150px]">
+                  {s.value} <span className="text-xs font-bold text-slate-400">{s.sub}</span>
+                </span>
+              </div>
+              <div className={`w-12 h-12 ${c.bg} ${c.text} rounded-2xl flex items-center justify-center transition-colors ${c.hover}`}>
+                <Icon size={20} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -962,7 +1202,7 @@ function CategoriesPage({ categories, onSelectCategory }: CategoriesPageProps) {
               <div className="text-4xl bg-slate-50 p-3 rounded-2xl group-hover:scale-105 transition-transform">
                 {c.icon}
               </div>
-              <div>
+              <div className="text-left">
                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.name}</h4>
                 <p className="text-[10px] text-slate-400 font-bold font-inter mt-0.5">{c.pros} active professionals</p>
               </div>
@@ -976,7 +1216,7 @@ function CategoriesPage({ categories, onSelectCategory }: CategoriesPageProps) {
 }
 
 // ==========================================
-// PROFESSIONALS DIRECTORY VIEW
+// PROFESSIONALS DIRECTORY VIEW WITH STATS
 // ==========================================
 
 interface ProfessionalsPageProps {
@@ -984,19 +1224,63 @@ interface ProfessionalsPageProps {
   onSelectWorker: (p: Professional) => void;
   onToggleVerify: (id: string) => void;
   onChangeStatus: (id: string, s: Professional["status"]) => void;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
 }
 
 function ProfessionalsPage({
   professionals,
   onSelectWorker,
   onToggleVerify,
-  onChangeStatus
+  onChangeStatus,
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
 }: ProfessionalsPageProps) {
+  // Statistics Calculations
+  const totalPros = professionals.length;
+  const onlinePros = professionals.filter(p => p.status === "online").length;
+  const verifiedPros = professionals.filter(p => p.verified).length;
+  const avgRating = (professionals.reduce((sum, p) => sum + p.rating, 0) / professionals.length).toFixed(1);
+
+  const prosStats = [
+    { label: "Enrolled Workers", value: String(totalPros), sub: "Pros", color: "blue", icon: Users },
+    { label: "Online Now", value: String(onlinePros), sub: "Active", color: "emerald", icon: UserCheck },
+    { label: "Verified Accounts", value: `${verifiedPros}/${totalPros}`, sub: "Valid", color: "amber", icon: Shield },
+    { label: "Avg Platform Rating", value: `⭐ ${avgRating}`, sub: "Rating", color: "purple", icon: Star }
+  ];
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Professionals Directory</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Manage account validation, status override, and details review</p>
+      <PageHeaderWithActions
+        title="Workers Directory"
+        subtitle="Manage safety validation, verified credentials, and active statuses."
+        badgeText="Professionals Registry"
+        onOpenBooking={onOpenBooking}
+        onOpenWorker={onOpenWorker}
+        onOpenCategory={onOpenCategory}
+      />
+
+      {/* Professionals stats block */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {prosStats.map((s, i) => {
+          const Icon = s.icon;
+          const c = COLOR_MAP[s.color] || COLOR_MAP.blue;
+          return (
+            <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex items-center justify-between group transition-all">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{s.label}</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight block">
+                  {s.value} <span className="text-xs font-bold text-slate-400">{s.sub}</span>
+                </span>
+              </div>
+              <div className={`w-12 h-12 ${c.bg} ${c.text} rounded-2xl flex items-center justify-center transition-colors ${c.hover}`}>
+                <Icon size={20} />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm">
@@ -1077,7 +1361,7 @@ function ProfessionalsPage({
 }
 
 // ==========================================
-// CLIENT BOOKINGS TABLE VIEW
+// CLIENT BOOKINGS TABLE VIEW WITH STATS
 // ==========================================
 
 interface BookingsPageProps {
@@ -1085,9 +1369,20 @@ interface BookingsPageProps {
   professionals: Professional[];
   onSelectBooking: (b: Booking) => void;
   onEditBooking: (b: Booking) => void;
+  onOpenBooking: () => void;
+  onOpenWorker: () => void;
+  onOpenCategory: () => void;
 }
 
-function BookingsPage({ bookings, professionals, onSelectBooking, onEditBooking }: BookingsPageProps) {
+function BookingsPage({
+  bookings,
+  professionals,
+  onSelectBooking,
+  onEditBooking,
+  onOpenBooking,
+  onOpenWorker,
+  onOpenCategory
+}: BookingsPageProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
 
   const filtered = bookings.filter(b => {
@@ -1096,14 +1391,53 @@ function BookingsPage({ bookings, professionals, onSelectBooking, onEditBooking 
     return b.status === activeTab;
   });
 
+  // Statistics Calculations
+  const totalCommands = bookings.length;
+  const activePipelines = bookings.filter(b => b.status !== "completed" && b.status !== "cancelled").length;
+  const pendingReview = bookings.filter(b => b.status === "pending_review").length;
+  const completedJobs = bookings.filter(b => b.status === "completed").length;
+
+  const bookingsStats = [
+    { label: "Total Commands", value: String(totalCommands), sub: "Bookings", color: "blue", icon: CalendarCheck },
+    { label: "Active Pipelines", value: String(activePipelines), sub: "Jobs", color: "emerald", icon: Clock },
+    { label: "Pending Review", value: String(pendingReview), sub: "Alerts", color: "amber", icon: AlertCircle },
+    { label: "Completed Jobs", value: String(completedJobs), sub: "Archived", color: "purple", icon: CheckCircle2 }
+  ];
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Bookings Pipeline</h1>
-          <p className="text-sm text-slate-400 font-medium font-inter">Manage customer orders, schedule days, and verified time slots</p>
-        </div>
-        
+      <PageHeaderWithActions
+        title="Bookings Pipeline"
+        subtitle="Manage customer orders, schedule days, and verified time slots."
+        badgeText="Job Workflows"
+        onOpenBooking={onOpenBooking}
+        onOpenWorker={onOpenWorker}
+        onOpenCategory={onOpenCategory}
+      />
+
+      {/* Bookings stats block */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {bookingsStats.map((s, i) => {
+          const Icon = s.icon;
+          const c = COLOR_MAP[s.color] || COLOR_MAP.blue;
+          return (
+            <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm flex items-center justify-between group transition-all">
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{s.label}</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight block">
+                  {s.value} <span className="text-xs font-bold text-slate-400">{s.sub}</span>
+                </span>
+              </div>
+              <div className={`w-12 h-12 ${c.bg} ${c.text} rounded-2xl flex items-center justify-center transition-colors ${c.hover}`}>
+                <Icon size={20} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between gap-4 mt-6">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter status</span>
         <div className="flex gap-2 overflow-x-auto pb-1 select-none">
           {[
             { id: "all", label: "All" },
@@ -1150,7 +1484,7 @@ function BookingsPage({ bookings, professionals, onSelectBooking, onEditBooking 
                 return (
                   <tr key={b.id}>
                     <td className="font-mono font-black text-primary">{b.id}</td>
-                    <td className="font-black text-slate-800">{b.clientName}</td>
+                    <td className="font-black text-slate-800 text-left">{b.clientName}</td>
                     <td>{worker ? worker.name : "Unassigned"}</td>
                     <td>{b.serviceCategory}</td>
                     <td className="font-bold text-slate-600">{b.bookingDate}</td>
@@ -1182,6 +1516,44 @@ function BookingsPage({ bookings, professionals, onSelectBooking, onEditBooking 
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// EARNINGS VIEW WITH REVENUE TRENDS
+// ==========================================
+
+function EarningsPage() {
+  const data = [
+    { period: "Today", revenue: "72,600", count: 64, unit: "bookings", avg: "1,134 DZD" },
+    { period: "This Week", revenue: "508,200", count: 448, unit: "bookings", avg: "1,134 DZD" },
+    { period: "This Month", revenue: "2,174,800", count: 1918, unit: "bookings", avg: "1,134 DZD" }
+  ];
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
+      <div className="space-y-2 text-left">
+        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Earnings</h1>
+        <p className="text-sm text-slate-400 font-medium font-inter">Service provider revenue and financial analytics</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {data.map((e, i) => (
+          <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm group transition-all hover:-translate-y-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{e.period}</span>
+            <span className="text-2xl font-black text-slate-800 tracking-tight block mt-2">{e.revenue} <span className="text-xs font-bold text-slate-400">DZD</span></span>
+            <div className="flex gap-4 mt-3 text-[10px] text-slate-400 font-bold font-inter"><span>{e.count} {e.unit}</span><span>Avg: {e.avg}</span></div>
+            <div className="w-full h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden mt-4"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${30 + i * 25}%`, background: "var(--primary)" }} /></div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
+        <h2 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6 text-left">Revenue Trend</h2>
+        <div className="flex items-end gap-2 h-40">
+          {[32, 48, 35, 58, 45, 72, 55, 42, 78, 62, 50, 82, 68, 58].map((h, i) => (
+            <div key={i} className="flex-1 rounded-t-lg transition-all duration-300" style={{ height: `${h}%`, background: "var(--primary)", opacity: 0.3 + (h / 130) }} />
+          ))}
         </div>
       </div>
     </div>
@@ -1386,6 +1758,244 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
               className="flex-1 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-primary/95 transition-all shadow-lg shadow-primary/20 active:scale-[0.98] cursor-pointer"
             >
               Save Booking
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MODAL: ADD NEW PROFESSIONAL (WORKER)
+// ==========================================
+
+interface AddWorkerModalProps {
+  categories: any[];
+  onClose: () => void;
+  onSubmit: (workerData: any) => void;
+}
+
+function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [category, setCategory] = useState(categories[0]?.name || "");
+  const [rate, setRate] = useState("");
+  const [experience, setExperience] = useState("");
+  const [bio, setBio] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !phone || !category || !rate || !experience || !bio) {
+      alert("Please fill in all fields.");
+      return;
+    }
+    onSubmit({
+      name,
+      phone,
+      category,
+      rate,
+      experience,
+      bio
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-6 relative m-4">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="space-y-1 text-left">
+          <h2 className="text-xl font-black text-slate-800 uppercase">Add Professional</h2>
+          <p className="text-xs text-slate-400 font-bold font-inter">Register a new service provider profile</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Worker Name *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Youcef Latreche"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Worker Phone *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. +213 550 99 88 77"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Category *</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 font-bold text-slate-700"
+              >
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.icon} {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Base Pricing Rate *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 1,600 DZD / Hour"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Experience Summary *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 5 Years in AC maintenance, certified at INSFP"
+              value={experience}
+              onChange={(e) => setExperience(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Detailed Bio *</label>
+            <textarea
+              required
+              rows={3}
+              placeholder="Provide a detailed description of skills and focus..."
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 resize-none"
+            />
+          </div>
+
+          <div className="pt-4 flex gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center text-slate-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+            >
+              Save Profile
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MODAL: ADD SERVICE CATEGORY
+// ==========================================
+
+interface AddCategoryModalProps {
+  onClose: () => void;
+  onSubmit: (name: string, icon: string) => void;
+}
+
+function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState("🛠️");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) {
+      alert("Category name is required.");
+      return;
+    }
+    onSubmit(name, icon);
+  };
+
+  const icons = ["🛠️", "🔧", "🔌", "🎨", "🧹", "❄️", "🔑", "🌱", "📦", "🪵", "🚗", "🏠", "💻", "🧱"];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full relative m-4">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="space-y-1 text-left">
+          <h2 className="text-xl font-black text-slate-800 uppercase">Add Specialty Category</h2>
+          <p className="text-xs text-slate-400 font-bold font-inter">Create a new service category for clients</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left mt-4">
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Category Name *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Locksmith"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Select Icon / Emoji *</label>
+            <div className="grid grid-cols-7 gap-2">
+              {icons.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setIcon(emoji)}
+                  className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center border transition-all ${
+                    icon === emoji ? "border-primary bg-primary/5 scale-110 shadow-sm" : "border-slate-100 bg-slate-50 hover:bg-slate-100"
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-4 flex gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center text-slate-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+            >
+              Create Category
             </button>
           </div>
         </form>
@@ -1816,7 +2426,6 @@ function BookingDetailDrawer({
     e.preventDefault();
     if (!inputTime) return;
     
-    // Automatically transition to worker_confirmed when confirmed time with worker is selected!
     booking.bookingTime = inputTime; 
     onUpdateStatus(booking.id, "worker_confirmed");
   };
@@ -1972,7 +2581,7 @@ function BookingDetailDrawer({
 
           {/* Direct State Override */}
           <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Direct State Override</label>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter">Direct State Override</label>
             <select
               value={booking.status}
               onChange={handleDirectStatusChange}
@@ -1988,7 +2597,7 @@ function BookingDetailDrawer({
 
           {/* Timeline workflow */}
           <div className="space-y-4">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Workflow Timeline</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter">Workflow Timeline</span>
             
             <div className="space-y-4 pl-4 border-l border-slate-100 relative">
               {statusList.map((st, i) => {
@@ -2028,7 +2637,7 @@ function BookingDetailDrawer({
           {booking.status === "worker_confirmed" && (
             <button
               onClick={() => onUpdateStatus(booking.id, "client_confirmed")}
-              className="w-full py-4 bg-violet-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-violet-700 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-violet-100"
+              className="w-full py-4 bg-violet-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-violet-700 active:scale-[0.98] transition-all cursor-pointer shadow-lg"
             >
               <Check size={14} /> Send Time Slot & Call Client ({booking.bookingTime})
             </button>
@@ -2076,39 +2685,5 @@ function BookingDetailDrawer({
         </div>
       </div>
     </>
-  );
-}
-
-function EarningsPage() {
-  const data = [
-    { period: "Today", revenue: "72,600", count: 64, unit: "bookings", avg: "1,134 DZD" },
-    { period: "This Week", revenue: "508,200", count: 448, unit: "bookings", avg: "1,134 DZD" },
-    { period: "This Month", revenue: "2,174,800", count: 1918, unit: "bookings", avg: "1,134 DZD" }
-  ];
-  return (
-    <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Earnings</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Service provider revenue and financial analytics</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {data.map((e, i) => (
-          <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm group transition-all hover:-translate-y-1">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{e.period}</span>
-            <span className="text-2xl font-black text-slate-800 tracking-tight block mt-2">{e.revenue} <span className="text-xs font-bold text-slate-400">DZD</span></span>
-            <div className="flex gap-4 mt-3 text-[10px] text-slate-400 font-bold font-inter"><span>{e.count} {e.unit}</span><span>Avg: {e.avg}</span></div>
-            <div className="w-full h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden mt-4"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${30 + i * 25}%`, background: "var(--primary)" }} /></div>
-          </div>
-        ))}
-      </div>
-      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
-        <h2 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6">Revenue Trend</h2>
-        <div className="flex items-end gap-2 h-40">
-          {[32, 48, 35, 58, 45, 72, 55, 42, 78, 62, 50, 82, 68, 58].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t-lg transition-all duration-300" style={{ height: `${h}%`, background: "var(--primary)", opacity: 0.3 + (h / 130) }} />
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
