@@ -408,6 +408,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editingCategory, setEditingCategory] = useState<{ name: string; icon: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
 
   // Sync state detail panels if the collection lists change
@@ -613,6 +614,33 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`🗂️ Category ${name} successfully added!`, "success");
   };
 
+  // Edit Category details
+  const handleEditCategory = (oldName: string, newName: string, newIcon: string) => {
+    setCategories(prev =>
+      prev.map(c => 
+        c.name === oldName 
+          ? { ...c, name: newName, icon: newIcon } 
+          : c
+      )
+    );
+    setProfessionals(prev =>
+      prev.map(p => 
+        p.category === oldName 
+          ? { ...p, category: newName } 
+          : p
+      )
+    );
+    setBookings(prev =>
+      prev.map(b => 
+        b.serviceCategory === oldName 
+          ? { ...b, serviceCategory: newName } 
+          : b
+      )
+    );
+    setEditingCategory(null);
+    showToast(`Category ${oldName} updated to ${newName}!`, "success");
+  };
+
   // 5. Edit existing booking details
   const handleEditBooking = (id: string, updatedFields: Partial<Booking>) => {
     setBookings(prev =>
@@ -741,6 +769,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           bookings={bookings}
           professionals={professionals}
           onSelectCategory={setSelectedCategory}
+          onEditCategory={setEditingCategory}
           onOpenBooking={openManualBooking}
           onOpenWorker={openAddWorker}
           onOpenCategory={openAddCategory}
@@ -872,6 +901,15 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         <AddCategoryModal
           onClose={() => setShowAddCategoryModal(false)}
           onSubmit={handleAddCategory}
+        />
+      )}
+
+      {editingCategory && (
+        <EditCategoryModal
+          category={editingCategory}
+          categories={categories}
+          onClose={() => setEditingCategory(null)}
+          onSubmit={handleEditCategory}
         />
       )}
 
@@ -1269,6 +1307,7 @@ interface CategoriesPageProps {
   bookings: Booking[];
   professionals: Professional[];
   onSelectCategory: (name: string) => void;
+  onEditCategory: (category: { name: string; icon: string }) => void;
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
@@ -1279,6 +1318,7 @@ function CategoriesPage({
   bookings,
   professionals,
   onSelectCategory,
+  onEditCategory,
   onOpenBooking,
   onOpenWorker,
   onOpenCategory
@@ -1345,7 +1385,20 @@ function CategoriesPage({
                 <p className="text-[10px] text-slate-400 font-bold font-inter mt-0.5">{c.pros} active professionals</p>
               </div>
             </div>
-            <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditCategory(c);
+                }}
+                className="p-2 text-slate-400 hover:text-primary rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+                title="Edit Category Name and Icon"
+              >
+                <Edit2 size={14} />
+              </button>
+              <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
+            </div>
           </div>
         ))}
       </div>
@@ -2292,6 +2345,103 @@ function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
 }
 
 // ==========================================
+// MODAL: EDIT SERVICE CATEGORY
+// ==========================================
+interface EditCategoryModalProps {
+  category: { name: string; icon: string };
+  categories: any[];
+  onClose: () => void;
+  onSubmit: (oldName: string, newName: string, newIcon: string) => void;
+}
+
+function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCategoryModalProps) {
+  const [name, setName] = useState(category.name);
+  const [icon, setIcon] = useState(category.icon);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) {
+      alert("Category name is required.");
+      return;
+    }
+    if (name.toLowerCase() !== category.name.toLowerCase() &&
+        categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      alert("Category name already exists.");
+      return;
+    }
+    onSubmit(category.name, name, icon);
+  };
+
+  const icons = ["🛠️", "🔧", "🔌", "🎨", "🧹", "❄️", "🔑", "🌱", "📦", "🪵", "🚗", "🏠", "💻", "🧱"];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full relative m-4">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="space-y-1 text-left">
+          <h2 className="text-xl font-black text-slate-800 uppercase">Edit Category</h2>
+          <p className="text-xs text-slate-400 font-bold font-inter">Update service category name and icon</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left mt-4">
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Category Name *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Locksmith"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Select Icon / Emoji *</label>
+            <div className="grid grid-cols-7 gap-2">
+              {icons.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setIcon(emoji)}
+                  className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center border transition-all ${
+                    icon === emoji ? "border-primary bg-primary/5 scale-110 shadow-sm" : "border-slate-100 bg-slate-50 hover:bg-slate-100"
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-4 flex gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center text-slate-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // MODAL: EDIT BOOKING / COMMAND DETAILS
 // ==========================================
 
@@ -3124,6 +3274,7 @@ interface ReviewsPageProps {
 function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
   const [search, setSearch] = useState("");
   const [ratingFilter, setRatingFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"individual" | "workers">("workers");
 
   const allReviews = professionals.flatMap(p =>
     p.reviews.map((r, idx) => ({
@@ -3153,9 +3304,37 @@ function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
       {/* Page Header */}
-      <div className="space-y-2 text-left">
-        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Reviews</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Manage customer feedback and worker quality control</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-left">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Reviews & Ratings</h1>
+          <p className="text-sm text-slate-400 font-medium font-inter">Manage customer feedback and worker quality control</p>
+        </div>
+        
+        {/* Toggle Mode Tab */}
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setViewMode("workers")}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              viewMode === "workers"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Worker Breakdown
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("individual")}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              viewMode === "individual"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            All Reviews
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -3184,7 +3363,7 @@ function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters (only for All Reviews or Search) */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50 p-4 rounded-3xl border border-slate-100">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -3213,52 +3392,134 @@ function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
         </div>
       </div>
 
-      {/* Reviews Grid */}
-      {filteredReviews.length === 0 ? (
-        <div className="bg-white border border-slate-100 rounded-[2.5rem] p-12 text-center text-slate-400 font-bold font-inter">
-          No matching reviews found.
+      {/* Reviews Render Container */}
+      {viewMode === "workers" ? (
+        <div className="space-y-8">
+          {professionals
+            .filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()))
+            .map(worker => {
+              // Calculate specific ratings distribution
+              const totalRating = worker.reviews.reduce((sum, r) => sum + r.rating, 0);
+              const workerAvg = worker.reviews.length > 0 ? (totalRating / worker.reviews.length).toFixed(1) : "5.0";
+              
+              // Filter reviews for this worker
+              const workerReviewsFiltered = worker.reviews.map((r, idx) => ({ ...r, originalIdx: idx }))
+                .filter(r => ratingFilter === "all" || r.rating === parseInt(ratingFilter));
+
+              return (
+                <div key={worker.id} className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm text-left space-y-6">
+                  {/* Worker Summary Header */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-50 pb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-primary/10 text-primary font-black rounded-2xl flex items-center justify-center text-sm uppercase">
+                        {worker.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                          {worker.name}
+                          {worker.verified && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-lg">Verified</span>}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-bold font-inter mt-0.5">{worker.category} · {worker.reviews.length} reviews</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Average Rating</span>
+                        <span className="text-xl font-black text-slate-800 block mt-0.5">⭐ {workerAvg} / 5.0</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Worker's Reviews List */}
+                  {workerReviewsFiltered.length === 0 ? (
+                    <p className="text-xs text-slate-400 font-bold font-inter py-2 pl-4">No matching reviews for this professional.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {workerReviewsFiltered.map((review) => (
+                        <div key={review.originalIdx} className="bg-slate-50/50 border border-slate-100 p-5 rounded-3xl space-y-3 relative group">
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => onDeleteReview(worker.id, review.originalIdx)}
+                            className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                            title="Delete this review"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">{review.clientName}</h4>
+                              <span className="text-[9px] text-slate-400 font-bold font-inter">{review.date}</span>
+                            </div>
+                            
+                            {/* Stars */}
+                            <div className="flex text-amber-400 text-[10px] mr-6">
+                              {Array.from({ length: 5 }).map((_, idx) => (
+                                <span key={idx}>{idx < review.rating ? "★" : "☆"}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium font-inter leading-relaxed bg-white p-3 rounded-xl border border-slate-50">
+                            &ldquo;{review.comment}&rdquo;
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredReviews.map((r, i) => (
-            <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow relative">
-              <button
-                onClick={() => onDeleteReview(r.workerId, r.reviewIdx)}
-                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Delete review"
-              >
-                <Trash2 size={16} />
-              </button>
+        /* Individual Reviews List View */
+        filteredReviews.length === 0 ? (
+          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-12 text-center text-slate-400 font-bold font-inter">
+            No matching reviews found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredReviews.map((r, i) => (
+              <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow relative">
+                <button
+                  onClick={() => onDeleteReview(r.workerId, r.reviewIdx)}
+                  className="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="Delete review"
+                >
+                  <Trash2 size={16} />
+                </button>
 
-              <div className="space-y-3">
-                {/* User/Worker context */}
-                <div className="flex justify-between items-start text-left">
-                  <div>
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">{r.clientName}</h4>
-                    <p className="text-[9px] text-slate-400 font-bold font-inter">{r.date}</p>
+                <div className="space-y-3">
+                  {/* User/Worker context */}
+                  <div className="flex justify-between items-start text-left">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">{r.clientName}</h4>
+                      <p className="text-[9px] text-slate-400 font-bold font-inter">{r.date}</p>
+                    </div>
+                    <div className="text-right mr-8">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Reviewing</span>
+                      <span className="text-xs font-black text-primary uppercase tracking-tight block mt-0.5">{r.workerName}</span>
+                      <span className="text-[9px] text-slate-400 font-bold font-inter block">{r.workerCategory}</span>
+                    </div>
                   </div>
-                  <div className="text-right mr-8">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Reviewing</span>
-                    <span className="text-xs font-black text-primary uppercase tracking-tight block mt-0.5">{r.workerName}</span>
-                    <span className="text-[9px] text-slate-400 font-bold font-inter block">{r.workerCategory}</span>
+
+                  {/* Stars */}
+                  <div className="flex text-amber-400 text-xs">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <span key={idx}>{idx < r.rating ? "★" : "☆"}</span>
+                    ))}
                   </div>
-                </div>
 
-                {/* Stars */}
-                <div className="flex text-amber-400 text-xs">
-                  {Array.from({ length: 5 }).map((_, idx) => (
-                    <span key={idx}>{idx < r.rating ? "★" : "☆"}</span>
-                  ))}
+                  {/* Comment */}
+                  <p className="text-xs text-slate-500 font-medium font-inter leading-relaxed text-left bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
+                    &ldquo;{r.comment}&rdquo;
+                  </p>
                 </div>
-
-                {/* Comment */}
-                <p className="text-xs text-slate-500 font-medium font-inter leading-relaxed text-left bg-slate-50 p-4 rounded-2xl border border-slate-100/50">
-                  &ldquo;{r.comment}&rdquo;
-                </p>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );
