@@ -792,6 +792,7 @@ interface PageHeaderWithActionsProps {
   title: string;
   subtitle: string;
   badgeText: string;
+  actionType: "booking" | "professional" | "specialty" | "all" | "none";
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
@@ -801,6 +802,7 @@ function PageHeaderWithActions({
   title,
   subtitle,
   badgeText,
+  actionType,
   onOpenBooking,
   onOpenWorker,
   onOpenCategory
@@ -818,26 +820,32 @@ function PageHeaderWithActions({
         <p className="text-sm text-slate-400 font-medium font-inter">{subtitle}</p>
       </div>
 
-      {/* Unified Quick Actions row */}
+      {/* Relevant Quick Actions based on page context */}
       <div className="flex flex-wrap gap-2">
-        <button
-          onClick={onOpenBooking}
-          className="px-4 py-3 bg-primary hover:bg-primary/95 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus size={12} /> booking
-        </button>
-        <button
-          onClick={onOpenWorker}
-          className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus size={12} /> professional
-        </button>
-        <button
-          onClick={onOpenCategory}
-          className="px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
-        >
-          <Plus size={12} /> specialty
-        </button>
+        {(actionType === "booking" || actionType === "all") && (
+          <button
+            onClick={onOpenBooking}
+            className="px-4 py-3 bg-primary hover:bg-primary/95 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus size={12} /> Add Booking
+          </button>
+        )}
+        {(actionType === "professional" || actionType === "all") && (
+          <button
+            onClick={onOpenWorker}
+            className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus size={12} /> Add Professional
+          </button>
+        )}
+        {(actionType === "specialty" || actionType === "all") && (
+          <button
+            onClick={onOpenCategory}
+            className="px-4 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus size={12} /> Add Specialty
+          </button>
+        )}
       </div>
     </div>
   );
@@ -876,6 +884,7 @@ function DashboardOverview({
         title="Services Overview"
         subtitle="Manage on-demand listings, category filters, and verify incoming client jobs."
         badgeText="Live Services Hub"
+        actionType="booking"
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
@@ -1043,6 +1052,7 @@ function CategoryWorkersPage({
         title={`${category} Specialists`}
         subtitle={`Roster configuration and validation panels for ${category} providers.`}
         badgeText={`${category} Directory`}
+        actionType="professional"
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
@@ -1165,6 +1175,7 @@ function CategoriesPage({
         title="Specialties Manager"
         subtitle="Configure client-facing categories, icons, and worker capacities."
         badgeText="Categories Configuration"
+        actionType="specialty"
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
@@ -1257,6 +1268,7 @@ function ProfessionalsPage({
         title="Workers Directory"
         subtitle="Manage safety validation, verified credentials, and active statuses."
         badgeText="Professionals Registry"
+        actionType="professional"
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
@@ -1410,6 +1422,7 @@ function BookingsPage({
         title="Bookings Pipeline"
         subtitle="Manage customer orders, schedule days, and verified time slots."
         badgeText="Job Workflows"
+        actionType="booking"
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
