@@ -33,6 +33,7 @@ export interface Professional {
   bio: string;
   portfolio: string[];
   reviews: Review[];
+  availableTimes: string[]; // Worker-specific time slots
 }
 
 export type BookingStatus =
@@ -59,7 +60,7 @@ export interface Booking {
   description: string;
   time: string; // creation relative time, e.g. "2 hours ago"
   bookingDate: string; // Day chosen by client
-  bookingTime?: string; // Time confirmed with worker
+  bookingTime?: string; // Time confirmed with worker from their availableTimes list
   statusHistory: { status: string; timestamp: string }[];
 }
 
@@ -85,7 +86,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     reviews: [
       { clientName: "Fodil B.", rating: 5, comment: "Very professional, fixed my distribution board in 30 minutes.", date: "1 week ago" },
       { clientName: "Amine S.", rating: 4.8, comment: "Punctual and clean work. Strongly recommended.", date: "3 weeks ago" }
-    ]
+    ],
+    availableTimes: ["08:00", "10:30", "14:00", "16:30"]
   },
   {
     id: "PRO-2",
@@ -106,7 +108,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Mourad L.", rating: 5, comment: "Excellent work, resolved pressure issues with the water tank perfectly.", date: "2 days ago" }
-    ]
+    ],
+    availableTimes: ["09:00", "11:30", "15:00", "17:30"]
   },
   {
     id: "PRO-3",
@@ -127,7 +130,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Yasmina R.", rating: 5, comment: "Clean diagnostic. Recharged the cooling gas quickly.", date: "5 days ago" }
-    ]
+    ],
+    availableTimes: ["08:30", "13:00", "16:00"]
   },
   {
     id: "PRO-4",
@@ -148,7 +152,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Imane H.", rating: 4, comment: "Nice cleaning job, missed a spot behind the couch but came back and fixed it.", date: "2 weeks ago" }
-    ]
+    ],
+    availableTimes: ["08:00", "11:00", "14:00", "17:00"]
   },
   {
     id: "PRO-5",
@@ -169,7 +174,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Omar D.", rating: 4.5, comment: "Did a beautiful modern design in the living room wall.", date: "1 month ago" }
-    ]
+    ],
+    availableTimes: ["09:00", "13:30", "16:00"]
   },
   {
     id: "PRO-6",
@@ -190,7 +196,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Chafik Y.", rating: 5, comment: "Customized our kitchen counters perfectly. Outstanding wood craftsmanship.", date: "3 weeks ago" }
-    ]
+    ],
+    availableTimes: ["08:00", "10:00", "13:00", "15:30"]
   },
   {
     id: "PRO-7",
@@ -210,7 +217,8 @@ const INITIAL_PROFESSIONALS: Professional[] = [
     ],
     reviews: [
       { clientName: "Tarek B.", rating: 5, comment: "Very quick in replacing the bathroom switches.", date: "1 month ago" }
-    ]
+    ],
+    availableTimes: ["09:30", "12:00", "15:00", "17:00"]
   }
 ];
 
@@ -227,7 +235,7 @@ const INITIAL_BOOKINGS: Booking[] = [
     description: "Bathroom water pipe leak repair. Water is dripping continuously from the main sink joint.",
     time: "1 hour ago",
     bookingDate: "2026-07-12",
-    bookingTime: "10:30",
+    bookingTime: "11:30",
     statusHistory: [
       { status: "pending_review", timestamp: "3 hours ago" },
       { status: "contacting_worker", timestamp: "2.5 hours ago" },
@@ -471,6 +479,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     rate: string;
     experience: string;
     bio: string;
+    availableTimes: string[];
   }) => {
     const newWorker: Professional = {
       id: `PRO-${professionals.length + 1}`,
@@ -486,12 +495,12 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       rating: 5.0,
       joined: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
       portfolio: ["https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&q=80"],
-      reviews: []
+      reviews: [],
+      availableTimes: fields.availableTimes.length > 0 ? fields.availableTimes : ["08:00", "10:00", "14:00", "16:00"]
     };
 
     setProfessionals([...professionals, newWorker]);
     
-    // Update active workers stats in categories
     setCategories(prev =>
       prev.map(c => (c.name === fields.category ? { ...c, pros: c.pros + 1 } : c))
     );
@@ -502,7 +511,6 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
 
   // 4. Add Category
   const handleAddCategory = (name: string, icon: string) => {
-    // Check if category already exists
     if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
       alert("Category already exists.");
       return;
@@ -571,6 +579,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
             ...b,
             workerId,
             status: "pending_review",
+            bookingTime: undefined, // Reset confirmed time since worker changed
             statusHistory: [...b.statusHistory, { status: `Worker changed to ${worker.name}`, timestamp: "Just now" }]
           };
         }
@@ -1636,7 +1645,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
 
         <div className="space-y-1 text-left">
           <h2 className="text-xl font-black text-slate-800 uppercase">Register Booking</h2>
-          <p className="text-xs text-slate-400 font-bold font-inter font-inter">Create a manual request with schedule inputs</p>
+          <p className="text-xs text-slate-400 font-bold font-inter">Create a manual request with schedule inputs</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
@@ -1780,7 +1789,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
 }
 
 // ==========================================
-// MODAL: ADD NEW PROFESSIONAL (WORKER)
+// MODAL: REGISTER NEW WORKER
 // ==========================================
 
 interface AddWorkerModalProps {
@@ -1796,6 +1805,18 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
   const [rate, setRate] = useState("");
   const [experience, setExperience] = useState("");
   const [bio, setBio] = useState("");
+  
+  // Available times state checkboxes
+  const timeSlots = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+  const [selectedSlots, setSelectedSlots] = useState<string[]>(["08:00", "10:00", "14:00", "16:00"]);
+
+  const handleToggleSlot = (slot: string) => {
+    if (selectedSlots.includes(slot)) {
+      setSelectedSlots(selectedSlots.filter(s => s !== slot));
+    } else {
+      setSelectedSlots([...selectedSlots, slot].sort());
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1809,7 +1830,8 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
       category,
       rate,
       experience,
-      bio
+      bio,
+      availableTimes: selectedSlots
     });
   };
 
@@ -1866,6 +1888,27 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Availability Time Slots *</label>
+            <div className="flex flex-wrap gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              {timeSlots.map(s => {
+                const active = selectedSlots.includes(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleToggleSlot(s)}
+                    className={`px-3 py-1.5 rounded-lg border text-[10px] font-black tracking-wide transition-all ${
+                      active ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2048,6 +2091,7 @@ function EditBookingModal({
   const [status, setStatus] = useState<BookingStatus>(booking.status);
 
   const filteredWorkers = professionals.filter(p => p.category === category);
+  const selectedWorkerObj = professionals.find(p => p.id === workerId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2131,13 +2175,19 @@ function EditBookingModal({
               />
             </div>
             <div>
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Confirmed Time</label>
-              <input
-                type="time"
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Confirmed Time Slot</label>
+              <select
                 value={bookingTime}
                 onChange={(e) => setBookingTime(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
-              />
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 font-bold"
+              >
+                <option value="">Awaiting slot selection...</option>
+                {selectedWorkerObj?.availableTimes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -2273,11 +2323,23 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }
                 {worker.verified && <Shield size={14} className="text-primary fill-primary flex-shrink-0" />}
               </h3>
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">{worker.category}</p>
-              <div className="flex items-center gap-2 font-inter text-[10px] text-slate-400 font-bold">
+              <div className="flex items-center gap-2 font-inter text-[10px] text-slate-400 font-bold font-inter">
                 <span>Joined {worker.joined}</span>
                 <span>•</span>
                 <span>⭐ {worker.rating}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Availability schedule */}
+          <div className="space-y-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Availability Slots ({worker.availableTimes.length})</span>
+            <div className="flex flex-wrap gap-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              {worker.availableTimes.map((t, idx) => (
+                <span key={idx} className="px-2.5 py-1 bg-white border border-slate-150 rounded-lg text-[10px] font-black text-slate-600 font-mono">
+                  {t}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -2375,7 +2437,7 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }
         <div className="pt-6 border-t border-slate-100 mt-8">
           <a
             href={`tel:${worker.phone}`}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all"
+            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all animate-fadeIn"
           >
             <Phone size={14} /> Contact Worker ({worker.phone})
           </a>
@@ -2407,7 +2469,7 @@ function BookingDetailDrawer({
   onEditBooking
 }: BookingDetailDrawerProps) {
   const [showReassign, setShowReassign] = useState(false);
-  const [inputTime, setInputTime] = useState(booking.bookingTime || "");
+  const [selectedSlot, setSelectedSlot] = useState("");
 
   const worker = professionals.find(p => p.id === booking.workerId);
   const eligibleWorkers = professionals.filter(
@@ -2434,12 +2496,11 @@ function BookingDetailDrawer({
     onUpdateStatus(booking.id, e.target.value as BookingStatus);
   };
 
-  // Confirm Time negotiated with Worker
-  const handleSaveConfirmedTime = (e: React.FormEvent) => {
+  // Confirm worker using their predefined availability slots
+  const handleConfirmWorkerTime = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputTime) return;
-    
-    booking.bookingTime = inputTime; 
+    if (!selectedSlot) return;
+    booking.bookingTime = selectedSlot;
     onUpdateStatus(booking.id, "worker_confirmed");
   };
 
@@ -2476,7 +2537,7 @@ function BookingDetailDrawer({
 
           {/* Client Details Section */}
           <div className="space-y-3">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Client Information</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter font-bold">Client Information</span>
             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-2">
               <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{booking.clientName}</p>
               <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 font-inter">
@@ -2501,7 +2562,7 @@ function BookingDetailDrawer({
           {/* Selected Worker snapshot */}
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Selected Professional</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter font-bold">Selected Professional</span>
               <button
                 onClick={() => setShowReassign(!showReassign)}
                 className="text-[9px] font-black text-primary uppercase tracking-wider hover:underline cursor-pointer"
@@ -2545,7 +2606,7 @@ function BookingDetailDrawer({
                         {worker.name.split(" ").map(n => n[0]).join("")}
                       </div>
                       <div>
-                        <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
+                        <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 font-bold">
                           {worker.name}
                           {worker.verified && <Shield size={12} className="text-primary fill-primary" />}
                         </p>
@@ -2564,29 +2625,36 @@ function BookingDetailDrawer({
             )}
           </div>
 
-          {/* Interactive Confirmed Time Selection with Worker */}
-          {booking.status === "contacting_worker" && (
-            <form onSubmit={handleSaveConfirmedTime} className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-3">
+          {/* Select time from available slots during worker confirmation */}
+          {booking.status === "contacting_worker" && worker && (
+            <form onSubmit={handleConfirmWorkerTime} className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-3">
               <div className="flex items-center gap-2 text-primary">
                 <Clock size={16} />
-                <h4 className="text-xs font-black uppercase tracking-tight">Confirm Time Slot with Worker</h4>
+                <h4 className="text-xs font-black uppercase tracking-tight">Select Slot from Worker Availability</h4>
               </div>
               <p className="text-[10px] text-slate-500 font-bold font-inter leading-relaxed">
-                Contact the worker at <strong className="text-slate-700">{worker?.phone}</strong>, verify their slot for day <strong className="text-slate-700">{booking.bookingDate}</strong>, and enter the time slot:
+                Choose one of the slots that <strong className="text-slate-700">{worker.name}</strong> has available on <strong className="text-slate-700">{booking.bookingDate}</strong>:
               </p>
               <div className="flex gap-2">
-                <input
-                  type="time"
+                <select
                   required
-                  value={inputTime}
-                  onChange={(e) => setInputTime(e.target.value)}
+                  value={selectedSlot}
+                  onChange={(e) => setSelectedSlot(e.target.value)}
                   className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none text-slate-700 flex-1 focus:ring-2 focus:ring-primary/20"
-                />
+                >
+                  <option value="">Choose available time slot...</option>
+                  {worker.availableTimes.map(slot => (
+                    <option key={slot} value={slot}>
+                      {slot}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-primary text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-primary-600 transition-all cursor-pointer"
+                  disabled={!selectedSlot}
+                  className="px-4 py-2.5 bg-primary text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-primary-600 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  Save Time Slot
+                  Confirm Slot
                 </button>
               </div>
             </form>
@@ -2610,7 +2678,7 @@ function BookingDetailDrawer({
 
           {/* Timeline workflow */}
           <div className="space-y-4">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter">Workflow Timeline</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-inter font-bold">Workflow Timeline</span>
             
             <div className="space-y-4 pl-4 border-l border-slate-100 relative">
               {statusList.map((st, i) => {
@@ -2634,7 +2702,7 @@ function BookingDetailDrawer({
                         {st.label}
                       </p>
                       {isCurrent && (
-                        <p className="text-[9px] text-slate-400 font-bold font-inter">Active state</p>
+                        <p className="text-[9px] text-slate-400 font-bold font-inter font-inter">Active state</p>
                       )}
                     </div>
                   </div>
