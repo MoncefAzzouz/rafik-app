@@ -16,6 +16,8 @@ import {
   Settings,
   LogOut,
   TrendingUp,
+  MessageSquare,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -44,6 +46,9 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "categories", label: "Service Categories", icon: FolderKanban },
     { id: "professionals", label: "Professionals", icon: UserCheck },
     { id: "bookings", label: "Bookings", icon: CalendarCheck },
+    { id: "reviews", label: "Reviews", icon: MessageSquare },
+    { id: "clients", label: "Clients", icon: Users },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "earnings", label: "Earnings", icon: TrendingUp },
   ],
 };
