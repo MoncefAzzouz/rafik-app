@@ -2182,7 +2182,7 @@ function EditBookingModal({
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 font-bold"
               >
                 <option value="">Awaiting slot selection...</option>
-                {selectedWorkerObj?.availableTimes.map((t) => (
+                {(selectedWorkerObj?.availableTimes || []).map((t) => (
                   <option key={t} value={t}>
                     {t}
                   </option>
