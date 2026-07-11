@@ -2497,8 +2497,7 @@ function BookingDetailDrawer({
   };
 
   // Confirm worker using their predefined availability slots
-  const handleConfirmWorkerTime = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleConfirmWorkerTime = () => {
     if (!selectedSlot) return;
     booking.bookingTime = selectedSlot;
     onUpdateStatus(booking.id, "worker_confirmed");
@@ -2627,37 +2626,48 @@ function BookingDetailDrawer({
 
           {/* Select time from available slots during worker confirmation */}
           {booking.status === "contacting_worker" && worker && (
-            <form onSubmit={handleConfirmWorkerTime} className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-3">
+            <div className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-4">
               <div className="flex items-center gap-2 text-primary">
                 <Clock size={16} />
-                <h4 className="text-xs font-black uppercase tracking-tight">Select Slot from Worker Availability</h4>
+                <h4 className="text-xs font-black uppercase tracking-tight">Select Available Time Slot</h4>
               </div>
               <p className="text-[10px] text-slate-500 font-bold font-inter leading-relaxed">
-                Choose one of the slots that <strong className="text-slate-700">{worker.name}</strong> has available on <strong className="text-slate-700">{booking.bookingDate}</strong>:
+                Pick one of <strong className="text-slate-700">{worker.name}</strong>&apos;s available slots for <strong className="text-slate-700">{booking.bookingDate}</strong>. You must choose a time before confirming.
               </p>
-              <div className="flex gap-2">
-                <select
-                  required
-                  value={selectedSlot}
-                  onChange={(e) => setSelectedSlot(e.target.value)}
-                  className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none text-slate-700 flex-1 focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">Choose available time slot...</option>
-                  {worker.availableTimes.map(slot => (
-                    <option key={slot} value={slot}>
-                      {slot}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  disabled={!selectedSlot}
-                  className="px-4 py-2.5 bg-primary text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-primary-600 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Confirm Slot
-                </button>
+
+              {/* Clickable time slot buttons */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {worker.availableTimes.map(slot => (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => setSelectedSlot(slot)}
+                    className={`py-3 px-2 rounded-xl border text-sm font-black font-mono text-center transition-all cursor-pointer ${
+                      selectedSlot === slot
+                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-primary/30 hover:bg-primary/5"
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
               </div>
-            </form>
+
+              {/* Confirm button */}
+              {selectedSlot ? (
+                <button
+                  type="button"
+                  onClick={handleConfirmWorkerTime}
+                  className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-primary/20"
+                >
+                  <Check size={14} /> Confirm Worker at {selectedSlot}
+                </button>
+              ) : (
+                <div className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 border border-slate-200">
+                  <AlertCircle size={14} /> Select a time slot above to confirm
+                </div>
+              )}
+            </div>
           )}
 
           {/* Direct State Override */}
