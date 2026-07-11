@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Wrench, Users, DollarSign, CalendarCheck, TrendingUp, ArrowDownRight,
   MoreHorizontal, CheckCircle2, Clock, XCircle, Plus, Activity, Shield, UserCheck, Briefcase,
-  Phone, MapPin, Image as ImageIcon, Star, Check, AlertCircle, ExternalLink, X, ChevronRight
+  Phone, MapPin, Image as ImageIcon, Star, Check, AlertCircle, ExternalLink, X, ChevronRight, Edit2, Calendar
 } from "lucide-react";
 
 // ==========================================
@@ -35,6 +35,18 @@ export interface Professional {
   reviews: Review[];
 }
 
+export type BookingStatus =
+  | "pending_review"
+  | "contacting_worker"
+  | "worker_confirmed"
+  | "contacting_client"
+  | "client_confirmed"
+  | "both_confirmed"
+  | "dispatched"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
 export interface Booking {
   id: string;
   clientName: string;
@@ -42,20 +54,12 @@ export interface Booking {
   clientAddress: string;
   serviceCategory: string;
   workerId: string; // references Professional.id
-  status:
-    | "pending_review"
-    | "contacting_worker"
-    | "worker_confirmed"
-    | "contacting_client"
-    | "client_confirmed"
-    | "both_confirmed"
-    | "dispatched"
-    | "in_progress"
-    | "completed"
-    | "cancelled";
+  status: BookingStatus;
   price: string;
   description: string;
-  time: string;
+  time: string; // creation relative time, e.g. "2 hours ago"
+  bookingDate: string; // Day chosen by client
+  bookingTime?: string; // Time confirmed with worker
   statusHistory: { status: string; timestamp: string }[];
 }
 
@@ -222,6 +226,8 @@ const INITIAL_BOOKINGS: Booking[] = [
     price: "4,000 DZD",
     description: "Bathroom water pipe leak repair. Water is dripping continuously from the main sink joint.",
     time: "1 hour ago",
+    bookingDate: "2026-07-12",
+    bookingTime: "10:30",
     statusHistory: [
       { status: "pending_review", timestamp: "3 hours ago" },
       { status: "contacting_worker", timestamp: "2.5 hours ago" },
@@ -244,6 +250,8 @@ const INITIAL_BOOKINGS: Booking[] = [
     price: "3,600 DZD",
     description: "Installation of 3 new ceiling lights and testing the kitchen stove power socket.",
     time: "2 hours ago",
+    bookingDate: "2026-07-11",
+    bookingTime: "14:00",
     statusHistory: [
       { status: "pending_review", timestamp: "5 hours ago" },
       { status: "both_confirmed", timestamp: "4 hours ago" },
@@ -262,6 +270,7 @@ const INITIAL_BOOKINGS: Booking[] = [
     price: "9,000 DZD",
     description: "Living room accent wall painting. Selected paint type is matte off-white.",
     time: "3 hours ago",
+    bookingDate: "2026-07-15",
     statusHistory: [
       { status: "pending_review", timestamp: "3 hours ago" }
     ]
@@ -277,6 +286,8 @@ const INITIAL_BOOKINGS: Booking[] = [
     price: "5,000 DZD",
     description: "AC is turning on but blowing warm air. Gas leakage verification and refill needed.",
     time: "4 hours ago",
+    bookingDate: "2026-07-13",
+    bookingTime: "09:30",
     statusHistory: [
       { status: "pending_review", timestamp: "6 hours ago" },
       { status: "contacting_worker", timestamp: "5.5 hours ago" },
@@ -299,7 +310,7 @@ const SERVICE_CATEGORIES = [
   { name: "Mover", pros: 28, bookings: 116, icon: "📦" }
 ];
 
-const STATUS_DETAILS: Record<string, { label: string; color: string; bg: string }> = {
+const STATUS_DETAILS: Record<BookingStatus, { label: string; color: string; bg: string }> = {
   pending_review: { label: "Pending Review", color: "text-amber-700 border-amber-200", bg: "bg-amber-500" },
   contacting_worker: { label: "Contacting Worker", color: "text-blue-700 border-blue-200", bg: "bg-blue-400" },
   worker_confirmed: { label: "Worker Confirmed", color: "text-indigo-700 border-indigo-200", bg: "bg-indigo-500" },
@@ -336,6 +347,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   
   // Modal states
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
 
   // Sync state detail panels if the collection lists change
@@ -358,9 +370,8 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     setTimeout(() => setToast(null), 4000);
   };
 
-  // 1. Simulate client order
+  // 1. Simulate client order (selects a Day, but not a confirmed Time)
   const handleSimulateOrder = () => {
-    // Pick random category and random worker from that category
     const randCategoryObj = categories[Math.floor(Math.random() * categories.length)];
     const eligibleWorkers = professionals.filter(p => p.category === randCategoryObj.name);
     
@@ -383,6 +394,11 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     const priceRange = ["3,000 DZD", "4,500 DZD", "7,000 DZD", "2,200 DZD"];
     const price = priceRange[Math.floor(Math.random() * priceRange.length)];
 
+    // Generate random date within next 7 days
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + Math.floor(Math.random() * 7 + 1));
+    const bookingDate = nextDate.toISOString().split("T")[0];
+
     const newBooking: Booking = {
       id: `SV-${Math.floor(Math.random() * 9000 + 1000)}`,
       clientName,
@@ -394,17 +410,17 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       price,
       description,
       time: "Just now",
+      bookingDate,
       statusHistory: [{ status: "pending_review", timestamp: "Just now" }]
     };
 
     setBookings([newBooking, ...bookings]);
     
-    // Update stats count locally
     setCategories(prev =>
       prev.map(c => (c.name === randCategoryObj.name ? { ...c, bookings: c.bookings + 1 } : c))
     );
 
-    showToast(`⚡ New order ${newBooking.id} received! Client ${clientName} selected ${worker.name}.`, "info");
+    showToast(`⚡ New simulated order ${newBooking.id} created! Client selected worker ${worker.name} for ${bookingDate}.`, "info");
   };
 
   // 2. Add custom manual booking
@@ -416,6 +432,8 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     workerId: string;
     description: string;
     price: string;
+    bookingDate: string;
+    bookingTime?: string;
   }) => {
     const newBooking: Booking = {
       id: `SV-${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -428,12 +446,13 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       price: fields.price || "Contact for Quote",
       description: fields.description,
       time: "Just now",
+      bookingDate: fields.bookingDate,
+      bookingTime: fields.bookingTime || undefined,
       statusHistory: [{ status: "pending_review", timestamp: "Just now" }]
     };
 
     setBookings([newBooking, ...bookings]);
     
-    // Update count
     setCategories(prev =>
       prev.map(c => (c.name === fields.category ? { ...c, bookings: c.bookings + 1 } : c))
     );
@@ -442,7 +461,29 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`📝 Booking ${newBooking.id} registered manually!`, "success");
   };
 
-  // 3. Update Booking Status
+  // 3. Edit existing booking details (from the Edit modal)
+  const handleEditBooking = (id: string, updatedFields: Partial<Booking>) => {
+    setBookings(prev =>
+      prev.map(b => {
+        if (b.id === id) {
+          const statusHistory = [...b.statusHistory];
+          if (updatedFields.status && updatedFields.status !== b.status) {
+            statusHistory.push({ status: updatedFields.status, timestamp: "Just now" });
+          }
+          return {
+            ...b,
+            ...updatedFields,
+            statusHistory
+          };
+        }
+        return b;
+      })
+    );
+    setEditingBooking(null);
+    showToast(`Booking ${id} updated successfully!`, "success");
+  };
+
+  // 4. Update Booking Status (direct inline transitions)
   const handleUpdateBookingStatus = (bookingId: string, nextStatus: Booking["status"]) => {
     const timeStr = "Just now";
     setBookings(prev =>
@@ -460,7 +501,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`Booking ${bookingId} transitioned to ${STATUS_DETAILS[nextStatus].label}`, "success");
   };
 
-  // 4. Reassign worker
+  // 5. Reassign worker
   const handleReassignWorker = (bookingId: string, workerId: string) => {
     const worker = professionals.find(p => p.id === workerId);
     if (!worker) return;
@@ -470,7 +511,6 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           return {
             ...b,
             workerId,
-            // Reassigning resets states back to pending review for fresh verification
             status: "pending_review",
             statusHistory: [...b.statusHistory, { status: `Worker changed to ${worker.name}`, timestamp: "Just now" }]
           };
@@ -481,7 +521,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     showToast(`Assigned worker updated to ${worker.name}`, "success");
   };
 
-  // 5. Verify / Unverify Professional
+  // 6. Verify / Unverify Professional
   const handleToggleVerifyWorker = (workerId: string) => {
     setProfessionals(prev =>
       prev.map(p => {
@@ -495,7 +535,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     );
   };
 
-  // 6. Change worker active status
+  // 7. Change worker active status
   const handleChangeWorkerStatus = (workerId: string, nextStatus: Professional["status"]) => {
     setProfessionals(prev =>
       prev.map(p => {
@@ -557,6 +597,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           bookings={bookings}
           professionals={professionals}
           onSelectBooking={setSelectedBooking}
+          onEditBooking={setEditingBooking}
         />
       );
     }
@@ -612,6 +653,16 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         />
       )}
 
+      {editingBooking && (
+        <EditBookingModal
+          booking={editingBooking}
+          professionals={professionals}
+          categories={categories}
+          onClose={() => setEditingBooking(null)}
+          onSubmit={handleEditBooking}
+        />
+      )}
+
       {selectedWorker && (
         <WorkerProfileDrawer
           worker={selectedWorker}
@@ -628,6 +679,10 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onClose={() => setSelectedBooking(null)}
           onUpdateStatus={handleUpdateBookingStatus}
           onReassignWorker={handleReassignWorker}
+          onEditBooking={(b) => {
+            setSelectedBooking(null);
+            setEditingBooking(b);
+          }}
         />
       )}
     </div>
@@ -746,9 +801,9 @@ function DashboardOverview({
                 <th>ID</th>
                 <th>Client</th>
                 <th>Selected Worker</th>
-                <th>Service Type</th>
+                <th>Scheduled Day</th>
+                <th>Confirmed Time</th>
                 <th>Price/Rate</th>
-                <th>Time</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -762,13 +817,9 @@ function DashboardOverview({
                     <td className="font-mono font-black text-primary">{b.id}</td>
                     <td className="font-black text-slate-800">{b.clientName}</td>
                     <td className="font-semibold">{worker ? worker.name : "Unassigned"}</td>
-                    <td>
-                      <span className="flex items-center gap-1.5 font-inter text-xs">
-                        <Wrench size={12} className="text-slate-400" /> {b.serviceCategory}
-                      </span>
-                    </td>
+                    <td className="font-semibold text-slate-700">{b.bookingDate}</td>
+                    <td className="font-mono font-bold text-primary">{b.bookingTime || "Awaiting Conf."}</td>
                     <td className="font-mono font-black text-slate-800">{b.price}</td>
-                    <td className="text-[10px] font-bold text-slate-400 font-inter">{b.time}</td>
                     <td>
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${st.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${st.bg}`} />
@@ -941,8 +992,6 @@ function ProfessionalsPage({
   onToggleVerify,
   onChangeStatus
 }: ProfessionalsPageProps) {
-  const statusColors: Record<string, string> = { online: "bg-emerald-500", busy: "bg-amber-500", offline: "bg-slate-300" };
-
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
       <div className="space-y-2">
@@ -1035,9 +1084,10 @@ interface BookingsPageProps {
   bookings: Booking[];
   professionals: Professional[];
   onSelectBooking: (b: Booking) => void;
+  onEditBooking: (b: Booking) => void;
 }
 
-function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPageProps) {
+function BookingsPage({ bookings, professionals, onSelectBooking, onEditBooking }: BookingsPageProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
 
   const filtered = bookings.filter(b => {
@@ -1051,10 +1101,9 @@ function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPage
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Bookings Pipeline</h1>
-          <p className="text-sm text-slate-400 font-medium font-inter">Manage customer orders and workflow validation states</p>
+          <p className="text-sm text-slate-400 font-medium font-inter">Manage customer orders, schedule days, and verified time slots</p>
         </div>
         
-        {/* State filters */}
         <div className="flex gap-2 overflow-x-auto pb-1 select-none">
           {[
             { id: "all", label: "All" },
@@ -1085,11 +1134,12 @@ function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPage
               <tr>
                 <th>ID</th>
                 <th>Client Name</th>
-                <th>Requested Worker</th>
-                <th>Specialty</th>
+                <th>Worker Assigned</th>
+                <th>Category</th>
+                <th>Scheduled Day</th>
+                <th>Confirmed Time</th>
                 <th>Price/Rate</th>
                 <th>Status</th>
-                <th>Created</th>
                 <th></th>
               </tr>
             </thead>
@@ -1103,6 +1153,8 @@ function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPage
                     <td className="font-black text-slate-800">{b.clientName}</td>
                     <td>{worker ? worker.name : "Unassigned"}</td>
                     <td>{b.serviceCategory}</td>
+                    <td className="font-bold text-slate-600">{b.bookingDate}</td>
+                    <td className="font-mono font-black text-primary">{b.bookingTime || "Awaiting Conf."}</td>
                     <td className="font-mono font-black text-slate-800">{b.price}</td>
                     <td>
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${st.color}`}>
@@ -1110,13 +1162,19 @@ function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPage
                         {st.label}
                       </span>
                     </td>
-                    <td className="text-[10px] font-bold text-slate-400 font-inter">{b.time}</td>
-                    <td>
+                    <td className="flex gap-2">
                       <button
                         onClick={() => onSelectBooking(b)}
                         className="px-3 py-1.5 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-primary/5 hover:text-primary transition-all cursor-pointer"
                       >
-                        Manage Pipeline
+                        Details
+                      </button>
+                      <button
+                        onClick={() => onEditBooking(b)}
+                        className="p-2 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl hover:bg-primary/5 hover:text-primary transition-all cursor-pointer"
+                        title="Edit Command"
+                      >
+                        <Edit2 size={12} />
                       </button>
                     </td>
                   </tr>
@@ -1131,45 +1189,7 @@ function BookingsPage({ bookings, professionals, onSelectBooking }: BookingsPage
 }
 
 // ==========================================
-// EARNINGS VIEW
-// ==========================================
-
-function EarningsPage() {
-  const data = [
-    { period: "Today", revenue: "72,600", count: 64, unit: "bookings", avg: "1,134 DZD" },
-    { period: "This Week", revenue: "508,200", count: 448, unit: "bookings", avg: "1,134 DZD" },
-    { period: "This Month", revenue: "2,174,800", count: 1918, unit: "bookings", avg: "1,134 DZD" }
-  ];
-  return (
-    <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Earnings</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Service provider revenue and financial analytics</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {data.map((e, i) => (
-          <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm group transition-all hover:-translate-y-1">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{e.period}</span>
-            <span className="text-2xl font-black text-slate-800 tracking-tight block mt-2">{e.revenue} <span className="text-xs font-bold text-slate-400">DZD</span></span>
-            <div className="flex gap-4 mt-3 text-[10px] text-slate-400 font-bold font-inter"><span>{e.count} {e.unit}</span><span>Avg: {e.avg}</span></div>
-            <div className="w-full h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden mt-4"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${30 + i * 25}%`, background: "var(--primary)" }} /></div>
-          </div>
-        ))}
-      </div>
-      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
-        <h2 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6">Revenue Trend</h2>
-        <div className="flex items-end gap-2 h-40">
-          {[32, 48, 35, 58, 45, 72, 55, 42, 78, 62, 50, 82, 68, 58].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t-lg transition-all duration-300" style={{ height: `${h}%`, background: "var(--primary)", opacity: 0.3 + (h / 130) }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// MODAL: REGISTER BOOKING
+// MODAL: REGISTER NEW BOOKING
 // ==========================================
 
 interface RegisterBookingModalProps {
@@ -1187,8 +1207,10 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
   const [workerId, setWorkerId] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("");
 
-  const filteredWorkers = professionals.filter(p => p.category === category && p.status === "online");
+  const filteredWorkers = professionals.filter(p => p.category === category);
 
   useEffect(() => {
     if (filteredWorkers.length > 0) {
@@ -1196,12 +1218,12 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
     } else {
       setWorkerId("");
     }
-  }, [category, professionals]);
+  }, [category]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName || !clientPhone || !clientAddress || !workerId || !description) {
-      alert("Please fill in all required fields and select an online worker.");
+    if (!clientName || !clientPhone || !clientAddress || !workerId || !description || !bookingDate) {
+      alert("Please fill in all required fields.");
       return;
     }
     onSubmit({
@@ -1211,13 +1233,15 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
       category,
       workerId,
       description,
-      price
+      price,
+      bookingDate,
+      bookingTime: bookingTime || undefined
     });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto space-y-6 relative m-4">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-6 relative m-4">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
@@ -1227,7 +1251,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
 
         <div className="space-y-1 text-left">
           <h2 className="text-xl font-black text-slate-800 uppercase">Register Booking</h2>
-          <p className="text-xs text-slate-400 font-bold font-inter">Create a manual request and assign a professional</p>
+          <p className="text-xs text-slate-400 font-bold font-inter font-inter">Create a manual request with schedule inputs</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
@@ -1256,13 +1280,35 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
               />
             </div>
             <div>
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Estimated Price (DZD)</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Price (DZD)</label>
               <input
                 type="text"
                 placeholder="e.g. 3,500 DZD"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Scheduled Day *</label>
+              <input
+                type="date"
+                required
+                value={bookingDate}
+                onChange={(e) => setBookingDate(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Confirmed Time (Optional)</label>
+              <input
+                type="time"
+                value={bookingTime}
+                onChange={(e) => setBookingTime(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
               />
             </div>
           </div>
@@ -1295,7 +1341,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Select Worker (Online Only) *</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Assign Worker *</label>
               <select
                 value={workerId}
                 required
@@ -1303,7 +1349,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
                 className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
               >
                 {filteredWorkers.length === 0 ? (
-                  <option value="">No online workers</option>
+                  <option value="">No workers available</option>
                 ) : (
                   filteredWorkers.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -1331,7 +1377,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center"
+              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center text-slate-500"
             >
               Cancel
             </button>
@@ -1340,6 +1386,220 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
               className="flex-1 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-primary/95 transition-all shadow-lg shadow-primary/20 active:scale-[0.98] cursor-pointer"
             >
               Save Booking
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MODAL: EDIT BOOKING / COMMAND DETAILS
+// ==========================================
+
+interface EditBookingModalProps {
+  booking: Booking;
+  professionals: Professional[];
+  categories: any[];
+  onClose: () => void;
+  onSubmit: (id: string, updatedFields: Partial<Booking>) => void;
+}
+
+function EditBookingModal({
+  booking,
+  professionals,
+  categories,
+  onClose,
+  onSubmit
+}: EditBookingModalProps) {
+  const [clientName, setClientName] = useState(booking.clientName);
+  const [clientPhone, setClientPhone] = useState(booking.clientPhone);
+  const [clientAddress, setClientAddress] = useState(booking.clientAddress);
+  const [category, setCategory] = useState(booking.serviceCategory);
+  const [workerId, setWorkerId] = useState(booking.workerId);
+  const [description, setDescription] = useState(booking.description);
+  const [price, setPrice] = useState(booking.price);
+  const [bookingDate, setBookingDate] = useState(booking.bookingDate);
+  const [bookingTime, setBookingTime] = useState(booking.bookingTime || "");
+  const [status, setStatus] = useState<BookingStatus>(booking.status);
+
+  const filteredWorkers = professionals.filter(p => p.category === category);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(booking.id, {
+      clientName,
+      clientPhone,
+      clientAddress,
+      serviceCategory: category,
+      workerId,
+      description,
+      price,
+      bookingDate,
+      bookingTime: bookingTime || undefined,
+      status
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-6 relative m-4">
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="space-y-1 text-left">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-black text-slate-800 uppercase">Edit Command</h2>
+            <span className="font-mono text-xs font-black text-primary px-2 py-0.5 bg-primary/5 rounded-md">
+              {booking.id}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 font-bold font-inter">Modify details or change status directly</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Full Name</label>
+            <input
+              type="text"
+              required
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Phone</label>
+              <input
+                type="text"
+                required
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Price (DZD)</label>
+              <input
+                type="text"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Scheduled Day</label>
+              <input
+                type="date"
+                required
+                value={bookingDate}
+                onChange={(e) => setBookingDate(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Confirmed Time</label>
+              <input
+                type="time"
+                value={bookingTime}
+                onChange={(e) => setBookingTime(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Address</label>
+            <input
+              type="text"
+              required
+              value={clientAddress}
+              onChange={(e) => setClientAddress(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Service Specialty</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.icon} {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Assign Worker</label>
+              <select
+                value={workerId}
+                required
+                onChange={(e) => setWorkerId(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                {filteredWorkers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name} ({w.rate})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Status Override</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as BookingStatus)}
+              className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 text-primary font-black uppercase tracking-wider"
+            >
+              {Object.keys(STATUS_DETAILS).map((k) => (
+                <option key={k} value={k}>
+                  {STATUS_DETAILS[k as BookingStatus].label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Job Description</label>
+            <textarea
+              required
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700 resize-none"
+            />
+          </div>
+
+          <div className="pt-4 flex gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 border border-slate-200 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer text-center text-slate-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+            >
+              Apply Updates
             </button>
           </div>
         </form>
@@ -1422,7 +1682,7 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }
                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                 }`}
               >
-                {worker.verified ? "Verified ✓" : "Unverified ✗"}
+                {worker.verified ? "Verified ✓" : "Verify account"}
               </button>
             </div>
           </div>
@@ -1503,7 +1763,7 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }
 }
 
 // ==========================================
-// DRAWER: BOOKING PIPELINE DETAIL & WORKER REASSIGN
+// DRAWER: BOOKING DETAILS PIPELINE CONTROL
 // ==========================================
 
 interface BookingDetailDrawerProps {
@@ -1512,6 +1772,7 @@ interface BookingDetailDrawerProps {
   onClose: () => void;
   onUpdateStatus: (id: string, s: Booking["status"]) => void;
   onReassignWorker: (id: string, wId: string) => void;
+  onEditBooking: (b: Booking) => void;
 }
 
 function BookingDetailDrawer({
@@ -1519,21 +1780,24 @@ function BookingDetailDrawer({
   professionals,
   onClose,
   onUpdateStatus,
-  onReassignWorker
+  onReassignWorker,
+  onEditBooking
 }: BookingDetailDrawerProps) {
   const [showReassign, setShowReassign] = useState(false);
+  const [inputTime, setInputTime] = useState(booking.bookingTime || "");
+
   const worker = professionals.find(p => p.id === booking.workerId);
   const eligibleWorkers = professionals.filter(
     p => p.category === booking.serviceCategory && p.id !== booking.workerId
   );
 
-  const statusList: { id: Booking["status"]; label: string; action: string }[] = [
-    { id: "pending_review", label: "Pending Review", action: "Reset to Pending" },
-    { id: "contacting_worker", label: "Contacting Worker", action: "Call Worker" },
+  const statusList: { id: BookingStatus; label: string; action: string }[] = [
+    { id: "pending_review", label: "Pending Review", action: "Review Booking" },
+    { id: "contacting_worker", label: "Contacting Worker", action: "Contact Worker" },
     { id: "worker_confirmed", label: "Worker Confirmed", action: "Confirm Worker" },
-    { id: "contacting_client", label: "Contacting Client", action: "Call Client" },
+    { id: "contacting_client", label: "Contacting Client", action: "Contact Client" },
     { id: "client_confirmed", label: "Client Confirmed", action: "Confirm Client" },
-    { id: "both_confirmed", label: "Both Confirmed", action: "Mark Confirmed" },
+    { id: "both_confirmed", label: "Both Confirmed", action: "Double Confirm" },
     { id: "dispatched", label: "Dispatched", action: "Dispatch Worker" },
     { id: "in_progress", label: "In Progress", action: "Start Job" },
     { id: "completed", label: "Completed", action: "Complete Job" }
@@ -1541,6 +1805,21 @@ function BookingDetailDrawer({
 
   const currentIdx = statusList.findIndex(s => s.id === booking.status);
   const nextStateObj = currentIdx < statusList.length - 1 ? statusList[currentIdx + 1] : null;
+
+  // Direct status override dropdown change
+  const handleDirectStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onUpdateStatus(booking.id, e.target.value as BookingStatus);
+  };
+
+  // Confirm Time negotiated with Worker
+  const handleSaveConfirmedTime = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputTime) return;
+    
+    // Automatically transition to worker_confirmed when confirmed time with worker is selected!
+    booking.bookingTime = inputTime; 
+    onUpdateStatus(booking.id, "worker_confirmed");
+  };
 
   return (
     <>
@@ -1551,17 +1830,26 @@ function BookingDetailDrawer({
           {/* Header */}
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order Details</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-inter">Order Details</span>
               <span className="font-mono text-xs font-black text-primary px-2 py-0.5 bg-primary/5 rounded-md">
                 {booking.id}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onEditBooking(booking)}
+                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-600 hover:text-slate-800 cursor-pointer"
+                title="Edit details"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                onClick={onClose}
+                className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* Client Details Section */}
@@ -1575,7 +1863,11 @@ function BookingDetailDrawer({
               <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 font-inter">
                 <MapPin size={12} /> {booking.clientAddress}
               </p>
-              <div className="border-t border-slate-100 pt-2.5 mt-2.5">
+              <div className="border-t border-slate-100 pt-2.5 mt-2.5 space-y-1.5">
+                <div className="flex gap-4 text-xs font-bold font-inter text-slate-500">
+                  <span className="flex items-center gap-1"><Calendar size={12} className="text-slate-400" /> Day: <strong className="text-slate-700">{booking.bookingDate}</strong></span>
+                  <span className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> Time: <strong className="text-primary">{booking.bookingTime || "Awaiting Conf."}</strong></span>
+                </div>
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Issue Description</p>
                 <p className="text-xs text-slate-600 font-bold leading-normal font-inter bg-white p-3 rounded-xl border border-slate-50">
                   {booking.description}
@@ -1587,7 +1879,7 @@ function BookingDetailDrawer({
           {/* Selected Worker snapshot */}
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Assigned Professional</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Selected Professional</span>
               <button
                 onClick={() => setShowReassign(!showReassign)}
                 className="text-[9px] font-black text-primary uppercase tracking-wider hover:underline cursor-pointer"
@@ -1598,11 +1890,11 @@ function BookingDetailDrawer({
 
             {showReassign ? (
               <div className="bg-primary/5 border border-primary/10 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-black uppercase text-primary">Select New {booking.serviceCategory} Worker</p>
+                <p className="text-xs font-black uppercase text-primary">Reassign {booking.serviceCategory} Professional</p>
                 {eligibleWorkers.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 font-bold font-inter">No other workers available in this category.</p>
+                  <p className="text-[10px] text-slate-400 font-bold font-inter font-inter">No other workers available in this category.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {eligibleWorkers.map(w => (
                       <div
                         key={w.id}
@@ -1614,9 +1906,9 @@ function BookingDetailDrawer({
                       >
                         <div>
                           <p className="text-xs font-black text-slate-800">{w.name}</p>
-                          <p className="text-[9px] text-slate-400 font-bold font-inter">⭐ {w.rating} · {w.rate}</p>
+                          <p className="text-[9px] text-slate-400 font-bold font-inter font-inter">⭐ {w.rating} · {w.rate}</p>
                         </div>
-                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Select</span>
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">Assign</span>
                       </div>
                     ))}
                   </div>
@@ -1650,6 +1942,50 @@ function BookingDetailDrawer({
             )}
           </div>
 
+          {/* Interactive Confirmed Time Selection with Worker */}
+          {booking.status === "contacting_worker" && (
+            <form onSubmit={handleSaveConfirmedTime} className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-3">
+              <div className="flex items-center gap-2 text-primary">
+                <Clock size={16} />
+                <h4 className="text-xs font-black uppercase tracking-tight">Confirm Time Slot with Worker</h4>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold font-inter leading-relaxed">
+                Contact the worker at <strong className="text-slate-700">{worker?.phone}</strong>, verify their slot for day <strong className="text-slate-700">{booking.bookingDate}</strong>, and enter the time slot:
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  required
+                  value={inputTime}
+                  onChange={(e) => setInputTime(e.target.value)}
+                  className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none text-slate-700 flex-1 focus:ring-2 focus:ring-primary/20"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-primary text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-primary-600 transition-all cursor-pointer"
+                >
+                  Save Time Slot
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Direct State Override */}
+          <div className="space-y-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Direct State Override</label>
+            <select
+              value={booking.status}
+              onChange={handleDirectStatusChange}
+              className="w-full mt-1 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase outline-none text-primary font-black"
+            >
+              {Object.keys(STATUS_DETAILS).map((k) => (
+                <option key={k} value={k}>
+                  {STATUS_DETAILS[k as BookingStatus].label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Timeline workflow */}
           <div className="space-y-4">
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Workflow Timeline</span>
@@ -1661,7 +1997,6 @@ function BookingDetailDrawer({
 
                 return (
                   <div key={st.id} className="relative flex items-start gap-4">
-                    {/* Bullet dot */}
                     <div
                       className={`absolute -left-6 w-3 h-3 rounded-full border-2 transition-all mt-1 ${
                         isCurrent
@@ -1689,7 +2024,27 @@ function BookingDetailDrawer({
 
         {/* Action button transitions */}
         <div className="pt-6 border-t border-slate-100 mt-8 flex flex-col gap-3">
-          {booking.status !== "completed" && booking.status !== "cancelled" && nextStateObj && (
+          {/* Client Confirmation Flow Trigger */}
+          {booking.status === "worker_confirmed" && (
+            <button
+              onClick={() => onUpdateStatus(booking.id, "client_confirmed")}
+              className="w-full py-4 bg-violet-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-violet-700 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-violet-100"
+            >
+              <Check size={14} /> Send Time Slot & Call Client ({booking.bookingTime})
+            </button>
+          )}
+
+          {booking.status === "client_confirmed" && (
+            <button
+              onClick={() => onUpdateStatus(booking.id, "both_confirmed")}
+              className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-emerald-600 active:scale-[0.98] transition-all cursor-pointer shadow-lg"
+            >
+              <CheckCircle2 size={14} /> Client Confirmed - Mark Both Confirmed
+            </button>
+          )}
+
+          {/* Standard status progression button */}
+          {booking.status !== "completed" && booking.status !== "cancelled" && nextStateObj && booking.status !== "contacting_worker" && booking.status !== "worker_confirmed" && booking.status !== "client_confirmed" && (
             <button
               onClick={() => onUpdateStatus(booking.id, nextStateObj.id)}
               className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-primary-600 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-primary/10"
@@ -1721,5 +2076,39 @@ function BookingDetailDrawer({
         </div>
       </div>
     </>
+  );
+}
+
+function EarningsPage() {
+  const data = [
+    { period: "Today", revenue: "72,600", count: 64, unit: "bookings", avg: "1,134 DZD" },
+    { period: "This Week", revenue: "508,200", count: 448, unit: "bookings", avg: "1,134 DZD" },
+    { period: "This Month", revenue: "2,174,800", count: 1918, unit: "bookings", avg: "1,134 DZD" }
+  ];
+  return (
+    <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Earnings</h1>
+        <p className="text-sm text-slate-400 font-medium font-inter">Service provider revenue and financial analytics</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {data.map((e, i) => (
+          <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm group transition-all hover:-translate-y-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">{e.period}</span>
+            <span className="text-2xl font-black text-slate-800 tracking-tight block mt-2">{e.revenue} <span className="text-xs font-bold text-slate-400">DZD</span></span>
+            <div className="flex gap-4 mt-3 text-[10px] text-slate-400 font-bold font-inter"><span>{e.count} {e.unit}</span><span>Avg: {e.avg}</span></div>
+            <div className="w-full h-2 bg-slate-50 border border-slate-100 rounded-full overflow-hidden mt-4"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${30 + i * 25}%`, background: "var(--primary)" }} /></div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
+        <h2 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6">Revenue Trend</h2>
+        <div className="flex items-end gap-2 h-40">
+          {[32, 48, 35, 58, 45, 72, 55, 42, 78, 62, 50, 82, 68, 58].map((h, i) => (
+            <div key={i} className="flex-1 rounded-t-lg transition-all duration-300" style={{ height: `${h}%`, background: "var(--primary)", opacity: 0.3 + (h / 130) }} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
