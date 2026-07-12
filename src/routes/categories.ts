@@ -38,7 +38,7 @@ router.post('/', authenticateToken, requireRole('ADMIN'), upload.single('image')
     res.status(400).json({ error: 'Category name is required' });
     return;
   }
-  const imagePath = file ? `/uploads/categories/${file.filename}` : '/uploads/categories/default.png';
+  const imagePath = file ? `/uploads/categories/${file.filename}` : (req.body.image || '/uploads/categories/default.png');
   try {
     const category = await prisma.category.create({
       data: { name, image: imagePath },
@@ -69,10 +69,10 @@ router.put('/:id', authenticateToken, requireRole('ADMIN'), upload.single('image
 
     const oldName = existing.name;
     const newName = name || existing.name;
-    const newImage = file ? `/uploads/categories/${file.filename}` : existing.image;
+    const newImage = file ? `/uploads/categories/${file.filename}` : (req.body.image || existing.image);
 
-    // Delete old image if a new image is uploaded and it's not the default image
-    if (file && existing.image && !existing.image.endsWith('default.png')) {
+    // Delete old image if a new image is set and it's not the default image
+    if (newImage !== existing.image && existing.image && !existing.image.endsWith('default.png')) {
       const oldPath = path.join(__dirname, '../../', existing.image);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
