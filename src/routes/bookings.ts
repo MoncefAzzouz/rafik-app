@@ -188,6 +188,22 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
 router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   try {
+    const booking = await prisma.booking.findUnique({ where: { id } });
+    if (!booking) {
+      res.status(404).json({ error: 'Booking not found' });
+      return;
+    }
+
+    // Delete booking photos from filesystem
+    if (booking.clientPhotos && booking.clientPhotos.length > 0) {
+      for (const imgPath of booking.clientPhotos) {
+        const fullPath = path.join(__dirname, '../../', imgPath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+    }
+
     await prisma.statusHistory.deleteMany({ where: { bookingId: id } });
     await prisma.booking.delete({ where: { id } });
     res.json({ success: true });

@@ -71,6 +71,14 @@ router.put('/:id', authenticateToken, requireRole('ADMIN'), upload.single('image
     const newName = name || existing.name;
     const newImage = file ? `/uploads/categories/${file.filename}` : existing.image;
 
+    // Delete old image if a new image is uploaded and it's not the default image
+    if (file && existing.image && !existing.image.endsWith('default.png')) {
+      const oldPath = path.join(__dirname, '../../', existing.image);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
     const updated = await prisma.category.update({
       where: { id },
       data: { name: newName, image: newImage },
@@ -103,6 +111,20 @@ router.put('/:id', authenticateToken, requireRole('ADMIN'), upload.single('image
 router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   try {
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+
+    // Delete category image file if it is not default
+    if (existing.image && !existing.image.endsWith('default.png')) {
+      const fullPath = path.join(__dirname, '../../', existing.image);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    }
+
     await prisma.category.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {

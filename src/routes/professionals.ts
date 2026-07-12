@@ -206,14 +206,35 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
       res.status(404).json({ error: 'Professional not found' });
       return;
     }
+
     // Delete related reviews first
     await prisma.review.deleteMany({ where: { professionalId: id } });
-    // Delete professional
+
+    // Delete professional portfolio images from filesystem
+    if (pro.portfolio && pro.portfolio.length > 0) {
+      for (const imgPath of pro.portfolio) {
+        const fullPath = path.join(__dirname, '../../', imgPath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+    }
+
+    // Delete professional record
     await prisma.professional.delete({ where: { id } });
-    // Delete linked user if exists
+
+    // Delete linked user and their profileImage if they exist
     if (pro.userId) {
+      const user = await prisma.user.findUnique({ where: { id: pro.userId } });
+      if (user && user.profileImage && !user.profileImage.endsWith('default.png')) {
+        const fullPath = path.join(__dirname, '../../', user.profileImage);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
       await prisma.user.delete({ where: { id: pro.userId } }).catch(() => {});
     }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
