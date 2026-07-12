@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import {
   Wrench, Users, DollarSign, CalendarCheck, TrendingUp, ArrowDownRight,
   MoreHorizontal, CheckCircle2, Clock, XCircle, Plus, Activity, Shield, UserCheck, Briefcase,
   Phone, MapPin, Image as ImageIcon, Star, Check, AlertCircle, ExternalLink, X, ChevronRight, Edit2, Calendar,
-  MessageSquare, BarChart3, UserCircle, Camera, Trash2, ThumbsUp, ThumbsDown, Filter, Search
+  MessageSquare, BarChart3, UserCircle, Camera, Trash2, ThumbsUp, ThumbsDown, Filter, Search, Code, Copy
 } from "lucide-react";
 
 // ==========================================
@@ -393,10 +394,16 @@ interface ServicesDashboardProps {
 }
 
 export default function ServicesDashboard({ activePage }: ServicesDashboardProps) {
-  // Top level state
-  const [professionals, setProfessionals] = useState<Professional[]>(INITIAL_PROFESSIONALS);
-  const [bookings, setBookings] = useState<Booking[]>(INITIAL_BOOKINGS);
-  const [categories, setCategories] = useState(SERVICE_CATEGORIES);
+  const { token } = useAuth();
+
+  // Top level state linked to PostgreSQL
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+
+  // JSON viewer states
+  const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Filter & Detail states
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -410,6 +417,31 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [editingCategory, setEditingCategory] = useState<{ name: string; icon: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
+  // Fetch all databases from API
+  const fetchAllData = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [resC, resP, resB] = await Promise.all([
+        fetch("http://localhost:4000/api/categories", { headers }),
+        fetch("http://localhost:4000/api/professionals", { headers }),
+        fetch("http://localhost:4000/api/bookings", { headers }),
+      ]);
+      if (resC.ok && resP.ok && resB.ok) {
+        setCategories(await resC.json());
+        setProfessionals(await resP.json());
+        setBookings(await resB.json());
+      }
+    } catch (err) {
+      console.error("Error fetching data from postgresql backend:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchAllData();
+    }
+  }, [token]);
 
   // Sync state detail panels if the collection lists change
   useEffect(() => {
@@ -432,7 +464,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   };
 
   // 1. Simulate client order (selects a Day, but not a confirmed Time)
-  const handleSimulateOrder = () => {
+  const handleSimulateOrder = async () => {
     const randCategoryObj = categories[Math.floor(Math.random() * categories.length)];
     const eligibleWorkers = professionals.filter(p => p.category === randCategoryObj.name);
     
@@ -449,48 +481,40 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       Carpenter: ["Door hinge squeaking adjustment", "Fitting new kitchen drawer sliders"]
     };
 
+    const description = (issues[randCategoryObj.name] || ["General repairs needed"])[Math.floor(Math.random() * (issues[randCategoryObj.name]?.length || 1))];
     const clientName = clientNames[Math.floor(Math.random() * clientNames.length)];
-    const issueList = issues[randCategoryObj.name] || ["Emergency request regarding home repair"];
-    const description = issueList[Math.floor(Math.random() * issueList.length)];
-    const priceRange = ["3,000 DZD", "4,500 DZD", "7,000 DZD", "2,200 DZD"];
-    const price = priceRange[Math.floor(Math.random() * priceRange.length)];
+    const bookingDate = new Date(Date.now() + 86400000 * Math.floor(Math.random() * 5 + 1)).toISOString().split("T")[0];
+    const clientPhone = `+213 6${Math.floor(Math.random() * 80000000 + 10000000)}`;
 
-    // Generate random date within next 7 days
-    const nextDate = new Date();
-    nextDate.setDate(nextDate.getDate() + Math.floor(Math.random() * 7 + 1));
-    const bookingDate = nextDate.toISOString().split("T")[0];
+    const newBookingId = `SV-${Math.floor(Math.random() * 9000 + 1000)}`;
 
-    const newBooking: Booking = {
-      id: `SV-${Math.floor(Math.random() * 9000 + 1000)}`,
-      clientName,
-      clientPhone: `+213 6${Math.floor(Math.random() * 90000000 + 10000000)}`,
-      clientAddress: `${Math.floor(Math.random() * 50 + 1)} Rue des Frères, Algiers`,
-      serviceCategory: randCategoryObj.name,
-      workerId: worker.id,
-      status: "pending_review",
-      price: "Contact for Quote",
-      description,
-      time: "Just now",
-      bookingDate,
-      clientPhotos: [
-        "https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=300&q=80"
-      ],
-      workerQuote: null,
-      quoteStatus: "none",
-      statusHistory: [{ status: "pending_review", timestamp: "Just now" }]
-    };
-
-    setBookings([newBooking, ...bookings]);
-    
-    setCategories(prev =>
-      prev.map(c => (c.name === randCategoryObj.name ? { ...c, bookings: c.bookings + 1 } : c))
-    );
-
-    showToast(`⚡ New simulated order ${newBooking.id} created! Client selected worker ${worker.name} for ${bookingDate}.`, "info");
+    try {
+      const res = await fetch("http://localhost:4000/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id: newBookingId,
+          clientName,
+          clientPhone,
+          clientAddress: "12 Rue Didouche Mourad, Algiers",
+          serviceCategory: randCategoryObj.name,
+          workerId: worker.id,
+          description,
+          bookingDate,
+          price: "Contact for Quote"
+        })
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast(`⚡ New simulated order ${newBookingId} created!`, "info");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 2. Add custom manual booking
-  const handleCreateManualBooking = (fields: {
+  const handleCreateManualBooking = async (fields: {
     clientName: string;
     clientPhone: string;
     clientAddress: string;
@@ -502,63 +526,34 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     bookingTime?: string;
     clientPhotos?: string[];
   }) => {
-    // High-quality task placeholder photos based on category
-    const defaultPhotosMap: Record<string, string[]> = {
-      Plumber: [
-        "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80",
-        "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=300&q=80"
-      ],
-      Electrician: [
-        "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=300&q=80",
-        "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80"
-      ],
-      "AC Repair": [
-        "https://images.unsplash.com/photo-1621905252507-b354bc25edac?w=300&q=80"
-      ],
-      Cleaner: [
-        "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80"
-      ],
-      Painter: [
-        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=300&q=80"
-      ],
-      Carpenter: [
-        "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=300&q=80"
-      ]
-    };
-
-    const newBooking: Booking = {
-      id: `SV-${Math.floor(Math.random() * 9000 + 1000)}`,
-      clientName: fields.clientName,
-      clientPhone: fields.clientPhone,
-      clientAddress: fields.clientAddress,
-      serviceCategory: fields.category,
-      workerId: fields.workerId,
-      status: "pending_review",
-      price: fields.price || "Contact for Quote",
-      description: fields.description,
-      time: "Just now",
-      bookingDate: fields.bookingDate,
-      bookingTime: fields.bookingTime || undefined,
-      clientPhotos: fields.clientPhotos && fields.clientPhotos.length > 0
-        ? fields.clientPhotos
-        : (defaultPhotosMap[fields.category] || ["https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=300&q=80"]),
-      workerQuote: null,
-      quoteStatus: "none",
-      statusHistory: [{ status: "pending_review", timestamp: "Just now" }]
-    };
-
-    setBookings([newBooking, ...bookings]);
-    
-    setCategories(prev =>
-      prev.map(c => (c.name === fields.category ? { ...c, bookings: c.bookings + 1 } : c))
-    );
-
-    setShowRegisterModal(false);
-    showToast(`📝 Booking ${newBooking.id} registered manually!`, "success");
+    try {
+      const res = await fetch("http://localhost:4000/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          clientName: fields.clientName,
+          clientPhone: fields.clientPhone,
+          clientAddress: fields.clientAddress,
+          serviceCategory: fields.category,
+          workerId: fields.workerId,
+          description: fields.description,
+          price: fields.price,
+          bookingDate: fields.bookingDate,
+          bookingTime: fields.bookingTime
+        })
+      });
+      if (res.ok) {
+        fetchAllData();
+        setShowRegisterModal(false);
+        showToast(`📝 Manual booking created successfully!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 3. Add Worker (Professional)
-  const handleAddWorker = (fields: {
+  const handleAddWorker = async (fields: {
     name: string;
     phone: string;
     category: string;
@@ -567,166 +562,163 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     bio: string;
     availableTimes: string[];
   }) => {
-    const newWorker: Professional = {
-      id: `PRO-${professionals.length + 1}`,
-      name: fields.name,
-      phone: fields.phone,
-      category: fields.category,
-      rate: fields.rate,
-      experience: fields.experience,
-      bio: fields.bio,
-      status: "online",
-      verified: false,
-      jobs: 0,
-      rating: 5.0,
-      joined: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
-      portfolio: ["https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&q=80"],
-      reviews: [],
-      availableTimes: fields.availableTimes.length > 0 ? fields.availableTimes : ["08:00", "10:00", "14:00", "16:00"]
-    };
-
-    setProfessionals([...professionals, newWorker]);
-    
-    setCategories(prev =>
-      prev.map(c => (c.name === fields.category ? { ...c, pros: c.pros + 1 } : c))
-    );
-
-    setShowAddWorkerModal(false);
-    showToast(`👷 New worker ${fields.name} added under category ${fields.category}!`, "success");
+    const nextId = `PRO-${professionals.length + 1}`;
+    try {
+      const res = await fetch("http://localhost:4000/api/professionals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          id: nextId,
+          name: fields.name,
+          phone: fields.phone,
+          category: fields.category,
+          rate: fields.rate,
+          experience: fields.experience,
+          bio: fields.bio,
+          availableTimes: fields.availableTimes
+        })
+      });
+      if (res.ok) {
+        fetchAllData();
+        setShowAddWorkerModal(false);
+        showToast(`👷 Worker ${fields.name} successfully registered!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 4. Add Category
-  const handleAddCategory = (name: string, icon: string) => {
+  const handleAddCategory = async (name: string, icon: string) => {
     if (categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
       alert("Category already exists.");
       return;
     }
-
-    const newCategory = {
-      name,
-      pros: 0,
-      bookings: 0,
-      icon: icon || "🛠️"
-    };
-
-    setCategories([...categories, newCategory]);
-    setShowAddCategoryModal(false);
-    showToast(`🗂️ Category ${name} successfully added!`, "success");
+    try {
+      const res = await fetch("http://localhost:4000/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, image: icon || "/uploads/categories/default.png" })
+      });
+      if (res.ok) {
+        fetchAllData();
+        setShowAddCategoryModal(false);
+        showToast(`🗂️ Category ${name} successfully added!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Edit Category details
-  const handleEditCategory = (oldName: string, newName: string, newIcon: string) => {
-    setCategories(prev =>
-      prev.map(c => 
-        c.name === oldName 
-          ? { ...c, name: newName, icon: newIcon } 
-          : c
-      )
-    );
-    setProfessionals(prev =>
-      prev.map(p => 
-        p.category === oldName 
-          ? { ...p, category: newName } 
-          : p
-      )
-    );
-    setBookings(prev =>
-      prev.map(b => 
-        b.serviceCategory === oldName 
-          ? { ...b, serviceCategory: newName } 
-          : b
-      )
-    );
-    setEditingCategory(null);
-    showToast(`Category ${oldName} updated to ${newName}!`, "success");
+  const handleEditCategory = async (oldName: string, newName: string, newIcon: string) => {
+    const cat = categories.find(c => c.name === oldName);
+    if (!cat) return;
+    try {
+      const res = await fetch(`http://localhost:4000/api/categories/${cat.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: newName, image: newIcon })
+      });
+      if (res.ok) {
+        fetchAllData();
+        setEditingCategory(null);
+        showToast(`Category ${oldName} updated to ${newName}!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 5. Edit existing booking details
-  const handleEditBooking = (id: string, updatedFields: Partial<Booking>) => {
-    setBookings(prev =>
-      prev.map(b => {
-        if (b.id === id) {
-          const statusHistory = [...b.statusHistory];
-          if (updatedFields.status && updatedFields.status !== b.status) {
-            statusHistory.push({ status: updatedFields.status, timestamp: "Just now" });
-          }
-          return {
-            ...b,
-            ...updatedFields,
-            statusHistory
-          };
-        }
-        return b;
-      })
-    );
-    setEditingBooking(null);
-    showToast(`Booking ${id} updated successfully!`, "success");
+  const handleEditBooking = async (id: string, updatedFields: Partial<Booking>) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(updatedFields)
+      });
+      if (res.ok) {
+        fetchAllData();
+        setEditingBooking(null);
+        showToast(`Booking ${id} updated successfully!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 6. Update Booking Status (direct inline transitions)
-  const handleUpdateBookingStatus = (bookingId: string, nextStatus: Booking["status"]) => {
-    const timeStr = "Just now";
-    setBookings(prev =>
-      prev.map(b => {
-        if (b.id === bookingId) {
-          return {
-            ...b,
-            status: nextStatus,
-            statusHistory: [...b.statusHistory, { status: nextStatus, timestamp: timeStr }]
-          };
-        }
-        return b;
-      })
-    );
-    showToast(`Booking ${bookingId} transitioned to ${STATUS_DETAILS[nextStatus].label}`, "success");
+  const handleUpdateBookingStatus = async (bookingId: string, nextStatus: Booking["status"]) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast(`Booking ${bookingId} transitioned to ${STATUS_DETAILS[nextStatus].label}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 7. Reassign worker
-  const handleReassignWorker = (bookingId: string, workerId: string) => {
+  const handleReassignWorker = async (bookingId: string, workerId: string) => {
     const worker = professionals.find(p => p.id === workerId);
     if (!worker) return;
-    setBookings(prev =>
-      prev.map(b => {
-        if (b.id === bookingId) {
-          return {
-            ...b,
-            workerId,
-            status: "pending_review",
-            bookingTime: undefined, // Reset confirmed time since worker changed
-            statusHistory: [...b.statusHistory, { status: `Worker changed to ${worker.name}`, timestamp: "Just now" }]
-          };
-        }
-        return b;
-      })
-    );
-    showToast(`Assigned worker updated to ${worker.name}`, "success");
+    try {
+      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ workerId, status: "pending_review", bookingTime: null })
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast(`Assigned worker updated to ${worker.name}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 8. Verify / Unverify Professional
-  const handleToggleVerifyWorker = (workerId: string) => {
-    setProfessionals(prev =>
-      prev.map(p => {
-        if (p.id === workerId) {
-          const nextVal = !p.verified;
-          showToast(`${p.name} is now ${nextVal ? "Verified ✅" : "Unverified ❌"}`, "success");
-          return { ...p, verified: nextVal };
-        }
-        return p;
-      })
-    );
+  const handleToggleVerifyWorker = async (workerId: string) => {
+    const worker = professionals.find(p => p.id === workerId);
+    if (!worker) return;
+    const nextVal = !worker.verified;
+    try {
+      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ verified: nextVal })
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast(`${worker.name} is now ${nextVal ? "Verified ✅" : "Unverified ❌"}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // 9. Change worker active status
-  const handleChangeWorkerStatus = (workerId: string, nextStatus: Professional["status"]) => {
-    setProfessionals(prev =>
-      prev.map(p => {
-        if (p.id === workerId) {
-          return { ...p, status: nextStatus };
-        }
-        return p;
-      })
-    );
-    showToast(`${professionals.find(p => p.id === workerId)?.name} is now ${nextStatus}`, "success");
+  const handleChangeWorkerStatus = async (workerId: string, nextStatus: Professional["status"]) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast(`${professionals.find(p => p.id === workerId)?.name} is now ${nextStatus}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // Trigger modal controls from any subpage header
@@ -773,6 +765,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onOpenBooking={openManualBooking}
           onOpenWorker={openAddWorker}
           onOpenCategory={openAddCategory}
+          onViewJson={() => setIsJsonModalOpen(true)}
         />
       );
     }
@@ -786,6 +779,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onOpenBooking={openManualBooking}
           onOpenWorker={openAddWorker}
           onOpenCategory={openAddCategory}
+          onViewJson={() => setIsJsonModalOpen(true)}
         />
       );
     }
@@ -799,6 +793,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onOpenBooking={openManualBooking}
           onOpenWorker={openAddWorker}
           onOpenCategory={openAddCategory}
+          onViewJson={() => setIsJsonModalOpen(true)}
         />
       );
     }
@@ -945,6 +940,83 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           }}
         />
       )}
+
+      {/* ── API JSON VIEWER MODAL ── */}
+      {isJsonModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-[700px] bg-slate-950 text-slate-200 rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden flex flex-col max-h-[85vh]">
+            
+            {/* Header */}
+            <div className="p-8 lg:p-10 border-b border-white/5 flex justify-between items-center shrink-0">
+              <div className="space-y-1 text-left">
+                <div className="flex items-center gap-2 text-primary">
+                  <Code size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Mobile API Endpoint</span>
+                </div>
+                <h2 className="text-2xl font-black uppercase italic tracking-tight text-white">
+                  {activePage === "categories" && "Categories JSON"}
+                  {activePage === "professionals" && "Workers JSON"}
+                  {activePage === "bookings" && "Bookings JSON"}
+                  {activePage !== "categories" && activePage !== "professionals" && activePage !== "bookings" && "Platform JSON Output"}
+                </h2>
+                <p className="text-xs text-slate-400 font-medium font-inter">
+                  Direct JSON structures configuration data for mobile app queries.
+                </p>
+              </div>
+              
+              <button 
+                onClick={() => setIsJsonModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white border border-white/10 transition-all cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Code viewer */}
+            <div className="flex-1 overflow-y-auto p-8 font-mono text-xs text-emerald-400 bg-slate-900/60 leading-relaxed text-left">
+              <pre>
+                {JSON.stringify(
+                  activePage === "categories" ? categories :
+                  activePage === "professionals" ? professionals :
+                  activePage === "bookings" ? bookings :
+                  { categories, professionals, bookings },
+                  null,
+                  2
+                )}
+              </pre>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-8 border-t border-white/5 bg-slate-950 flex gap-4 shrink-0 justify-end">
+              <button 
+                onClick={() => {
+                  const target = activePage === "categories" ? categories :
+                                 activePage === "professionals" ? professionals :
+                                 activePage === "bookings" ? bookings :
+                                 { categories, professionals, bookings };
+                  navigator.clipboard.writeText(JSON.stringify(target, null, 2));
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="px-6 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-wider text-[10px] shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check size={14} strokeWidth={3} />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    Copy JSON API
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -961,6 +1033,7 @@ interface PageHeaderWithActionsProps {
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
+  onViewJson?: () => void;
 }
 
 function PageHeaderWithActions({
@@ -970,7 +1043,8 @@ function PageHeaderWithActions({
   actionType,
   onOpenBooking,
   onOpenWorker,
-  onOpenCategory
+  onOpenCategory,
+  onViewJson
 }: PageHeaderWithActionsProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6">
@@ -987,6 +1061,14 @@ function PageHeaderWithActions({
 
       {/* Relevant Quick Actions based on page context */}
       <div className="flex flex-wrap gap-2">
+        {onViewJson && (
+          <button
+            onClick={onViewJson}
+            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 border border-slate-200/50 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all hover:scale-102 active:scale-98 flex items-center gap-1.5 cursor-pointer"
+          >
+            <Code size={12} /> Voir JSON API
+          </button>
+        )}
         {(actionType === "booking" || actionType === "all") && (
           <button
             onClick={onOpenBooking}
@@ -1311,6 +1393,7 @@ interface CategoriesPageProps {
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
+  onViewJson?: () => void;
 }
 
 function CategoriesPage({
@@ -1321,7 +1404,8 @@ function CategoriesPage({
   onEditCategory,
   onOpenBooking,
   onOpenWorker,
-  onOpenCategory
+  onOpenCategory,
+  onViewJson
 }: CategoriesPageProps) {
   // Statistics Calculations
   const totalSpecialties = categories.length;
@@ -1346,6 +1430,7 @@ function CategoriesPage({
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
+        onViewJson={onViewJson}
       />
 
       {/* Categories stats block */}
@@ -1418,6 +1503,7 @@ interface ProfessionalsPageProps {
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
+  onViewJson?: () => void;
 }
 
 function ProfessionalsPage({
@@ -1427,7 +1513,8 @@ function ProfessionalsPage({
   onChangeStatus,
   onOpenBooking,
   onOpenWorker,
-  onOpenCategory
+  onOpenCategory,
+  onViewJson
 }: ProfessionalsPageProps) {
   // Statistics Calculations
   const totalPros = professionals.length;
@@ -1452,6 +1539,7 @@ function ProfessionalsPage({
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
+        onViewJson={onViewJson}
       />
 
       {/* Professionals stats block */}
@@ -1564,6 +1652,7 @@ interface BookingsPageProps {
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
+  onViewJson?: () => void;
 }
 
 function BookingsPage({
@@ -1573,7 +1662,8 @@ function BookingsPage({
   onEditBooking,
   onOpenBooking,
   onOpenWorker,
-  onOpenCategory
+  onOpenCategory,
+  onViewJson
 }: BookingsPageProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
 
@@ -1606,6 +1696,7 @@ function BookingsPage({
         onOpenBooking={onOpenBooking}
         onOpenWorker={onOpenWorker}
         onOpenCategory={onOpenCategory}
+        onViewJson={onViewJson}
       />
 
       {/* Bookings stats block */}
