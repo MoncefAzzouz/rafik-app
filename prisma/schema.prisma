@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  WORKER
+  CLIENT
+}
+
+model User {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  phone         String        @unique
+  passwordHash  String
+  fullName      String
+  role          Role          @default(CLIENT)
+  profileImage  String?
+  createdAt     DateTime      @default(now())
+  professional  Professional?
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  image     String
+  pros      Int      @default(0)
+  bookings  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Professional {
+  id             String    @id
+  name           String
+  category       String
+  phone          String
+  status         String    @default("offline")
+  verified       Boolean   @default(false)
+  jobs           Int       @default(0)
+  rating         Float     @default(5.0)
+  joined         String
+  rate           String
+  experience     String
+  bio            String
+  portfolio      String[]
+  availableTimes String[]
+  userId         String?   @unique
+  user           User?     @relation(fields: [userId], references: [id])
+  reviews        Review[]
+  bookings       Booking[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Review {
+  id             String       @id @default(cuid())
+  clientName     String
+  rating         Float
+  comment        String
+  date           String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professionalId String
+  createdAt      DateTime     @default(now())
+}
+
+model Booking {
+  id              String          @id
+  clientName      String
+  clientPhone     String
+  clientAddress   String
+  serviceCategory String
+  worker          Professional    @relation(fields: [workerId], references: [id])
+  workerId        String
+  status          String          @default("pending_review")
+  price           String
+  description     String
+  time            String
+  bookingDate     String
+  bookingTime     String?
+  clientPhotos    String[]
+  workerQuote     Int?
+  quoteStatus     String          @default("none")
+  statusHistory   StatusHistory[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model StatusHistory {
+  id        String   @id @default(cuid())
+  status    String
+  timestamp String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String
+}
