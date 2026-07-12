@@ -1,58 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import TopBar from "@/components/TopBar";
-import Sidebar from "@/components/Sidebar";
-import TaxiDashboard from "@/components/TaxiDashboard";
-import FoodDashboard from "@/components/FoodDashboard";
-import ServicesDashboard from "@/components/ServicesDashboard";
-import SettingsPage from "@/components/SettingsPage";
 import LandingPage from "@/components/LandingPage";
 import LoginPage from "@/components/LoginPage";
-import WorkerPanel from "@/components/WorkerPanel";
-
-function AdminShell() {
-  const { activeService } = useTheme();
-  const [activePage, setActivePage] = useState("dashboard");
-
-  // Reset to dashboard whenever the service changes
-  useEffect(() => {
-    setActivePage("dashboard");
-  }, [activeService]);
-
-  const renderContent = () => {
-    if (activePage === "settings") return <SettingsPage />;
-
-    switch (activeService) {
-      case "taxi":
-        return <TaxiDashboard activePage={activePage} />;
-      case "food":
-        return <FoodDashboard activePage={activePage} />;
-      case "services":
-        return <ServicesDashboard activePage={activePage} />;
-      default:
-        return <TaxiDashboard activePage={activePage} />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      <TopBar />
-      <div className="flex flex-1">
-        <Sidebar activePage={activePage} onNavigate={setActivePage} />
-        <main className="flex-1 p-6 lg:p-10 overflow-y-auto" key={`${activeService}-${activePage}`}>
-          {renderContent()}
-        </main>
-      </div>
-    </div>
-  );
-}
 
 function MainRoutingShell() {
   const { isAuthenticated, user } = useAuth();
   const [view, setView] = useState<"landing" | "login">("landing");
+  const router = useRouter();
+
+  // Automatic routing redirects when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === "ADMIN") {
+        router.push("/services/dashboard");
+      } else if (user.role === "WORKER") {
+        router.push("/worker/dashboard");
+      }
+    }
+  }, [isAuthenticated, user, router]);
 
   if (!isAuthenticated) {
     if (view === "login") {
@@ -61,22 +29,12 @@ function MainRoutingShell() {
     return <LandingPage onGoToLogin={() => setView("login")} />;
   }
 
-  // Redirect based on role
-  if (user?.role === "ADMIN") {
-    return (
-      <ThemeProvider>
-        <AdminShell />
-      </ThemeProvider>
-    );
-  }
-
-  if (user?.role === "WORKER") {
-    return <WorkerPanel />;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
-      <p>Redirecting portal access...</p>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Redirecting to Dashboard...</p>
+      </div>
     </div>
   );
 }

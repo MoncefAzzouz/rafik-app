@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useParams, useRouter } from "next/navigation";
 import {
   Wrench, Users, DollarSign, CalendarCheck, Clock, CheckCircle2, XCircle,
   LogOut, Shield, UserCheck, Star, Edit2, Calendar, MessageSquare, BarChart3,
@@ -72,7 +73,15 @@ const STATUS_DETAILS: Record<string, { label: string; color: string; bg: string 
 
 export default function WorkerPanel() {
   const { user, token, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<"dashboard" | "bookings" | "profile" | "reviews" | "earnings">("dashboard");
+  const params = useParams();
+  const router = useRouter();
+
+  const activeTab = (params?.page as "dashboard" | "bookings" | "profile" | "reviews" | "earnings") || "dashboard";
+
+  const setActiveTab = (tabId: string) => {
+    router.push(`/worker/${tabId}`);
+  };
+
   const [profile, setProfile] = useState<ProfessionalProfile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);

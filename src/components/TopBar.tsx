@@ -3,12 +3,22 @@
 import { useTheme, SERVICE_CONFIGS, ServiceType } from "@/context/ThemeContext";
 import { Bell, Search, Sparkles, Menu } from "lucide-react";
 import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function TopBar() {
   const { activeService, setActiveService, config } = useTheme();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const services = Object.values(SERVICE_CONFIGS);
+
+  const handleServiceChange = (svcId: ServiceType) => {
+    setActiveService(svcId);
+    const parts = pathname.split("/");
+    const currentPage = parts.length > 2 ? parts[parts.length - 1] : "dashboard";
+    router.push(`/${svcId}/${currentPage}`);
+  };
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 lg:px-10 h-20 flex justify-between items-center">
@@ -27,7 +37,7 @@ export default function TopBar() {
         {services.map((svc) => (
           <button
             key={svc.id}
-            onClick={() => setActiveService(svc.id as ServiceType)}
+            onClick={() => handleServiceChange(svc.id as ServiceType)}
             className={`service-btn ${activeService === svc.id ? "active" : ""}`}
           >
             <span className="mr-1.5">{svc.emoji}</span>

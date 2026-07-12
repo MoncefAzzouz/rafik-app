@@ -610,6 +610,25 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     }
   };
 
+  // Delete Category
+  const handleDeleteCategory = async (catId: string) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/categories/${catId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAllData();
+        setSelectedCategory(null);
+        showToast("Category deleted successfully!", "success");
+      } else {
+        alert("Failed to delete category.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Edit Category details
   const handleEditCategory = async (oldName: string, newName: string, newIcon: string) => {
     const cat = categories.find(c => c.name === oldName);
@@ -624,6 +643,44 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         fetchAllData();
         setEditingCategory(null);
         showToast(`Category ${oldName} updated to ${newName}!`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Delete Worker (Professional)
+  const handleDeleteWorker = async (workerId: string) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAllData();
+        setSelectedWorker(null);
+        showToast("Worker deleted successfully!", "success");
+      } else {
+        alert("Failed to delete worker.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Delete Booking
+  const handleDeleteBooking = async (bookingId: string) => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAllData();
+        setSelectedBooking(null);
+        showToast("Booking deleted successfully!", "success");
+      } else {
+        alert("Failed to delete booking.");
       }
     } catch (err) {
       console.error(err);
@@ -762,6 +819,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           professionals={professionals}
           onSelectCategory={setSelectedCategory}
           onEditCategory={setEditingCategory}
+          onDeleteCategory={handleDeleteCategory}
           onOpenBooking={openManualBooking}
           onOpenWorker={openAddWorker}
           onOpenCategory={openAddCategory}
@@ -924,6 +982,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           onClose={() => setSelectedWorker(null)}
           onToggleVerify={handleToggleVerifyWorker}
           onChangeStatus={handleChangeWorkerStatus}
+          onDeleteWorker={handleDeleteWorker}
         />
       )}
 
@@ -938,6 +997,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
             setSelectedBooking(null);
             setEditingBooking(b);
           }}
+          onDeleteBooking={handleDeleteBooking}
         />
       )}
 
@@ -1390,6 +1450,7 @@ interface CategoriesPageProps {
   professionals: Professional[];
   onSelectCategory: (name: string) => void;
   onEditCategory: (category: { name: string; icon: string }) => void;
+  onDeleteCategory: (id: string) => void;
   onOpenBooking: () => void;
   onOpenWorker: () => void;
   onOpenCategory: () => void;
@@ -1402,6 +1463,7 @@ function CategoriesPage({
   professionals,
   onSelectCategory,
   onEditCategory,
+  onDeleteCategory,
   onOpenBooking,
   onOpenWorker,
   onOpenCategory,
@@ -1463,14 +1525,16 @@ function CategoriesPage({
           >
             <div className="flex items-center gap-4">
               <div className="text-4xl bg-slate-50 p-3 rounded-2xl group-hover:scale-105 transition-transform">
-                {c.icon}
+                <img src={c.icon} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
+                }} />
               </div>
               <div className="text-left">
                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.name}</h4>
                 <p className="text-[10px] text-slate-400 font-bold font-inter mt-0.5">{c.pros} active professionals</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={(e) => {
@@ -1481,6 +1545,19 @@ function CategoriesPage({
                 title="Edit Category Name and Icon"
               >
                 <Edit2 size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Are you sure you want to delete category "${c.name}" permanently?`)) {
+                    onDeleteCategory(c.id);
+                  }
+                }}
+                className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+                title="Delete Category"
+              >
+                <Trash2 size={14} />
               </button>
               <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -2355,18 +2432,57 @@ interface AddCategoryModalProps {
 
 function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState("🛠️");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+  const { token } = useAuth();
+  const [uploading, setUploading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) {
+      setFile(selected);
+      setPreview(URL.createObjectURL(selected));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) {
       alert("Category name is required.");
       return;
     }
-    onSubmit(name, icon);
-  };
+    if (!file) {
+      alert("Please upload a category picture.");
+      return;
+    }
 
-  const icons = ["🛠️", "🔧", "🔌", "🎨", "🧹", "❄️", "🔑", "🌱", "📦", "🪵", "🚗", "🏠", "💻", "🧱"];
+    setUploading(true);
+    let imageUrl = "/uploads/categories/default.png";
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("http://localhost:4000/api/upload?type=categories", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        imageUrl = data.url;
+      } else {
+        alert("Image upload failed.");
+        setUploading(false);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Image upload error.");
+      setUploading(false);
+      return;
+    }
+    setUploading(false);
+    onSubmit(name, imageUrl);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
@@ -2380,7 +2496,7 @@ function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
 
         <div className="space-y-1 text-left">
           <h2 className="text-xl font-black text-slate-800 uppercase">Add Specialty Category</h2>
-          <p className="text-xs text-slate-400 font-bold font-inter">Create a new service category for clients</p>
+          <p className="text-xs text-slate-400 font-bold font-inter">Create a new service category with a custom picture</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left mt-4">
@@ -2397,22 +2513,26 @@ function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
           </div>
 
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Select Icon / Emoji *</label>
-            <div className="grid grid-cols-7 gap-2">
-              {icons.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setIcon(emoji)}
-                  className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center border transition-all ${
-                    icon === emoji ? "border-primary bg-primary/5 scale-110 shadow-sm" : "border-slate-100 bg-slate-50 hover:bg-slate-100"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Upload Category Picture *</label>
+            <div className="flex flex-col gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={handleFileChange}
+                className="text-xs font-bold text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:bg-slate-900 file:text-white file:cursor-pointer file:hover:bg-slate-800"
+              />
+              {preview && (
+                <div className="w-28 h-28 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
+                  <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
             </div>
           </div>
+
+          {uploading && (
+            <p className="text-[10px] text-primary font-black uppercase tracking-wider animate-pulse">Uploading picture to server...</p>
+          )}
 
           <div className="pt-4 flex gap-4">
             <button
@@ -2447,9 +2567,20 @@ interface EditCategoryModalProps {
 
 function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCategoryModalProps) {
   const [name, setName] = useState(category.name);
-  const [icon, setIcon] = useState(category.icon);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>(category.icon);
+  const { token } = useAuth();
+  const [uploading, setUploading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) {
+      setFile(selected);
+      setPreview(URL.createObjectURL(selected));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) {
       alert("Category name is required.");
@@ -2460,10 +2591,36 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
       alert("Category name already exists.");
       return;
     }
-    onSubmit(category.name, name, icon);
-  };
 
-  const icons = ["🛠️", "🔧", "🔌", "🎨", "🧹", "❄️", "🔑", "🌱", "📦", "🪵", "🚗", "🏠", "💻", "🧱"];
+    setUploading(true);
+    let imageUrl = category.icon;
+    if (file) {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("http://localhost:4000/api/upload?type=categories", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          imageUrl = data.url;
+        } else {
+          alert("Image upload failed.");
+          setUploading(false);
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Image upload error.");
+        setUploading(false);
+        return;
+      }
+    }
+    setUploading(false);
+    onSubmit(category.name, name, imageUrl);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
@@ -2477,7 +2634,7 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
 
         <div className="space-y-1 text-left">
           <h2 className="text-xl font-black text-slate-800 uppercase">Edit Category</h2>
-          <p className="text-xs text-slate-400 font-bold font-inter">Update service category name and icon</p>
+          <p className="text-xs text-slate-400 font-bold font-inter">Update service category name and picture</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left mt-4">
@@ -2494,22 +2651,27 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
           </div>
 
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Select Icon / Emoji *</label>
-            <div className="grid grid-cols-7 gap-2">
-              {icons.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setIcon(emoji)}
-                  className={`w-10 h-10 text-xl rounded-xl flex items-center justify-center border transition-all ${
-                    icon === emoji ? "border-primary bg-primary/5 scale-110 shadow-sm" : "border-slate-100 bg-slate-50 hover:bg-slate-100"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Category Picture</label>
+            <div className="flex flex-col gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="text-xs font-bold text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:bg-slate-900 file:text-white file:cursor-pointer file:hover:bg-slate-800"
+              />
+              {preview && (
+                <div className="w-28 h-28 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
+                  <img src={preview} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
+                  }} />
+                </div>
+              )}
             </div>
           </div>
+
+          {uploading && (
+            <p className="text-[10px] text-primary font-black uppercase tracking-wider animate-pulse">Uploading picture to server...</p>
+          )}
 
           <div className="pt-4 flex gap-4">
             <button
@@ -2762,9 +2924,10 @@ interface WorkerProfileDrawerProps {
   onClose: () => void;
   onToggleVerify: (id: string) => void;
   onChangeStatus: (id: string, s: Professional["status"]) => void;
+  onDeleteWorker: (id: string) => void;
 }
 
-function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }: WorkerProfileDrawerProps) {
+function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, onDeleteWorker }: WorkerProfileDrawerProps) {
   return (
     <>
       {/* Backdrop */}
@@ -2906,13 +3069,23 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus }
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 mt-8">
+        <div className="pt-6 border-t border-slate-100 mt-8 flex gap-3">
           <a
             href={`tel:${worker.phone}`}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all animate-fadeIn"
+            className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-slate-800 active:scale-[0.98] transition-all"
           >
-            <Phone size={14} /> Contact Worker ({worker.phone})
+            <Phone size={14} /> Contact Worker
           </a>
+          <button
+            onClick={() => {
+              if (confirm(`Are you sure you want to delete worker "${worker.name}" permanently?`)) {
+                onDeleteWorker(worker.id);
+              }
+            }}
+            className="px-5 py-4 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <Trash2 size={14} /> Delete
+          </button>
         </div>
       </div>
     </>
@@ -2930,6 +3103,7 @@ interface BookingDetailDrawerProps {
   onUpdateStatus: (id: string, s: Booking["status"]) => void;
   onReassignWorker: (id: string, wId: string) => void;
   onEditBooking: (b: Booking) => void;
+  onDeleteBooking: (id: string) => void;
 }
 
 function BookingDetailDrawer({
@@ -2938,7 +3112,8 @@ function BookingDetailDrawer({
   onClose,
   onUpdateStatus,
   onReassignWorker,
-  onEditBooking
+  onEditBooking,
+  onDeleteBooking
 }: BookingDetailDrawerProps) {
   const [showReassign, setShowReassign] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState("");
@@ -3337,6 +3512,17 @@ function BookingDetailDrawer({
               <XCircle size={14} /> Cancel Booking
             </button>
           )}
+
+          <button
+            onClick={() => {
+              if (confirm(`Are you sure you want to delete booking ${booking.id} permanently?`)) {
+                onDeleteBooking(booking.id);
+              }
+            }}
+            className="w-full py-4 bg-rose-100 hover:bg-rose-200 text-rose-700 border border-rose-200/50 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <Trash2 size={14} /> Delete Booking Permanently
+          </button>
 
           {booking.status === "completed" && (
             <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700 text-xs font-black uppercase justify-center">
