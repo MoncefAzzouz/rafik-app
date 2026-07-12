@@ -40,9 +40,5 @@ function MainRoutingShell() {
 }
 
 export default function Home() {
-  return (
-    <AuthProvider>
-      <MainRoutingShell />
-    </AuthProvider>
-  );
+  return <MainRoutingShell />;
 }
