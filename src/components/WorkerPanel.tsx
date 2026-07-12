@@ -538,7 +538,7 @@ export default function WorkerPanel() {
                               {b.clientPhotos.map((photo, pIdx) => (
                                 <img
                                   key={pIdx}
-                                  src={photo}
+                                  src={photo.startsWith("/uploads") ? `http://localhost:4000${photo}` : photo}
                                   alt="Job photo"
                                   className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0"
                                 />
@@ -706,7 +706,7 @@ export default function WorkerPanel() {
                       {profile.portfolio.map((url, pIdx) => (
                         <img
                           key={pIdx}
-                          src={url}
+                          src={url.startsWith("/uploads") ? `http://localhost:4000${url}` : url}
                           alt="Portfolio item"
                           className="w-full h-16 rounded-xl object-cover border border-slate-100"
                         />

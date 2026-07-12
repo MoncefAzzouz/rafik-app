@@ -1238,7 +1238,16 @@ function DashboardOverview({
               onClick={() => onSelectCategory(c.name)}
               className="text-center p-4 rounded-2xl bg-slate-50 hover:bg-primary/5 hover:border-primary/20 hover:scale-[1.02] transition-all cursor-pointer group border border-transparent"
             >
-              <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">{c.icon}</div>
+              <div className="w-12 h-12 mx-auto mb-2 bg-white rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden group-hover:scale-110 transition-transform">
+                <img
+                  src={c.icon.startsWith("/uploads") ? `http://localhost:4000${c.icon}` : c.icon}
+                  alt={c.name}
+                  className="w-full h-full object-contain p-1"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
+                  }}
+                />
+              </div>
               <p className="text-[10px] font-black text-slate-700 uppercase tracking-tight truncate">{c.name}</p>
               <p className="text-[9px] text-slate-400 font-bold mt-0.5 font-inter">View Workers</p>
             </div>
@@ -1525,7 +1534,7 @@ function CategoriesPage({
           >
             <div className="flex items-center gap-4">
               <div className="text-4xl bg-slate-50 p-3 rounded-2xl group-hover:scale-105 transition-transform">
-                <img src={c.icon} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
+                <img src={c.icon.startsWith("/uploads") ? `http://localhost:4000${c.icon}` : c.icon} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
                 }} />
               </div>
@@ -2181,7 +2190,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
               >
                 {categories.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.icon} {c.name}
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -2336,7 +2345,7 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
               >
                 {categories.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.icon} {c.name}
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -2846,7 +2855,7 @@ function EditBookingModal({
               >
                 {categories.map((c) => (
                   <option key={c.name} value={c.name}>
-                    {c.icon} {c.name}
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -3036,7 +3045,7 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, 
               {worker.portfolio.map((imgUrl, i) => (
                 <div key={i} className="aspect-video bg-slate-100 rounded-xl overflow-hidden relative group border border-slate-100">
                   <img
-                    src={imgUrl}
+                    src={imgUrl.startsWith("/uploads") ? `http://localhost:4000${imgUrl}` : imgUrl}
                     alt={`work-${i}`}
                     className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
                   />
@@ -3249,7 +3258,7 @@ function BookingDetailDrawer({
                 {booking.clientPhotos.map((photo, i) => (
                   <div key={i} className="aspect-square rounded-2xl overflow-hidden border border-slate-100 group">
                     <img
-                      src={photo}
+                      src={photo.startsWith("/uploads") ? `http://localhost:4000${photo}` : photo}
                       alt={`Job photo ${i + 1}`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
