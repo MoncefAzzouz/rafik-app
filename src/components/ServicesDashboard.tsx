@@ -1240,7 +1240,7 @@ function DashboardOverview({
             >
               <div className="w-12 h-12 mx-auto mb-2 bg-white rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden group-hover:scale-110 transition-transform">
                 <img
-                  src={c.icon.startsWith("/uploads") ? `http://localhost:4000${c.icon}` : c.icon}
+                  src={(c.image || c.icon || "").startsWith("/uploads") ? `http://localhost:4000${c.image || c.icon}` : (c.image || c.icon || "")}
                   alt={c.name}
                   className="w-full h-full object-contain p-1"
                   onError={(e) => {
@@ -1534,7 +1534,7 @@ function CategoriesPage({
           >
             <div className="flex items-center gap-4">
               <div className="text-4xl bg-slate-50 p-3 rounded-2xl group-hover:scale-105 transition-transform">
-                <img src={c.icon.startsWith("/uploads") ? `http://localhost:4000${c.icon}` : c.icon} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
+                <img src={(c.image || c.icon || "").startsWith("/uploads") ? `http://localhost:4000${c.image || c.icon}` : (c.image || c.icon || "")} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
                 }} />
               </div>
