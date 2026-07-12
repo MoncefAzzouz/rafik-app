@@ -2670,7 +2670,7 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
               />
               {preview && (
                 <div className="w-28 h-28 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
-                  <img src={preview} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
+                  <img src={preview.startsWith("/uploads") ? `http://localhost:4000${preview}` : preview} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
                     (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
                   }} />
                 </div>

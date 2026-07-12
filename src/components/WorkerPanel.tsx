@@ -253,7 +253,7 @@ export default function WorkerPanel() {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Professional Space...</p>
         </div>
       </div>
@@ -262,16 +262,16 @@ export default function WorkerPanel() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8">
-        <div className="bg-slate-850 p-8 rounded-[2rem] border border-slate-800 max-w-md w-full text-center space-y-6">
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-8">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl max-w-md w-full text-center space-y-6">
           <XCircle className="mx-auto text-rose-500" size={48} />
-          <h2 className="text-xl font-black uppercase">Professional Record Missing</h2>
-          <p className="text-xs text-slate-400 font-bold leading-relaxed">
-            Your user account doesn't have a linked professional provider record. Please contact the administrator.
+          <h2 className="text-xl font-black uppercase text-slate-800">Professional Record Missing</h2>
+          <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            Your user account doesn&apos;t have a linked professional provider record. Please contact the administrator.
           </p>
           <button
             onClick={logout}
-            className="w-full py-4 bg-slate-800 hover:bg-slate-750 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
+            className="w-full py-4 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
           >
             Disconnect
           </button>
@@ -283,91 +283,132 @@ export default function WorkerPanel() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row">
       
-      {/* ── SIDEBAR PANELS ── */}
-      <aside className="w-full md:w-64 bg-slate-900 text-slate-400 flex flex-col justify-between shrink-0 border-r border-slate-800">
-        <div className="p-6 space-y-8 text-left">
-          {/* Logo Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center font-black text-xl italic tracking-tighter text-white shadow-lg shadow-blue-500/20">
-              R
-            </div>
-            <div>
-              <span className="text-sm font-black tracking-widest uppercase italic text-white block">RAFIK</span>
-              <span className="text-[9px] font-black text-blue-400 uppercase tracking-wider block">Pro Console</span>
-            </div>
+      {/* ── SIDEBAR (matching admin style) ── */}
+      <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-100 p-6 h-screen sticky top-0 shrink-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {/* Brand Header */}
+        <div className="flex items-center gap-4 mb-8 group cursor-pointer">
+          <div className="p-3 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-500/20 text-white font-black text-xl italic flex items-center justify-center group-hover:rotate-6 transition-transform">
+            R
           </div>
-
-          {/* User Profile Card */}
-          <div className="bg-slate-950/40 p-4 rounded-3xl border border-slate-800/40 flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 text-primary font-black rounded-xl flex items-center justify-center text-sm uppercase">
-              {profile.name.split(" ").map(n => n[0]).join("")}
-            </div>
-            <div className="truncate">
-              <h4 className="text-xs font-black text-white uppercase tracking-tight">{profile.name}</h4>
-              <span className="text-[9px] font-bold text-slate-500 uppercase">{profile.category}</span>
-            </div>
+          <div>
+            <span className="text-xl font-black tracking-tighter uppercase text-indigo-600 block leading-none">RAFIK</span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block">Pro Console</span>
           </div>
-
-          {/* Status Switches */}
-          <div className="space-y-2">
-            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-1">My Duty Status</label>
-            <div className="grid grid-cols-3 gap-1 bg-slate-950/50 p-1 rounded-2xl border border-slate-850">
-              {(["online", "busy", "offline"] as const).map(st => (
-                <button
-                  key={st}
-                  onClick={() => updateStatus(st)}
-                  className={`text-[9px] py-2 rounded-xl font-black uppercase tracking-wider transition-colors cursor-pointer ${
-                    profile.status === st
-                      ? st === "online" ? "bg-emerald-500 text-white shadow-sm" : st === "busy" ? "bg-amber-500 text-white shadow-sm" : "bg-slate-800 text-white shadow-sm"
-                      : "hover:text-white"
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Navigation Menus */}
-          <nav className="space-y-1.5 pt-4">
-            {[
-              { id: "dashboard", label: "Overview", icon: BarChart3 },
-              { id: "bookings", label: `Bookings (${activeJobs.length})`, icon: CalendarCheck },
-              { id: "profile", label: "Edit Profile", icon: Edit2 },
-              { id: "reviews", label: "My Reviews", icon: MessageSquare },
-              { id: "earnings", label: "My Earnings", icon: DollarSign }
-            ].map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`w-full px-4 py-3 rounded-2xl text-xs font-bold transition-all flex items-center gap-3 cursor-pointer ${
-                    isActive
-                      ? "bg-blue-500 text-white font-black shadow-lg shadow-blue-500/10 scale-[1.01]"
-                      : "hover:bg-slate-800 hover:text-white"
-                  }`}
-                >
-                  <Icon size={16} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
         </div>
 
-        {/* Footer Logout */}
-        <div className="p-6 border-t border-slate-850">
+        {/* Worker Profile Card */}
+        <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl mb-6">
+          <div className="w-10 h-10 bg-indigo-50 text-indigo-600 font-black rounded-xl flex items-center justify-center text-sm uppercase border border-indigo-100">
+            {profile.name.split(" ").map(n => n[0]).join("")}
+          </div>
+          <div className="truncate">
+            <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight">{profile.name}</h4>
+            <span className="text-[9px] font-bold text-slate-400 uppercase">{profile.category}</span>
+          </div>
+        </div>
+
+        {/* Status Switches */}
+        <div className="mb-6 space-y-2">
+          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-1">Duty Status</label>
+          <div className="grid grid-cols-3 gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+            {(["online", "busy", "offline"] as const).map(st => (
+              <button
+                key={st}
+                onClick={() => updateStatus(st)}
+                className={`text-[9px] py-2 rounded-xl font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  profile.status === st
+                    ? st === "online" ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : st === "busy" ? "bg-amber-500 text-white shadow-sm shadow-amber-500/20" : "bg-slate-700 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 space-y-2">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4 pl-4">Management</p>
+          {[
+            { id: "dashboard", label: "Overview", icon: BarChart3 },
+            { id: "bookings", label: `Bookings (${activeJobs.length})`, icon: CalendarCheck },
+            { id: "profile", label: "Edit Profile", icon: Edit2 },
+            { id: "reviews", label: "My Reviews", icon: MessageSquare },
+            { id: "earnings", label: "My Earnings", icon: DollarSign }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 relative group overflow-hidden text-left ${
+                  isActive
+                    ? "bg-indigo-600 text-white shadow-xl shadow-indigo-500/20"
+                    : "text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+                }`}
+              >
+                <Icon
+                  size={20}
+                  className={`transition-transform duration-300 group-hover:scale-110 ${
+                    isActive ? "text-white" : "text-slate-400 group-hover:text-indigo-600"
+                  }`}
+                />
+                <span className="text-sm font-bold uppercase tracking-wider">{tab.label}</span>
+                {isActive && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-l-full" />
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom: Logout */}
+        <div className="pt-6 border-t border-slate-100 mt-auto">
           <button
             onClick={logout}
-            className="w-full px-4 py-3 bg-slate-850 hover:bg-rose-900/20 hover:text-rose-400 border border-slate-800 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+            className="w-full flex items-center justify-center gap-3 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-rose-100 active:scale-[0.98] transition-all cursor-pointer"
           >
             <LogOut size={16} />
             Logout
           </button>
         </div>
       </aside>
+
+      {/* Mobile header for small screens */}
+      <div className="lg:hidden bg-white border-b border-slate-100 p-4 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-sm italic">R</div>
+          <span className="text-sm font-black tracking-tighter uppercase text-indigo-600">RAFIK</span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto">
+          {[
+            { id: "dashboard", icon: BarChart3 },
+            { id: "bookings", icon: CalendarCheck },
+            { id: "profile", icon: Edit2 },
+            { id: "reviews", icon: MessageSquare },
+            { id: "earnings", icon: DollarSign }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                  isActive ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-slate-400 hover:bg-slate-50"
+                }`}
+              >
+                <Icon size={16} />
+              </button>
+            );
+          })}
+          <button onClick={logout} className="p-2.5 rounded-xl text-rose-400 hover:bg-rose-50 cursor-pointer">
+            <LogOut size={16} />
+          </button>
+        </div>
+      </div>
 
       {/* ── MAIN WORKSPACE CONTENT ── */}
       <main className="flex-1 p-6 lg:p-10 overflow-y-auto">
