@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme, ServiceType } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard,
   Car,
@@ -60,6 +61,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const { activeService, config } = useTheme();
+  const { logout } = useAuth();
   const navItems = SERVICE_NAV[activeService];
 
   return (
@@ -173,7 +175,10 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           </div>
         </div>
 
-        <button className="w-full flex items-center justify-center gap-3 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-rose-100 active:scale-[0.98] transition-all cursor-pointer">
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-3 py-4 bg-rose-50 text-rose-600 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-rose-100 active:scale-[0.98] transition-all cursor-pointer"
+        >
           <LogOut size={16} />
           Logout
         </button>
