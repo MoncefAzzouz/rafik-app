@@ -54,38 +54,12 @@ class _MainPageState extends State<MainPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    Expanded(child: _buildNavItem(label: 'Home', index: 0)),
+                    Expanded(child: _buildNavItem(label: 'Promos', index: 1)),
                     Expanded(
-                      child: _buildNavItem(
-                        label: 'Home',
-                        activeIconPath: 'assets/icons/Home-color.png',
-                        inactiveIconPath: 'assets/icons/Home.png',
-                        index: 0,
-                      ),
+                      child: _buildNavItem(label: 'Activities', index: 2),
                     ),
-                    Expanded(
-                      child: _buildNavItem(
-                        label: 'Promos',
-                        activeIconPath: 'assets/icons/promo-color.png',
-                        inactiveIconPath: 'assets/icons/promo.png',
-                        index: 1,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildNavItem(
-                        label: 'Activities',
-                        activeIconPath: 'assets/icons/Paper-color.png',
-                        inactiveIconPath: 'assets/icons/Paper.png',
-                        index: 2,
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildNavItem(
-                        label: 'Profile',
-                        activeIconPath: 'assets/icons/Profile-color.png',
-                        inactiveIconPath: 'assets/icons/Profile.png',
-                        index: 3,
-                      ),
-                    ),
+                    Expanded(child: _buildNavItem(label: 'Profile', index: 3)),
                   ],
                 ),
               ),
@@ -96,12 +70,7 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget _buildNavItem({
-    required String label,
-    required String activeIconPath,
-    required String inactiveIconPath,
-    required int index,
-  }) {
+  Widget _buildNavItem({required String label, required int index}) {
     final isActive = _currentIndex == index;
     return GestureDetector(
       onTap: () {
@@ -126,14 +95,7 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              isActive ? activeIconPath : inactiveIconPath,
-              width: 28,
-              height: 28,
-              cacheWidth: 112,
-              cacheHeight: 112,
-              color: isActive ? AppColors.primary : AppColors.textSecondary,
-            ),
+            _buildNavIcon(index, isActive),
             const SizedBox(height: 4),
             Text(
               label,
@@ -149,5 +111,43 @@ class _MainPageState extends State<MainPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildNavIcon(int index, bool isActive) {
+    final color = isActive ? AppColors.primary : AppColors.textSecondary;
+
+    if (index == 0) {
+      return SizedBox(
+        width: 30,
+        height: 30,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(Icons.home_rounded, color: color, size: 30),
+            if (isActive)
+              Positioned(
+                bottom: 8,
+                child: Container(
+                  width: 5,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(1.2),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    final icons = [
+      Icons.home_rounded,
+      Icons.new_releases_outlined,
+      Icons.receipt_long_outlined,
+      Icons.person_outline_rounded,
+    ];
+
+    return Icon(icons[index], color: color, size: 30);
   }
 }
