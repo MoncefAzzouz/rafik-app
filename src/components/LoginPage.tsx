@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { KeyRound, Mail, ArrowLeft, AlertCircle, RefreshCw, Zap, ShieldCheck, Users, Star } from "lucide-react";
@@ -26,7 +27,7 @@ export default function LoginPage({ onBack }: LoginPageProps) {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:4000/api/auth/login", {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -202,16 +203,9 @@ export default function LoginPage({ onBack }: LoginPageProps) {
             </div>
           </form>
 
-          {/* Test Accounts */}
-          <div className="mt-8 bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left space-y-2">
-            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Test Accounts</div>
-            <div className="text-[11px] text-slate-500 font-medium">
-              Admin: <span className="font-bold text-slate-700">admin@rafik.app</span> <span className="text-slate-300 mx-1">·</span> PW: <span className="font-bold text-slate-700">admin123</span>
-            </div>
-            <div className="text-[11px] text-slate-500 font-medium">
-              Worker: <span className="font-bold text-slate-700">lyes@rafik.app</span> <span className="text-slate-300 mx-1">·</span> PW: <span className="font-bold text-slate-700">worker123</span>
-            </div>
-          </div>
+          <p className="mt-8 text-[10px] text-slate-400 font-medium text-center font-inter">
+            Access is restricted to Rafik staff and registered professionals.
+          </p>
         </div>
       </div>
     </div>

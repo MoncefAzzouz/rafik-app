@@ -47,6 +47,7 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "categories", label: "Service Categories", icon: FolderKanban },
     { id: "professionals", label: "Professionals", icon: UserCheck },
     { id: "bookings", label: "Bookings", icon: CalendarCheck },
+    { id: "chats", label: "Chats", icon: MessageSquare },
     { id: "reviews", label: "Reviews", icon: MessageSquare },
     { id: "clients", label: "Clients", icon: Users },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
@@ -61,7 +62,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const { activeService, config } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navItems = SERVICE_NAV[activeService];
 
   return (
@@ -167,11 +168,11 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs"
             style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)", color: "var(--primary)" }}
           >
-            R
+            {(user?.fullName || "R").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-tight truncate">Rafik Admin</p>
-            <p className="text-[10px] font-bold text-slate-400 truncate">admin@rafik.dz</p>
+            <p className="text-xs font-black uppercase tracking-tight truncate">{user?.fullName || "Admin"}</p>
+            <p className="text-[10px] font-bold text-slate-400 truncate">{user?.email || ""}</p>
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import TaxiDashboard from "@/components/TaxiDashboard";
 import FoodDashboard from "@/components/FoodDashboard";
 import ServicesDashboard from "@/components/ServicesDashboard";
 import SettingsPage from "@/components/SettingsPage";
+import ChatMonitor from "@/components/ChatMonitor";
 
 function AdminShellWrapper() {
   const params = useParams();
@@ -32,6 +33,7 @@ function AdminShellWrapper() {
 
   const renderContent = () => {
     if (page === "settings") return <SettingsPage />;
+    if (page === "chats") return <ChatMonitor />;
 
     switch (service) {
       case "taxi":

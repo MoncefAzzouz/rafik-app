@@ -1,12 +1,14 @@
 "use client";
 
 import { useTheme, SERVICE_CONFIGS, ServiceType } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import { Bell, Search, Sparkles, Menu } from "lucide-react";
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 export default function TopBar() {
   const { activeService, setActiveService, config } = useTheme();
+  const { user } = useAuth();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -69,10 +71,10 @@ export default function TopBar() {
               boxShadow: `0 8px 24px color-mix(in srgb, var(--primary) 20%, transparent)`,
             }}
           >
-            R
+            {(user?.fullName || "R").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
           </div>
           <div className="hidden md:block text-left">
-            <p className="text-xs font-black uppercase tracking-tight">Rafik Admin</p>
+            <p className="text-xs font-black uppercase tracking-tight">{user?.fullName || "Admin"}</p>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
               <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Online</span>

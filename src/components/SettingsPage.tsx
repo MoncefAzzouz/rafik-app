@@ -1,111 +1,273 @@
 "use client";
 
-import { Settings, Bell, Shield, Palette, Moon, Sun, Save } from "lucide-react";
-import { useTheme } from "@/context/ThemeContext";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/lib/api";
+import { Shield, Users, Percent, Wallet, Check, MessageSquare, UserCog, Loader2 } from "lucide-react";
+
+type MediationMode = "MEDIATED" | "DIRECT";
+type CommissionMode = "PERCENTAGE" | "SUBSCRIPTION";
+
+interface PlatformSettings {
+  mediationMode: MediationMode;
+  commissionMode: CommissionMode;
+  commissionPercent: number;
+  subscriptionFee: number;
+}
 
 export default function SettingsPage() {
-  const { config } = useTheme();
+  const { token, user } = useAuth();
+  const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  const [mediationMode, setMediationMode] = useState<MediationMode>("MEDIATED");
+  const [commissionMode, setCommissionMode] = useState<CommissionMode>("PERCENTAGE");
+  const [commissionPercent, setCommissionPercent] = useState("15");
+  const [subscriptionFee, setSubscriptionFee] = useState("3000");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/settings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data: PlatformSettings = await res.json();
+          setSettings(data);
+          setMediationMode(data.mediationMode);
+          setCommissionMode(data.commissionMode);
+          setCommissionPercent(String(data.commissionPercent));
+          setSubscriptionFee(String(data.subscriptionFee));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) load();
+  }, [token]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      const res = await fetch(`${API_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          mediationMode,
+          commissionMode,
+          commissionPercent: parseFloat(commissionPercent),
+          subscriptionFee: parseInt(subscriptionFee),
+        }),
+      });
+      if (res.ok) {
+        setSettings(await res.json());
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to save settings");
+      }
+    } catch {
+      setError("Network error — is the backend running?");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="animate-spin text-slate-400" size={32} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto animate-fadeIn pb-16">
+    <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn pb-16 text-left">
+      {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-4xl font-black tracking-tighter text-slate-800 uppercase italic">
-          Panel <span className="text-primary">Settings</span>
-        </h1>
-        <p className="text-sm text-slate-400 font-medium">Manage admin panel preferences and configurations</p>
+        <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Platform Settings</h1>
+        <p className="text-sm text-slate-400 font-medium font-inter">
+          Global defaults for every worker. You can override each worker individually from their profile drawer.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* General */}
-        <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600"><Settings size={20} /></div>
-            <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">General</h3><p className="text-[10px] text-slate-400 font-bold">App configuration</p></div>
+      {/* GLOBAL SWITCH 1 — Order handling mode */}
+      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+            <UserCog size={20} />
           </div>
-          <div className="space-y-5">
-            <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">App Name</label>
-              <input type="text" defaultValue="Rafik App" className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs" /></div>
-            <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Default Language</label>
-              <select className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs appearance-none">
-                <option>Arabic (العربية)</option><option>French (Français)</option><option>English</option>
-              </select></div>
-            <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Timezone</label>
-              <select className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs appearance-none">
-                <option>Africa/Algiers (GMT+1)</option><option>Europe/Paris (GMT+2)</option>
-              </select></div>
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Order Handling — Global Switch</h2>
+            <p className="text-xs text-slate-400 font-bold font-inter">How orders flow between clients and workers (default for all workers)</p>
           </div>
         </div>
 
-        {/* Notifications */}
-        <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600"><Bell size={20} /></div>
-            <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Notifications</h3><p className="text-[10px] text-slate-400 font-bold">Alert preferences</p></div>
-          </div>
-          <div className="space-y-4">
-            {[
-              { label: "New booking alerts", desc: "Get notified for new bookings", on: true },
-              { label: "Driver registration", desc: "Alert when new drivers register", on: true },
-              { label: "Revenue reports", desc: "Daily revenue summary emails", on: false },
-              { label: "System alerts", desc: "Critical system notifications", on: true },
-            ].map((n, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-colors">
-                <div><p className="text-xs font-black text-slate-800 uppercase tracking-tight">{n.label}</p><p className="text-[10px] text-slate-400 font-bold">{n.desc}</p></div>
-                <div className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors ${n.on ? "bg-primary" : "bg-slate-200"}`} style={n.on ? { background: "var(--primary)" } : undefined}>
-                  <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${n.on ? "left-[22px]" : "left-0.5"}`} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Security */}
-        <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600"><Shield size={20} /></div>
-            <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Security</h3><p className="text-[10px] text-slate-400 font-bold">Account protection</p></div>
-          </div>
-          <div className="space-y-5">
-            <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Admin Email</label>
-              <input type="email" defaultValue="admin@rafik-app.dz" className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs" /></div>
-            <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Change Password</label>
-              <input type="password" placeholder="••••••••••" className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs" /></div>
-            <button className="w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all hover:opacity-90 cursor-pointer" style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)", color: "var(--primary)" }}>Enable Two-Factor Auth</button>
-          </div>
-        </div>
-
-        {/* Appearance */}
-        <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600"><Palette size={20} /></div>
-            <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Appearance</h3><p className="text-[10px] text-slate-400 font-bold">Visual preferences</p></div>
-          </div>
-          <div className="space-y-5">
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 mb-3">Active Theme</p>
-              <div className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
-                <div className="w-10 h-10 rounded-xl" style={{ background: "var(--primary)" }} />
-                <div>
-                  <p className="text-xs font-black uppercase tracking-tight text-primary">{config.label} Theme</p>
-                  <p className="text-[10px] text-slate-400 font-bold">Currently active service color</p>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button
+            onClick={() => setMediationMode("MEDIATED")}
+            className={`p-6 rounded-3xl border-2 text-left transition-all cursor-pointer ${
+              mediationMode === "MEDIATED"
+                ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Shield size={20} className={mediationMode === "MEDIATED" ? "text-primary" : "text-slate-400"} />
+              {mediationMode === "MEDIATED" && <Check size={18} className="text-primary" />}
             </div>
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 mb-3">Mode</p>
-              <div className="flex gap-3">
-                <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-slate-200 text-xs font-black uppercase tracking-wider text-slate-600 cursor-pointer"><Sun size={16} /> Light</button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-black uppercase tracking-wider text-slate-400 cursor-pointer"><Moon size={16} /> Dark</button>
-              </div>
+            <p className="text-xs font-black uppercase tracking-tight text-slate-800 mb-1">Admin in the Middle</p>
+            <p className="text-[11px] text-slate-500 font-bold font-inter leading-relaxed">
+              You relay everything: contact the worker, send the quote to the client, confirm both sides. Clients and workers never talk directly.
+            </p>
+          </button>
+
+          <button
+            onClick={() => setMediationMode("DIRECT")}
+            className={`p-6 rounded-3xl border-2 text-left transition-all cursor-pointer ${
+              mediationMode === "DIRECT"
+                ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <MessageSquare size={20} className={mediationMode === "DIRECT" ? "text-primary" : "text-slate-400"} />
+              {mediationMode === "DIRECT" && <Check size={18} className="text-primary" />}
             </div>
-          </div>
+            <p className="text-xs font-black uppercase tracking-tight text-slate-800 mb-1">Direct (You Observe)</p>
+            <p className="text-[11px] text-slate-500 font-bold font-inter leading-relaxed">
+              Worker and client negotiate and chat with each other directly. You watch every conversation live from the Chats page, but don&apos;t intervene.
+            </p>
+          </button>
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <button className="px-8 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-[0.98] flex items-center gap-2 cursor-pointer" style={{ boxShadow: `0 8px 24px color-mix(in srgb, var(--primary) 15%, transparent)` }}>
-          <Save size={16} /> Save Changes
+      {/* GLOBAL SWITCH 2 — Payment model */}
+      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Wallet size={20} />
+          </div>
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-tight text-slate-800">Payment Model — Global Switch</h2>
+            <p className="text-xs text-slate-400 font-bold font-inter">How the platform earns from workers (default for all workers)</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <button
+            onClick={() => setCommissionMode("PERCENTAGE")}
+            className={`p-6 rounded-3xl border-2 text-left transition-all cursor-pointer ${
+              commissionMode === "PERCENTAGE"
+                ? "border-emerald-500 bg-emerald-50/50 shadow-lg shadow-emerald-500/10"
+                : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Percent size={20} className={commissionMode === "PERCENTAGE" ? "text-emerald-600" : "text-slate-400"} />
+              {commissionMode === "PERCENTAGE" && <Check size={18} className="text-emerald-600" />}
+            </div>
+            <p className="text-xs font-black uppercase tracking-tight text-slate-800 mb-1">Percentage per Job</p>
+            <p className="text-[11px] text-slate-500 font-bold font-inter leading-relaxed">
+              The platform takes a percentage of each completed job&apos;s price. The worker keeps the rest.
+            </p>
+          </button>
+
+          <button
+            onClick={() => setCommissionMode("SUBSCRIPTION")}
+            className={`p-6 rounded-3xl border-2 text-left transition-all cursor-pointer ${
+              commissionMode === "SUBSCRIPTION"
+                ? "border-violet-500 bg-violet-50/50 shadow-lg shadow-violet-500/10"
+                : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <Users size={20} className={commissionMode === "SUBSCRIPTION" ? "text-violet-600" : "text-slate-400"} />
+              {commissionMode === "SUBSCRIPTION" && <Check size={18} className="text-violet-600" />}
+            </div>
+            <p className="text-xs font-black uppercase tracking-tight text-slate-800 mb-1">Subscription (Fixed Price)</p>
+            <p className="text-[11px] text-slate-500 font-bold font-inter leading-relaxed">
+              Workers pay a fixed monthly fee and keep 100% of their job money. You record their payments on the Earnings page.
+            </p>
+          </button>
+        </div>
+
+        {/* Values */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className={commissionMode === "PERCENTAGE" ? "" : "opacity-50"}>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Commission Percentage (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={commissionPercent}
+              onChange={(e) => setCommissionPercent(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-emerald-500/10 focus:bg-white transition-all font-black text-sm text-slate-800"
+            />
+          </div>
+          <div className={commissionMode === "SUBSCRIPTION" ? "" : "opacity-50"}>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Monthly Subscription Fee (DZD)</label>
+            <input
+              type="number"
+              min="0"
+              value={subscriptionFee}
+              onChange={(e) => setSubscriptionFee(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-violet-500/10 focus:bg-white transition-all font-black text-sm text-slate-800"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-10 py-4 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary/90 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+        >
+          {saving ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
+          {saving ? "Saving..." : "Save Global Settings"}
         </button>
+        {saved && (
+          <span className="text-xs font-black text-emerald-600 uppercase tracking-wider animate-fadeIn">✓ Settings saved</span>
+        )}
+        {error && (
+          <span className="text-xs font-black text-rose-600 uppercase tracking-wider animate-fadeIn">{error}</span>
+        )}
+      </div>
+
+      {/* Current summary + account */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="bg-slate-900 text-white rounded-[2.5rem] p-8 space-y-3">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Active Configuration</h3>
+          <p className="text-sm font-black uppercase">
+            {settings?.mediationMode === "DIRECT" ? "Direct — clients & workers chat" : "Mediated — admin relays everything"}
+          </p>
+          <p className="text-sm font-black uppercase text-emerald-400">
+            {settings?.commissionMode === "SUBSCRIPTION"
+              ? `Subscription: ${settings?.subscriptionFee.toLocaleString()} DZD / month`
+              : `Commission: ${settings?.commissionPercent}% per completed job`}
+          </p>
+          <p className="text-[10px] font-bold text-slate-400 font-inter leading-relaxed">
+            Per-worker overrides win over these defaults. Set them from Professionals → worker profile → Mode &amp; Payment.
+          </p>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 space-y-3">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Signed-in Account</h3>
+          <p className="text-sm font-black uppercase text-slate-800">{user?.fullName || "Admin"}</p>
+          <p className="text-xs font-bold text-slate-400 font-inter">{user?.email}</p>
+          <span className="inline-block px-3 py-1 bg-primary/10 text-primary rounded-lg text-[9px] font-black uppercase tracking-widest">
+            {user?.role}
+          </span>
+        </div>
       </div>
     </div>
   );

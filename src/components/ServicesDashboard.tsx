@@ -1,5 +1,7 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
+import { WILAYAS, DEFAULT_WILAYA } from "@/lib/locations";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -14,10 +16,28 @@ import {
 // ==========================================
 
 export interface Review {
+  id?: string;
   clientName: string;
   rating: number;
   comment: string;
   date: string;
+}
+
+export interface PortfolioPost {
+  id: string;
+  image: string;
+  caption?: string | null;
+  createdAt: string;
+}
+
+export type MediationMode = "MEDIATED" | "DIRECT";
+export type CommissionMode = "PERCENTAGE" | "SUBSCRIPTION";
+
+export interface PlatformSettings {
+  mediationMode: MediationMode;
+  commissionMode: CommissionMode;
+  commissionPercent: number;
+  subscriptionFee: number;
 }
 
 export interface Professional {
@@ -33,9 +53,20 @@ export interface Professional {
   rate: string;
   experience: string;
   bio: string;
+  profileImage?: string | null;
   portfolio: string[];
+  portfolioPosts?: PortfolioPost[];
   reviews: Review[];
   availableTimes: string[]; // Worker-specific time slots
+  // Location (launch area: Sétif)
+  wilaya?: string | null;
+  commune?: string | null;
+  address?: string | null;
+  // Per-worker overrides; null = follow the global platform settings
+  mediationModeOverride?: MediationMode | null;
+  commissionModeOverride?: CommissionMode | null;
+  commissionPercentOverride?: number | null;
+  subscriptionFeeOverride?: number | null;
 }
 
 export type BookingStatus =
@@ -48,13 +79,19 @@ export type BookingStatus =
   | "dispatched"
   | "in_progress"
   | "completed"
-  | "cancelled";
+  | "cancelled"
+  // Direct-mode statuses (worker handles the client without admin relay)
+  | "awaiting_worker"
+  | "accepted"
+  | "declined";
 
 export interface Booking {
   id: string;
   clientName: string;
   clientPhone: string;
   clientAddress: string;
+  clientWilaya?: string | null;
+  clientCommune?: string | null;
   serviceCategory: string;
   workerId: string; // references Professional.id
   status: BookingStatus;
@@ -62,10 +99,18 @@ export interface Booking {
   description: string;
   time: string; // creation relative time, e.g. "2 hours ago"
   bookingDate: string; // Day chosen by client
-  bookingTime?: string; // Time confirmed with worker from their availableTimes list
+  bookingTime?: string | null; // Time confirmed with worker from their availableTimes list
   clientPhotos: string[]; // Photos uploaded by client showing the job
   workerQuote: number | null; // Price proposed by the worker (DZD)
   quoteStatus: "none" | "pending" | "sent" | "approved" | "rejected";
+  // Mode the booking runs under (frozen at creation): MEDIATED = admin relays, DIRECT = worker↔client chat
+  mediationModeSnapshot?: MediationMode | null;
+  // Money snapshot frozen at completion
+  finalPrice?: number | null;
+  commissionModeSnapshot?: CommissionMode | null;
+  commissionPercentSnapshot?: number | null;
+  commissionAmount?: number | null;
+  conversation?: { id: string } | null;
   statusHistory: { status: string; timestamp: string }[];
 }
 
@@ -379,7 +424,10 @@ const STATUS_DETAILS: Record<BookingStatus, { label: string; color: string; bg: 
   dispatched: { label: "Dispatched", color: "text-violet-700 border-violet-200", bg: "bg-violet-600" },
   in_progress: { label: "In Progress", color: "text-orange-700 border-orange-200", bg: "bg-orange-500" },
   completed: { label: "Completed", color: "text-emerald-800 border-emerald-300", bg: "bg-emerald-600" },
-  cancelled: { label: "Cancelled", color: "text-rose-700 border-rose-200", bg: "bg-rose-500" }
+  cancelled: { label: "Cancelled", color: "text-rose-700 border-rose-200", bg: "bg-rose-500" },
+  awaiting_worker: { label: "Awaiting Worker", color: "text-cyan-700 border-cyan-200", bg: "bg-cyan-500" },
+  accepted: { label: "Worker Accepted", color: "text-teal-700 border-teal-200", bg: "bg-teal-500" },
+  declined: { label: "Worker Declined", color: "text-rose-700 border-rose-200", bg: "bg-rose-400" }
 };
 
 const COLOR_MAP: Record<string, { bg: string; text: string; hover: string }> = {
@@ -400,6 +448,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
 
   // JSON viewer states
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
@@ -422,15 +471,19 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   const fetchAllData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [resC, resP, resB] = await Promise.all([
-        fetch("http://localhost:4000/api/categories", { headers }),
-        fetch("http://localhost:4000/api/professionals", { headers }),
-        fetch("http://localhost:4000/api/bookings", { headers }),
+      const [resC, resP, resB, resS] = await Promise.all([
+        fetch(`${API_URL}/api/categories`, { headers }),
+        fetch(`${API_URL}/api/professionals`, { headers }),
+        fetch(`${API_URL}/api/bookings`, { headers }),
+        fetch(`${API_URL}/api/settings`, { headers }),
       ]);
       if (resC.ok && resP.ok && resB.ok) {
         setCategories(await resC.json());
         setProfessionals(await resP.json());
         setBookings(await resB.json());
+      }
+      if (resS.ok) {
+        setPlatformSettings(await resS.json());
       }
     } catch (err) {
       console.error("Error fetching data from postgresql backend:", err);
@@ -486,17 +539,19 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     const bookingDate = new Date(Date.now() + 86400000 * Math.floor(Math.random() * 5 + 1)).toISOString().split("T")[0];
     const clientPhone = `+213 6${Math.floor(Math.random() * 80000000 + 10000000)}`;
 
-    const newBookingId = `SV-${Math.floor(Math.random() * 9000 + 1000)}`;
+    const communes = WILAYAS[DEFAULT_WILAYA];
+    const clientCommune = communes[Math.floor(Math.random() * communes.length)];
 
     try {
-      const res = await fetch("http://localhost:4000/api/bookings", {
+      const res = await fetch(`${API_URL}/api/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          id: newBookingId,
           clientName,
           clientPhone,
-          clientAddress: "12 Rue Didouche Mourad, Algiers",
+          clientAddress: "Cité El Hidhab, Bt 12",
+          clientWilaya: DEFAULT_WILAYA,
+          clientCommune,
           serviceCategory: randCategoryObj.name,
           workerId: worker.id,
           description,
@@ -505,8 +560,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
         })
       });
       if (res.ok) {
+        const created = await res.json();
         fetchAllData();
-        showToast(`⚡ New simulated order ${newBookingId} created!`, "info");
+        showToast(`⚡ New simulated order ${created.id} created!`, "info");
       }
     } catch (err) {
       console.error(err);
@@ -518,6 +574,8 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     clientName: string;
     clientPhone: string;
     clientAddress: string;
+    clientWilaya: string;
+    clientCommune: string;
     category: string;
     workerId: string;
     description: string;
@@ -527,13 +585,15 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     clientPhotos?: string[];
   }) => {
     try {
-      const res = await fetch("http://localhost:4000/api/bookings", {
+      const res = await fetch(`${API_URL}/api/bookings`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           clientName: fields.clientName,
           clientPhone: fields.clientPhone,
           clientAddress: fields.clientAddress,
+          clientWilaya: fields.clientWilaya,
+          clientCommune: fields.clientCommune,
           serviceCategory: fields.category,
           workerId: fields.workerId,
           description: fields.description,
@@ -560,11 +620,19 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     rate: string;
     experience: string;
     bio: string;
+    wilaya: string;
+    commune: string;
+    address?: string;
     availableTimes: string[];
   }) => {
-    const nextId = `PRO-${professionals.length + 1}`;
+    // Next id = highest existing PRO-N + 1 (deleting workers never causes collisions)
+    const maxNum = professionals.reduce((max, p) => {
+      const n = parseInt(p.id.replace(/^PRO-/, ""), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+    const nextId = `PRO-${maxNum + 1}`;
     try {
-      const res = await fetch("http://localhost:4000/api/professionals", {
+      const res = await fetch(`${API_URL}/api/professionals`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -575,6 +643,9 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           rate: fields.rate,
           experience: fields.experience,
           bio: fields.bio,
+          wilaya: fields.wilaya,
+          commune: fields.commune,
+          address: fields.address,
           availableTimes: fields.availableTimes
         })
       });
@@ -595,7 +666,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       return;
     }
     try {
-      const res = await fetch("http://localhost:4000/api/categories", {
+      const res = await fetch(`${API_URL}/api/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name, image: icon || "/uploads/categories/default.png" })
@@ -613,7 +684,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   // Delete Category
   const handleDeleteCategory = async (catId: string) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/categories/${catId}`, {
+      const res = await fetch(`${API_URL}/api/categories/${catId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -634,7 +705,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     const cat = categories.find(c => c.name === oldName);
     if (!cat) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/categories/${cat.id}`, {
+      const res = await fetch(`${API_URL}/api/categories/${cat.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: newName, image: newIcon })
@@ -652,7 +723,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   // Delete Worker (Professional)
   const handleDeleteWorker = async (workerId: string) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -671,7 +742,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   // Delete Booking
   const handleDeleteBooking = async (bookingId: string) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
+      const res = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -690,7 +761,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   // 5. Edit existing booking details
   const handleEditBooking = async (id: string, updatedFields: Partial<Booking>) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/bookings/${id}`, {
+      const res = await fetch(`${API_URL}/api/bookings/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(updatedFields)
@@ -705,17 +776,116 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     }
   };
 
-  // 6. Update Booking Status (direct inline transitions)
+  // 6. Update Booking Status (direct inline transitions).
+  // "completed" goes through the dedicated endpoint so the money snapshot
+  // (final price + commission for the worker's payment model) is frozen server-side.
   const handleUpdateBookingStatus = async (bookingId: string, nextStatus: Booking["status"]) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status: nextStatus })
-      });
+      const res = nextStatus === "completed"
+        ? await fetch(`${API_URL}/api/bookings/${bookingId}/complete`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({})
+          })
+        : await fetch(`${API_URL}/api/bookings/${bookingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status: nextStatus })
+          });
       if (res.ok) {
         fetchAllData();
         showToast(`Booking ${bookingId} transitioned to ${STATUS_DETAILS[nextStatus].label}`, "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 6b. Persist quote data (price, time slot, quote status) together with a status move.
+  // This replaces the old local-only mutations that were lost on refresh.
+  const handleUpdateBookingFields = async (bookingId: string, fields: Partial<Booking>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(fields)
+      });
+      if (res.ok) {
+        fetchAllData();
+        if (fields.status) {
+          showToast(`Booking ${bookingId} → ${STATUS_DETAILS[fields.status].label}`, "success");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 6c. Per-worker mode/commission overrides (null = follow global settings)
+  const handleSaveWorkerOverrides = async (workerId: string, overrides: {
+    mediationModeOverride?: MediationMode | null;
+    commissionModeOverride?: CommissionMode | null;
+    commissionPercentOverride?: number | null;
+    subscriptionFeeOverride?: number | null;
+  }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}/overrides`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(overrides)
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast("Worker mode & payment settings saved", "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 6d. Update worker profile fields (location, etc.)
+  const handleSaveWorkerProfile = async (workerId: string, fields: Partial<Professional>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(fields)
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast("Worker profile updated", "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 6e-bis. Delete a worker's portfolio post (admin moderation)
+  const handleDeletePortfolioPost = async (workerId: string, postId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}/portfolio/${postId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast("Portfolio post removed", "success");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 6e. Delete a review permanently (backend recomputes the rating)
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/reviews/${reviewId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchAllData();
+        showToast("Review deleted successfully", "success");
       }
     } catch (err) {
       console.error(err);
@@ -727,7 +897,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     const worker = professionals.find(p => p.id === workerId);
     if (!worker) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/bookings/${bookingId}`, {
+      const res = await fetch(`${API_URL}/api/bookings/${bookingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ workerId, status: "pending_review", bookingTime: null })
@@ -747,7 +917,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
     if (!worker) return;
     const nextVal = !worker.verified;
     try {
-      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ verified: nextVal })
@@ -764,7 +934,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
   // 9. Change worker active status
   const handleChangeWorkerStatus = async (workerId: string, nextStatus: Professional["status"]) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/professionals/${workerId}`, {
+      const res = await fetch(`${API_URL}/api/professionals/${workerId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: nextStatus })
@@ -856,26 +1026,13 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       );
     }
     if (activePage === "earnings") {
-      return <EarningsPage bookings={bookings} professionals={professionals} categories={categories} />;
+      return <EarningsPage />;
     }
     if (activePage === "reviews") {
       return (
         <ReviewsPage
           professionals={professionals}
-          onDeleteReview={(workerId: string, reviewIdx: number) => {
-            setProfessionals(prev =>
-              prev.map(p => {
-                if (p.id === workerId) {
-                  const newReviews = [...p.reviews];
-                  newReviews.splice(reviewIdx, 1);
-                  const avgRating = newReviews.length > 0 ? parseFloat((newReviews.reduce((s, r) => s + r.rating, 0) / newReviews.length).toFixed(1)) : 5.0;
-                  return { ...p, reviews: newReviews, rating: avgRating };
-                }
-                return p;
-              })
-            );
-            showToast("Review deleted successfully", "success");
-          }}
+          onDeleteReview={handleDeleteReview}
         />
       );
     }
@@ -979,10 +1136,14 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
       {selectedWorker && (
         <WorkerProfileDrawer
           worker={selectedWorker}
+          globalSettings={platformSettings}
           onClose={() => setSelectedWorker(null)}
           onToggleVerify={handleToggleVerifyWorker}
           onChangeStatus={handleChangeWorkerStatus}
           onDeleteWorker={handleDeleteWorker}
+          onSaveOverrides={handleSaveWorkerOverrides}
+          onSaveProfile={handleSaveWorkerProfile}
+          onDeletePortfolioPost={handleDeletePortfolioPost}
         />
       )}
 
@@ -992,6 +1153,7 @@ export default function ServicesDashboard({ activePage }: ServicesDashboardProps
           professionals={professionals}
           onClose={() => setSelectedBooking(null)}
           onUpdateStatus={handleUpdateBookingStatus}
+          onUpdateBooking={handleUpdateBookingFields}
           onReassignWorker={handleReassignWorker}
           onEditBooking={(b) => {
             setSelectedBooking(null);
@@ -1240,7 +1402,7 @@ function DashboardOverview({
             >
               <div className="w-12 h-12 mx-auto mb-2 bg-white rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden group-hover:scale-110 transition-transform">
                 <img
-                  src={(c.image || c.icon || "").startsWith("/uploads") ? `http://localhost:4000${c.image || c.icon}` : (c.image || c.icon || "")}
+                  src={(c.image || c.icon || "").startsWith("/uploads") ? `${API_URL}${c.image || c.icon}` : (c.image || c.icon || "")}
                   alt={c.name}
                   className="w-full h-full object-contain p-1"
                   onError={(e) => {
@@ -1410,9 +1572,17 @@ function CategoryWorkersPage({
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-primary/10 text-primary font-black uppercase rounded-2xl flex items-center justify-center text-sm">
-                      {p.name.split(" ").map(n => n[0]).join("")}
-                    </div>
+                    {p.profileImage ? (
+                      <img
+                        src={p.profileImage.startsWith("/uploads") ? `${API_URL}${p.profileImage}` : p.profileImage}
+                        alt={p.name}
+                        className="w-12 h-12 rounded-2xl object-cover border border-slate-100"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-primary/10 text-primary font-black uppercase rounded-2xl flex items-center justify-center text-sm">
+                        {p.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                    )}
                     <div className="text-left">
                       <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
                         {p.name}
@@ -1534,7 +1704,7 @@ function CategoriesPage({
           >
             <div className="flex items-center gap-4">
               <div className="text-4xl bg-slate-50 p-3 rounded-2xl group-hover:scale-105 transition-transform">
-                <img src={(c.image || c.icon || "").startsWith("/uploads") ? `http://localhost:4000${c.image || c.icon}` : (c.image || c.icon || "")} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
+                <img src={(c.image || c.icon || "").startsWith("/uploads") ? `${API_URL}${c.image || c.icon}` : (c.image || c.icon || "")} alt={c.name} className="w-10 h-10 object-contain rounded-lg" onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
                 }} />
               </div>
@@ -1896,45 +2066,92 @@ function BookingsPage({
 // EARNINGS VIEW WITH REVENUE TRENDS
 // ==========================================
 
-interface EarningsPageProps {
-  bookings: Booking[];
-  professionals: Professional[];
-  categories: any[];
+interface WorkerEarningsRow {
+  professionalId: string;
+  name: string;
+  category: string;
+  commissionMode: CommissionMode;
+  commissionPercent: number | null;
+  subscriptionFee: number | null;
+  completedJobs: number;
+  gross: number;
+  platformCut: number;
+  netPayout: number;
+  subscriptionPaid: number;
 }
 
-function EarningsPage({ bookings, professionals, categories }: EarningsPageProps) {
-  const [selectedCategory, setSelectedCategory] = useState("all");
+interface EarningsData {
+  workers: WorkerEarningsRow[];
+  totals: {
+    gross: number;
+    commissionRevenue: number;
+    subscriptionRevenue: number;
+    netWorkerPayouts: number;
+    platformRevenue: number;
+  };
+}
 
-  const filteredBookings = bookings.filter(b => 
-    selectedCategory === "all" || b.serviceCategory === selectedCategory
-  );
+function EarningsPage() {
+  const { token } = useAuth();
+  const [data, setData] = useState<EarningsData | null>(null);
+  const [payWorker, setPayWorker] = useState<WorkerEarningsRow | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // Revenue metrics
-  const completedJobs = filteredBookings.filter(b => b.status === "completed");
-  const activeJobs = filteredBookings.filter(b => 
-    b.status !== "completed" && b.status !== "cancelled" && b.status !== "pending_review"
-  );
+  const fetchEarnings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/earnings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setData(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const confirmedRevenue = completedJobs.reduce((sum, b) => sum + (b.workerQuote || 0), 0);
-  const pendingRevenue = activeJobs.reduce((sum, b) => sum + (b.workerQuote || 0), 0);
-  const platformFee = Math.round(confirmedRevenue * 0.15); // 15% platform commission
-  const netWorkerPayouts = confirmedRevenue - platformFee;
+  useEffect(() => {
+    if (token) fetchEarnings();
+  }, [token]);
 
-  // Earnings by Worker
-  const workerEarnings = professionals.map(pro => {
-    const proBookings = completedJobs.filter(b => b.workerId === pro.id);
-    const totalRevenue = proBookings.reduce((sum, b) => sum + (b.workerQuote || 0), 0);
-    const payout = Math.round(totalRevenue * 0.85); // 85% goes to worker
-    const fee = totalRevenue - payout;
-    return {
-      name: pro.name,
-      category: pro.category,
-      jobsCount: proBookings.length,
-      gross: totalRevenue,
-      payout,
-      platformFee: fee
-    };
-  }).filter(w => w.gross > 0).sort((a, b) => b.gross - a.gross);
+  const openPayModal = (w: WorkerEarningsRow) => {
+    setPayWorker(w);
+    setPayAmount(w.subscriptionFee != null ? String(w.subscriptionFee) : "");
+    setPayNote("");
+  };
+
+  // Record a subscription payment covering one month starting today
+  const handleRecordPayment = async () => {
+    if (!payWorker || !payAmount) return;
+    setSaving(true);
+    const periodStart = new Date();
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    try {
+      const res = await fetch(`${API_URL}/api/earnings/subscription-payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          professionalId: payWorker.professionalId,
+          amount: parseInt(payAmount),
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+          note: payNote || undefined,
+        }),
+      });
+      if (res.ok) {
+        setPayWorker(null);
+        fetchEarnings();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const totals = data?.totals;
+  const workers = (data?.workers ?? []).filter(w => w.gross > 0 || w.subscriptionPaid > 0 || w.commissionMode === "SUBSCRIPTION");
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16">
@@ -1942,86 +2159,110 @@ function EarningsPage({ bookings, professionals, categories }: EarningsPageProps
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-left">
         <div className="space-y-2">
           <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Earnings</h1>
-          <p className="text-sm text-slate-400 font-medium font-inter">Platform commission billing and worker payout accounts</p>
+          <p className="text-sm text-slate-400 font-medium font-inter">
+            Real revenue per worker — respects each worker&apos;s payment model (percentage or subscription)
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-inter">Specialty</span>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase outline-none text-slate-700 focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="all">All Categories</option>
-            {categories.map(c => (
-              <option key={c.name} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+        <button
+          onClick={fetchEarnings}
+          className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Financial Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Gross Confirmed Revenue</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Gross Completed Revenue</span>
           <span className="text-2xl font-black text-slate-800 tracking-tight block mt-2">
-            {confirmedRevenue.toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
+            {(totals?.gross ?? 0).toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
           </span>
-          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">{completedJobs.length} completed jobs</p>
+          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">All completed jobs</p>
         </div>
         <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Platform Commission (15%)</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Commission Revenue (%)</span>
           <span className="text-2xl font-black text-primary tracking-tight block mt-2">
-            {platformFee.toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
+            {(totals?.commissionRevenue ?? 0).toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
           </span>
-          <p className="text-[10px] text-emerald-500 font-bold font-inter mt-1">Net platform earnings</p>
+          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">From percentage-model workers</p>
         </div>
         <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Net Worker Payouts</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Subscription Revenue</span>
+          <span className="text-2xl font-black text-violet-600 tracking-tight block mt-2">
+            {(totals?.subscriptionRevenue ?? 0).toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
+          </span>
+          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">Fixed fees collected</p>
+        </div>
+        <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Total Platform Revenue</span>
           <span className="text-2xl font-black text-emerald-600 tracking-tight block mt-2">
-            {netWorkerPayouts.toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
+            {(totals?.platformRevenue ?? 0).toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
           </span>
-          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">Disbursed to professionals</p>
-        </div>
-        <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Pending / Escrow Volume</span>
-          <span className="text-2xl font-black text-amber-600 tracking-tight block mt-2">
-            {pendingRevenue.toLocaleString()} <span className="text-xs text-slate-400 font-bold">DZD</span>
-          </span>
-          <p className="text-[10px] text-slate-400 font-bold font-inter mt-1">{activeJobs.length} active quotes/orders</p>
+          <p className="text-[10px] text-emerald-500 font-bold font-inter mt-1">Commission + subscriptions</p>
         </div>
       </div>
 
       {/* Payout Breakdown Table */}
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm">
         <h3 className="text-sm font-black uppercase tracking-tight text-slate-800 mb-6 text-left">Worker Billing Details</h3>
-        {workerEarnings.length === 0 ? (
-          <p className="text-slate-400 font-bold font-inter text-center py-6">No completed payouts recorded in this category selection.</p>
+        {workers.length === 0 ? (
+          <p className="text-slate-400 font-bold font-inter text-center py-6">No completed jobs or subscriptions recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table text-left">
               <thead>
                 <tr className="border-b border-slate-50 text-[10px] uppercase tracking-widest text-slate-400">
-                  <th className="pb-4 font-black">Worker Name</th>
+                  <th className="pb-4 font-black">Worker</th>
                   <th className="pb-4 font-black">Specialty</th>
-                  <th className="pb-4 font-black text-center">Completed Jobs</th>
-                  <th className="pb-4 font-black text-right">Gross Billing</th>
-                  <th className="pb-4 font-black text-right">Platform Fee (15%)</th>
-                  <th className="pb-4 font-black text-right">Net Payout (85%)</th>
+                  <th className="pb-4 font-black text-center">Model</th>
+                  <th className="pb-4 font-black text-center">Jobs</th>
+                  <th className="pb-4 font-black text-right">Gross</th>
+                  <th className="pb-4 font-black text-right">Platform Cut</th>
+                  <th className="pb-4 font-black text-right">Worker Keeps</th>
+                  <th className="pb-4 font-black text-right">Subs Paid</th>
+                  <th className="pb-4 font-black text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-xs font-semibold text-slate-700">
-                {workerEarnings.map((w, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                {workers.map((w) => (
+                  <tr key={w.professionalId} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-4 font-black text-slate-800 uppercase tracking-tight">{w.name}</td>
                     <td className="py-4 text-slate-500 font-medium">{w.category}</td>
+                    <td className="py-4 text-center">
+                      {w.commissionMode === "PERCENTAGE" ? (
+                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-lg text-[9px] font-black uppercase">
+                          {w.commissionPercent}%
+                        </span>
+                      ) : (
+                        <span className="bg-violet-50 text-violet-600 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase">
+                          SUB {w.subscriptionFee?.toLocaleString()} DZD/mo
+                        </span>
+                      )}
+                    </td>
                     <td className="py-4 text-center font-black">
                       <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px]">
-                        {w.jobsCount}
+                        {w.completedJobs}
                       </span>
                     </td>
                     <td className="py-4 text-right font-black text-slate-800">{w.gross.toLocaleString()} DZD</td>
-                    <td className="py-4 text-right font-black text-rose-500">-{w.platformFee.toLocaleString()} DZD</td>
-                    <td className="py-4 text-right font-black text-emerald-600">{w.payout.toLocaleString()} DZD</td>
+                    <td className="py-4 text-right font-black text-rose-500">
+                      {w.platformCut > 0 ? `-${w.platformCut.toLocaleString()} DZD` : "—"}
+                    </td>
+                    <td className="py-4 text-right font-black text-emerald-600">{w.netPayout.toLocaleString()} DZD</td>
+                    <td className="py-4 text-right font-black text-violet-600">
+                      {w.subscriptionPaid > 0 ? `${w.subscriptionPaid.toLocaleString()} DZD` : "—"}
+                    </td>
+                    <td className="py-4 text-right">
+                      {w.commissionMode === "SUBSCRIPTION" && (
+                        <button
+                          onClick={() => openPayModal(w)}
+                          className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-violet-700 transition-all cursor-pointer"
+                        >
+                          + Record Payment
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -2030,15 +2271,51 @@ function EarningsPage({ bookings, professionals, categories }: EarningsPageProps
         )}
       </div>
 
-      {/* Revenue Trend chart */}
-      <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm">
-        <h2 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6 text-left">Confirmed Billings Trend</h2>
-        <div className="flex items-end gap-2 h-40">
-          {[32, 48, 35, 58, 45, 72, 55, 42, 78, 62, 50, 82, 68, 58].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t-lg transition-all duration-300 hover:opacity-100" style={{ height: `${h}%`, background: "var(--primary)", opacity: 0.3 + (h / 130) }} />
-          ))}
+      {/* Record Subscription Payment modal */}
+      {payWorker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-sm w-full space-y-5 relative m-4">
+            <button
+              onClick={() => setPayWorker(null)}
+              className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+            <div className="space-y-1 text-left">
+              <h2 className="text-lg font-black text-slate-800 uppercase">Subscription Payment</h2>
+              <p className="text-xs text-slate-400 font-bold font-inter">{payWorker.name} — one month starting today</p>
+            </div>
+            <div className="space-y-3 text-left">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Amount (DZD) *</label>
+                <input
+                  type="number"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-black outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Note (optional)</label>
+                <input
+                  type="text"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  placeholder="e.g. Cash payment received"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none font-inter"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleRecordPayment}
+              disabled={saving || !payAmount}
+              className="w-full py-4 bg-violet-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-violet-700 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Record Payment"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -2058,6 +2335,8 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
+  const [clientWilaya, setClientWilaya] = useState(DEFAULT_WILAYA);
+  const [clientCommune, setClientCommune] = useState("");
   const [category, setCategory] = useState(categories[0]?.name || "");
   const [workerId, setWorkerId] = useState("");
   const [description, setDescription] = useState("");
@@ -2065,7 +2344,14 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("");
 
-  const filteredWorkers = professionals.filter(p => p.category === category);
+  // Prefer workers serving the client's commune, but keep others selectable
+  const filteredWorkers = professionals
+    .filter(p => p.category === category)
+    .sort((a, b) => {
+      const aNear = a.commune === clientCommune ? 0 : 1;
+      const bNear = b.commune === clientCommune ? 0 : 1;
+      return aNear - bNear;
+    });
 
   useEffect(() => {
     if (filteredWorkers.length > 0) {
@@ -2081,10 +2367,16 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
       alert("Please fill in all required fields.");
       return;
     }
+    if (!clientCommune) {
+      alert("Please select the client's commune (location).");
+      return;
+    }
     onSubmit({
       clientName,
       clientPhone,
       clientAddress,
+      clientWilaya,
+      clientCommune,
       category,
       workerId,
       description,
@@ -2168,12 +2460,37 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Wilaya *</label>
+              <select
+                value={clientWilaya}
+                onChange={(e) => { setClientWilaya(e.target.value); setClientCommune(""); }}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                {Object.keys(WILAYAS).map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Commune *</label>
+              <select
+                value={clientCommune}
+                required
+                onChange={(e) => setClientCommune(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                <option value="">— Select commune —</option>
+                {(WILAYAS[clientWilaya] || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Client Address *</label>
             <input
               type="text"
               required
-              placeholder="e.g. Villa 14, Cité Les Dunes, Cheraga"
+              placeholder="e.g. Villa 14, Cité El Hidhab, Sétif"
               value={clientAddress}
               onChange={(e) => setClientAddress(e.target.value)}
               className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
@@ -2208,7 +2525,7 @@ function RegisterBookingModal({ categories, professionals, onClose, onSubmit }: 
                 ) : (
                   filteredWorkers.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name} ({w.rate})
+                      {w.name}{w.commune ? ` — ${w.commune}` : ""} ({w.rate})
                     </option>
                   ))
                 )}
@@ -2266,6 +2583,9 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
   const [rate, setRate] = useState("");
   const [experience, setExperience] = useState("");
   const [bio, setBio] = useState("");
+  const [wilaya, setWilaya] = useState(DEFAULT_WILAYA);
+  const [commune, setCommune] = useState("");
+  const [address, setAddress] = useState("");
   
   // Available times state checkboxes
   const timeSlots = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
@@ -2285,6 +2605,10 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
       alert("Please fill in all fields.");
       return;
     }
+    if (!commune) {
+      alert("Please select the worker's commune (location).");
+      return;
+    }
     onSubmit({
       name,
       phone,
@@ -2292,6 +2616,9 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
       rate,
       experience,
       bio,
+      wilaya,
+      commune,
+      address,
       availableTimes: selectedSlots
     });
   };
@@ -2350,6 +2677,42 @@ function AddWorkerModal({ categories, onClose, onSubmit }: AddWorkerModalProps) 
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Wilaya *</label>
+              <select
+                value={wilaya}
+                onChange={(e) => { setWilaya(e.target.value); setCommune(""); }}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                {Object.keys(WILAYAS).map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Commune *</label>
+              <select
+                value={commune}
+                required
+                onChange={(e) => setCommune(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+              >
+                <option value="">— Select commune —</option>
+                {(WILAYAS[wilaya] || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block mb-2">Street / Neighborhood (Optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Cité Bel Air, Sétif"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full px-5 py-4 bg-slate-50 border border-transparent focus:border-primary/20 rounded-2xl outline-none focus:ring-4 focus:ring-primary/5 focus:bg-white transition-all font-semibold text-xs text-slate-700"
+            />
           </div>
 
           <div>
@@ -2470,7 +2833,7 @@ function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("http://localhost:4000/api/upload?type=categories", {
+      const res = await fetch(`${API_URL}/api/upload?type=categories`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -2607,7 +2970,7 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch("http://localhost:4000/api/upload?type=categories", {
+        const res = await fetch(`${API_URL}/api/upload?type=categories`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: formData
@@ -2670,7 +3033,7 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
               />
               {preview && (
                 <div className="w-28 h-28 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50">
-                  <img src={preview.startsWith("/uploads") ? `http://localhost:4000${preview}` : preview} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
+                  <img src={preview.startsWith("/uploads") ? `${API_URL}${preview}` : preview} alt="Preview" className="w-full h-full object-cover" onError={(e) => {
                     (e.target as HTMLImageElement).src = "https://cdn-icons-png.flaticon.com/512/1048/1048953.png";
                   }} />
                 </div>
@@ -2930,13 +3293,48 @@ function EditBookingModal({
 
 interface WorkerProfileDrawerProps {
   worker: Professional;
+  globalSettings: PlatformSettings | null;
   onClose: () => void;
   onToggleVerify: (id: string) => void;
   onChangeStatus: (id: string, s: Professional["status"]) => void;
   onDeleteWorker: (id: string) => void;
+  onSaveOverrides: (id: string, overrides: {
+    mediationModeOverride?: MediationMode | null;
+    commissionModeOverride?: CommissionMode | null;
+    commissionPercentOverride?: number | null;
+    subscriptionFeeOverride?: number | null;
+  }) => void;
+  onSaveProfile: (id: string, fields: Partial<Professional>) => void;
+  onDeletePortfolioPost: (workerId: string, postId: string) => void;
 }
 
-function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, onDeleteWorker }: WorkerProfileDrawerProps) {
+function WorkerProfileDrawer({ worker, globalSettings, onClose, onToggleVerify, onChangeStatus, onDeleteWorker, onSaveOverrides, onSaveProfile, onDeletePortfolioPost }: WorkerProfileDrawerProps) {
+  // Per-worker switches: "" = follow global, otherwise an explicit override
+  const [medMode, setMedMode] = useState<string>(worker.mediationModeOverride ?? "");
+  const [comMode, setComMode] = useState<string>(worker.commissionModeOverride ?? "");
+  const [percent, setPercent] = useState<string>(worker.commissionPercentOverride != null ? String(worker.commissionPercentOverride) : "");
+  const [fee, setFee] = useState<string>(worker.subscriptionFeeOverride != null ? String(worker.subscriptionFeeOverride) : "");
+  // Location editing
+  const [wilaya, setWilaya] = useState<string>(worker.wilaya ?? DEFAULT_WILAYA);
+  const [commune, setCommune] = useState<string>(worker.commune ?? "");
+  const [address, setAddress] = useState<string>(worker.address ?? "");
+
+  const effectiveMediation = (medMode || globalSettings?.mediationMode || "MEDIATED") as MediationMode;
+  const effectiveCommission = (comMode || globalSettings?.commissionMode || "PERCENTAGE") as CommissionMode;
+
+  const saveModes = () => {
+    onSaveOverrides(worker.id, {
+      mediationModeOverride: (medMode || null) as MediationMode | null,
+      commissionModeOverride: (comMode || null) as CommissionMode | null,
+      commissionPercentOverride: percent === "" ? null : parseFloat(percent),
+      subscriptionFeeOverride: fee === "" ? null : parseInt(fee),
+    });
+  };
+
+  const saveLocation = () => {
+    onSaveProfile(worker.id, { wilaya, commune: commune || null, address: address || null });
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -2958,9 +3356,17 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, 
 
           {/* Profile overview Card */}
           <div className="flex items-center gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-            <div className="w-16 h-16 bg-primary text-white font-black text-xl uppercase rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-primary/20">
-              {worker.name.split(" ").map(n => n[0]).join("")}
-            </div>
+            {worker.profileImage ? (
+              <img
+                src={worker.profileImage.startsWith("/uploads") ? `${API_URL}${worker.profileImage}` : worker.profileImage}
+                alt={worker.name}
+                className="w-16 h-16 rounded-[1.5rem] object-cover shadow-lg border-2 border-white"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-primary text-white font-black text-xl uppercase rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-primary/20">
+                {worker.name.split(" ").map(n => n[0]).join("")}
+              </div>
+            )}
             <div className="space-y-1">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                 {worker.name}
@@ -3016,6 +3422,139 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, 
             </div>
           </div>
 
+          {/* Location (service area) */}
+          <div className="space-y-3 bg-slate-50/50 p-5 rounded-3xl border border-slate-100">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <MapPin size={12} /> Service Location
+            </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Wilaya</label>
+                <select
+                  value={wilaya}
+                  onChange={(e) => { setWilaya(e.target.value); setCommune(""); }}
+                  className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-black outline-none"
+                >
+                  {Object.keys(WILAYAS).map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Commune</label>
+                <select
+                  value={commune}
+                  onChange={(e) => setCommune(e.target.value)}
+                  className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-black outline-none"
+                >
+                  <option value="">— Select —</option>
+                  {(WILAYAS[wilaya] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street / neighborhood (optional)"
+              className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold outline-none font-inter"
+            />
+            <button
+              onClick={saveLocation}
+              className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all cursor-pointer"
+            >
+              Save Location
+            </button>
+          </div>
+
+          {/* Mode & Payment: per-worker switches (override the global settings) */}
+          <div className="space-y-4 bg-primary/5 p-5 rounded-3xl border border-primary/10">
+            <span className="text-[9px] font-black text-primary uppercase tracking-widest flex items-center gap-1.5">
+              <Shield size={12} /> Mode & Payment (This Worker)
+            </span>
+
+            {/* Switch 1: mediation mode */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                Order Handling — currently: <span className="text-primary">{effectiveMediation === "MEDIATED" ? "Admin in the middle" : "Direct (chat)"}</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { v: "", label: `Global (${globalSettings?.mediationMode === "DIRECT" ? "Direct" : "Mediated"})` },
+                  { v: "MEDIATED", label: "Mediated" },
+                  { v: "DIRECT", label: "Direct" },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    onClick={() => setMedMode(opt.v)}
+                    className={`py-2 px-1 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      medMode === opt.v
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-primary/30"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Switch 2: payment model */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                Payment Model — currently: <span className="text-primary">{effectiveCommission === "PERCENTAGE" ? "Percentage %" : "Subscription (fixed)"}</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { v: "", label: `Global (${globalSettings?.commissionMode === "SUBSCRIPTION" ? "Subscription" : `${globalSettings?.commissionPercent ?? 15}%`})` },
+                  { v: "PERCENTAGE", label: "Percentage" },
+                  { v: "SUBSCRIPTION", label: "Subscription" },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    onClick={() => setComMode(opt.v)}
+                    className={`py-2 px-1 rounded-xl border text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      comMode === opt.v
+                        ? "bg-primary text-white border-primary"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-primary/30"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom values for the overrides */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Custom % (blank = global)</label>
+                <input
+                  type="number"
+                  value={percent}
+                  onChange={(e) => setPercent(e.target.value)}
+                  placeholder={`${globalSettings?.commissionPercent ?? 15}`}
+                  className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-black outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Custom Fee DZD (blank = global)</label>
+                <input
+                  type="number"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                  placeholder={`${globalSettings?.subscriptionFee ?? 3000}`}
+                  className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-xs font-black outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={saveModes}
+              className="w-full py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all cursor-pointer"
+            >
+              Save Mode & Payment
+            </button>
+          </div>
+
           {/* Pricing and Details */}
           <div className="space-y-4">
             <div>
@@ -3038,20 +3577,43 @@ function WorkerProfileDrawer({ worker, onClose, onToggleVerify, onChangeStatus, 
             </div>
           </div>
 
-          {/* Portfolio Pictures */}
-          <div className="space-y-2">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Portfolio Images</span>
-            <div className="grid grid-cols-3 gap-3">
-              {worker.portfolio.map((imgUrl, i) => (
-                <div key={i} className="aspect-video bg-slate-100 rounded-xl overflow-hidden relative group border border-slate-100">
-                  <img
-                    src={imgUrl.startsWith("/uploads") ? `http://localhost:4000${imgUrl}` : imgUrl}
-                    alt={`work-${i}`}
-                    className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-              ))}
-            </div>
+          {/* Work Posts — the worker's published portfolio */}
+          <div className="space-y-3">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+              Work Posts ({worker.portfolioPosts?.length ?? 0})
+            </span>
+            {(worker.portfolioPosts?.length ?? 0) === 0 ? (
+              <p className="text-[10px] text-slate-400 font-bold font-inter bg-slate-50 border border-dashed border-slate-100 rounded-2xl p-4 text-center">
+                This worker hasn&apos;t published any work posts yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {worker.portfolioPosts!.map((post) => (
+                  <div key={post.id} className="border border-slate-100 rounded-2xl overflow-hidden group">
+                    <div className="relative">
+                      <img
+                        src={post.image.startsWith("/uploads") ? `${API_URL}${post.image}` : post.image}
+                        alt={post.caption || "Work post"}
+                        className="w-full h-36 object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                      />
+                      <button
+                        onClick={() => { if (confirm("Remove this post from the worker's portfolio?")) onDeletePortfolioPost(worker.id, post.id); }}
+                        className="absolute top-2 right-2 w-8 h-8 bg-slate-900/60 hover:bg-rose-600 text-white rounded-xl flex items-center justify-center cursor-pointer transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove post (moderation)"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <div className="px-4 py-3 flex justify-between items-center gap-3">
+                      <p className="text-[11px] font-bold text-slate-600 font-inter">{post.caption || "—"}</p>
+                      <span className="text-[9px] font-bold text-slate-400 font-inter shrink-0">
+                        {new Date(post.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Client Reviews */}
@@ -3110,6 +3672,7 @@ interface BookingDetailDrawerProps {
   professionals: Professional[];
   onClose: () => void;
   onUpdateStatus: (id: string, s: Booking["status"]) => void;
+  onUpdateBooking: (id: string, fields: Partial<Booking>) => void;
   onReassignWorker: (id: string, wId: string) => void;
   onEditBooking: (b: Booking) => void;
   onDeleteBooking: (id: string) => void;
@@ -3120,6 +3683,7 @@ function BookingDetailDrawer({
   professionals,
   onClose,
   onUpdateStatus,
+  onUpdateBooking,
   onReassignWorker,
   onEditBooking,
   onDeleteBooking
@@ -3129,20 +3693,31 @@ function BookingDetailDrawer({
   const [quoteAmount, setQuoteAmount] = useState(booking.workerQuote ? String(booking.workerQuote) : "");
 
   const worker = professionals.find(p => p.id === booking.workerId);
+  const isDirect = booking.mediationModeSnapshot === "DIRECT";
   const eligibleWorkers = professionals.filter(
     p => p.category === booking.serviceCategory && p.id !== booking.workerId
   );
 
-  const statusList: { id: BookingStatus; label: string; action: string }[] = [
-    { id: "pending_review", label: "Pending Review", action: "Review Booking" },
-    { id: "contacting_worker", label: "Contacting Worker", action: "Contact Worker" },
-    { id: "quote_sent", label: "Quote Sent", action: "Send Quote" },
-    { id: "quote_approved", label: "Quote Approved", action: "Approve Quote" },
-    { id: "both_confirmed", label: "Both Confirmed", action: "Confirm Both" },
-    { id: "dispatched", label: "Dispatched", action: "Dispatch Worker" },
-    { id: "in_progress", label: "In Progress", action: "Start Job" },
-    { id: "completed", label: "Completed", action: "Complete Job" }
-  ];
+  // Mediated chain (admin relays) vs direct chain (worker drives, admin observes)
+  const statusList: { id: BookingStatus; label: string; action: string }[] = isDirect
+    ? [
+        { id: "awaiting_worker", label: "Awaiting Worker", action: "Notify Worker" },
+        { id: "accepted", label: "Worker Accepted", action: "Accept Order" },
+        { id: "quote_sent", label: "Quote Sent", action: "Send Quote" },
+        { id: "quote_approved", label: "Quote Approved", action: "Approve Quote" },
+        { id: "in_progress", label: "In Progress", action: "Start Job" },
+        { id: "completed", label: "Completed", action: "Complete Job" }
+      ]
+    : [
+        { id: "pending_review", label: "Pending Review", action: "Review Booking" },
+        { id: "contacting_worker", label: "Contacting Worker", action: "Contact Worker" },
+        { id: "quote_sent", label: "Quote Sent", action: "Send Quote" },
+        { id: "quote_approved", label: "Quote Approved", action: "Approve Quote" },
+        { id: "both_confirmed", label: "Both Confirmed", action: "Confirm Both" },
+        { id: "dispatched", label: "Dispatched", action: "Dispatch Worker" },
+        { id: "in_progress", label: "In Progress", action: "Start Job" },
+        { id: "completed", label: "Completed", action: "Complete Job" }
+      ];
 
   const currentIdx = statusList.findIndex(s => s.id === booking.status);
   const nextStateObj = currentIdx < statusList.length - 1 ? statusList[currentIdx + 1] : null;
@@ -3152,34 +3727,37 @@ function BookingDetailDrawer({
     onUpdateStatus(booking.id, e.target.value as BookingStatus);
   };
 
-  // Confirm worker with time slot AND price together, then send to client
+  // Confirm worker with time slot AND price together, then send to client.
+  // Everything is persisted in one PUT so the quote survives refreshes.
   const handleSendQuoteToClient = () => {
     if (!selectedSlot || !quoteAmount) return;
-    booking.bookingTime = selectedSlot;
-    booking.workerQuote = parseInt(quoteAmount);
-    booking.quoteStatus = "sent";
-    booking.price = `${parseInt(quoteAmount).toLocaleString()} DZD`;
-    onUpdateStatus(booking.id, "quote_sent");
+    onUpdateBooking(booking.id, {
+      status: "quote_sent",
+      bookingTime: selectedSlot,
+      workerQuote: parseInt(quoteAmount),
+      quoteStatus: "sent",
+      price: `${parseInt(quoteAmount).toLocaleString()} DZD`,
+    });
   };
 
   // Client approves the quote
   const handleClientApproveQuote = () => {
-    booking.quoteStatus = "approved";
-    onUpdateStatus(booking.id, "both_confirmed");
+    onUpdateBooking(booking.id, { status: "both_confirmed", quoteStatus: "approved" });
   };
 
   // Client rejects the quote
   const handleClientRejectQuote = () => {
-    booking.quoteStatus = "rejected";
-    onUpdateStatus(booking.id, "quote_rejected");
+    onUpdateBooking(booking.id, { status: "quote_rejected", quoteStatus: "rejected" });
   };
 
   // Re-quote after rejection
   const handleReQuote = () => {
-    booking.quoteStatus = "pending";
-    booking.workerQuote = null;
-    booking.bookingTime = undefined;
-    onUpdateStatus(booking.id, "contacting_worker");
+    onUpdateBooking(booking.id, {
+      status: "contacting_worker",
+      quoteStatus: "none",
+      workerQuote: null,
+      bookingTime: null,
+    });
   };
 
   return (
@@ -3223,6 +3801,11 @@ function BookingDetailDrawer({
               </p>
               <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 font-inter">
                 <MapPin size={12} /> {booking.clientAddress}
+                {(booking.clientCommune || booking.clientWilaya) && (
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-primary/5 text-primary rounded-lg">
+                    {[booking.clientCommune, booking.clientWilaya].filter(Boolean).join(", ")}
+                  </span>
+                )}
               </p>
               <div className="border-t border-slate-100 pt-2.5 mt-2.5 space-y-1.5">
                 <div className="flex gap-4 text-xs font-bold font-inter text-slate-500">
@@ -3258,7 +3841,7 @@ function BookingDetailDrawer({
                 {booking.clientPhotos.map((photo, i) => (
                   <div key={i} className="aspect-square rounded-2xl overflow-hidden border border-slate-100 group">
                     <img
-                      src={photo.startsWith("/uploads") ? `http://localhost:4000${photo}` : photo}
+                      src={photo.startsWith("/uploads") ? `${API_URL}${photo}` : photo}
                       alt={`Job photo ${i + 1}`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
@@ -3311,9 +3894,17 @@ function BookingDetailDrawer({
                 {worker ? (
                   <>
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary/10 text-primary font-black rounded-xl flex items-center justify-center text-xs uppercase">
-                        {worker.name.split(" ").map(n => n[0]).join("")}
-                      </div>
+                      {worker.profileImage ? (
+                        <img
+                          src={worker.profileImage.startsWith("/uploads") ? `${API_URL}${worker.profileImage}` : worker.profileImage}
+                          alt={worker.name}
+                          className="w-12 h-12 rounded-xl object-cover border border-slate-100"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-primary/10 text-primary font-black rounded-xl flex items-center justify-center text-xs uppercase">
+                          {worker.name.split(" ").map(n => n[0]).join("")}
+                        </div>
+                      )}
                       <div>
                         <p className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 font-bold">
                           {worker.name}
@@ -3334,8 +3925,23 @@ function BookingDetailDrawer({
             )}
           </div>
 
-          {/* CONTACTING WORKER: Combined time slot + price selection */}
-          {booking.status === "contacting_worker" && worker && (
+          {/* DIRECT MODE: worker handles the client themselves — admin observes */}
+          {isDirect && (
+            <div className="bg-cyan-50 border border-cyan-100 p-5 rounded-3xl space-y-2">
+              <div className="flex items-center gap-2 text-cyan-700">
+                <MessageSquare size={16} />
+                <h4 className="text-xs font-black uppercase tracking-tight">Direct Mode — You Are Observing</h4>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold font-inter leading-relaxed">
+                This order runs in <strong className="text-cyan-700">direct mode</strong>: the worker and the client
+                negotiate the quote and chat with each other directly. You can follow the conversation from the
+                <strong className="text-cyan-700"> Chats</strong> page but you don&apos;t relay quotes here.
+              </p>
+            </div>
+          )}
+
+          {/* CONTACTING WORKER: Combined time slot + price selection (admin relay, mediated mode only) */}
+          {!isDirect && booking.status === "contacting_worker" && worker && (
             <div className="bg-primary/5 border border-primary/15 p-5 rounded-3xl space-y-4">
               <div className="flex items-center gap-2 text-primary">
                 <Clock size={16} />
@@ -3395,8 +4001,8 @@ function BookingDetailDrawer({
             </div>
           )}
 
-          {/* QUOTE SENT: Waiting for client response */}
-          {booking.status === "quote_sent" && (
+          {/* QUOTE SENT: Waiting for client response (admin relay, mediated mode only) */}
+          {!isDirect && booking.status === "quote_sent" && (
             <div className="bg-purple-50 border border-purple-100 p-5 rounded-3xl space-y-4">
               <div className="flex items-center gap-2 text-purple-700">
                 <DollarSign size={16} />
@@ -3429,8 +4035,8 @@ function BookingDetailDrawer({
             </div>
           )}
 
-          {/* QUOTE REJECTED: Option to re-quote */}
-          {booking.status === "quote_rejected" && (
+          {/* QUOTE REJECTED: Option to re-quote (admin relay, mediated mode only) */}
+          {!isDirect && booking.status === "quote_rejected" && (
             <div className="bg-rose-50 border border-rose-100 p-5 rounded-3xl space-y-3">
               <div className="flex items-center gap-2 text-rose-700">
                 <XCircle size={16} />
@@ -3503,8 +4109,8 @@ function BookingDetailDrawer({
         {/* Action button transitions */}
         <div className="pt-6 border-t border-slate-100 mt-8 flex flex-col gap-3">
 
-          {/* Standard status progression button */}
-          {booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "quote_rejected" && nextStateObj && booking.status !== "contacting_worker" && booking.status !== "quote_sent" && (
+          {/* Standard status progression button (admin drives the mediated flow only) */}
+          {!isDirect && booking.status !== "completed" && booking.status !== "cancelled" && booking.status !== "quote_rejected" && nextStateObj && booking.status !== "contacting_worker" && booking.status !== "quote_sent" && (
             <button
               onClick={() => onUpdateStatus(booking.id, nextStateObj.id)}
               className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-primary-600 active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-primary/10"
@@ -3554,7 +4160,7 @@ function BookingDetailDrawer({
 // ==========================================
 interface ReviewsPageProps {
   professionals: Professional[];
-  onDeleteReview: (workerId: string, idx: number) => void;
+  onDeleteReview: (reviewId: string) => void;
 }
 
 function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
@@ -3727,7 +4333,7 @@ function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
                           {/* Delete Button */}
                           <button
                             type="button"
-                            onClick={() => onDeleteReview(worker.id, review.originalIdx)}
+                            onClick={() => review.id && onDeleteReview(review.id)}
                             className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                             title="Delete this review"
                           >
@@ -3769,7 +4375,7 @@ function ReviewsPage({ professionals, onDeleteReview }: ReviewsPageProps) {
             {filteredReviews.map((r, i) => (
               <div key={i} className="bg-white border border-slate-100 p-6 rounded-[2.5rem] shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition-shadow relative">
                 <button
-                  onClick={() => onDeleteReview(r.workerId, r.reviewIdx)}
+                  onClick={() => r.id && onDeleteReview(r.id)}
                   className="absolute top-6 right-6 p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
                   title="Delete review"
                 >
