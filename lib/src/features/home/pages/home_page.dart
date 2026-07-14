@@ -82,8 +82,6 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
-
                     // Greeting & Location
                     const Text(
                       'Hello, Moncef',
@@ -96,7 +94,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     GestureDetector(
-                      onTap: () {},
+                      onTap: _showLocationSheet,
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -443,6 +441,125 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLocationSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 84,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8E5EE),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Location',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Divider(height: 1, color: Color(0xFFE8E8E8)),
+                const SizedBox(height: 24),
+                _buildLocationRow(
+                  icon: Icons.my_location_rounded,
+                  title: 'Use my current location',
+                  subtitle: 'Avenue des Frères Meslem, Sétif, Algérie',
+                  trailing: Icons.check_rounded,
+                  onTap: () => Navigator.pop(context),
+                ),
+                const SizedBox(height: 26),
+                _buildLocationRow(
+                  icon: Icons.map_outlined,
+                  title: 'Choose another location',
+                  trailing: Icons.chevron_right_rounded,
+                  onTap: () {},
+                ),
+                const SizedBox(height: 26),
+                _buildLocationRow(
+                  icon: Icons.add_rounded,
+                  title: 'Add a new address',
+                  trailing: Icons.chevron_right_rounded,
+                  onTap: () {},
+                ),
+                const SizedBox(height: 28),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLocationRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required IconData trailing,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textPrimary, size: 26),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Icon(trailing, color: AppColors.textPrimary, size: 30),
           ],
         ),
       ),
