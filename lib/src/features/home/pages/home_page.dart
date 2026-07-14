@@ -449,7 +449,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBannerCard(int index) {
-    final isArabicPromo = index == 0;
+    final bannerText = _bannerText(index);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -461,7 +461,7 @@ class _HomePageState extends State<HomePage> {
             width: double.infinity,
             fit: BoxFit.cover,
           ),
-          if (isArabicPromo) ...[
+          if (bannerText != null) ...[
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -478,19 +478,19 @@ class _HomePageState extends State<HomePage> {
             Directionality(
               textDirection: TextDirection.rtl,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 18, 20, 18),
+                padding: const EdgeInsets.fromLTRB(10, 18, 20, 18),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 190),
+                    constraints: const BoxConstraints(maxWidth: 165),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'كل خدماتك\nفي تطبيق واحد',
+                        Text(
+                          bannerText['title']!,
                           textAlign: TextAlign.right,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
                             height: 1.12,
@@ -499,7 +499,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'توصيل، تاكسي، وتسوق',
+                          bannerText['subtitle']!,
                           textAlign: TextAlign.right,
                           style: TextStyle(
                             color: Colors.white.withAlpha(230),
@@ -519,9 +519,9 @@ class _HomePageState extends State<HomePage> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
                             ),
-                            child: const Text(
-                              'اطلب الآن',
-                              style: TextStyle(
+                            child: Text(
+                              bannerText['action']!,
+                              style: const TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
@@ -539,6 +539,31 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  Map<String, String>? _bannerText(int index) {
+    switch (index) {
+      case 0:
+        return {
+          'title': 'كل خدماتك\nفي تطبيق واحد',
+          'subtitle': 'توصيل، تاكسي، وتسوق',
+          'action': 'اطلب الآن',
+        };
+      case 1:
+        return {
+          'title': 'وجبتك المفضلة\nتوصلك بسرعة',
+          'subtitle': 'مطاعمك القريبة بين يديك',
+          'action': 'اطلب الآن',
+        };
+      case 2:
+        return {
+          'title': 'مشوارك جاهز\nفي دقائق',
+          'subtitle': 'تنقل بسهولة وأمان',
+          'action': 'احجز الآن',
+        };
+      default:
+        return null;
+    }
   }
 
   // Service Grid Item Builder

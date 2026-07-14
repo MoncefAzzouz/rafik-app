@@ -57,32 +57,28 @@ class _MainPageState extends State<MainPage> {
                     Expanded(
                       child: _buildNavItem(
                         label: 'Home',
-                        activeIconPath: 'assets/icons/Home-color.png',
-                        inactiveIconPath: 'assets/icons/Home.png',
+                        icon: Icons.home_rounded,
                         index: 0,
                       ),
                     ),
                     Expanded(
                       child: _buildNavItem(
                         label: 'Promos',
-                        activeIconPath: 'assets/icons/promo-color.png',
-                        inactiveIconPath: 'assets/icons/promo.png',
+                        icon: Icons.local_offer_rounded,
                         index: 1,
                       ),
                     ),
                     Expanded(
                       child: _buildNavItem(
                         label: 'Activities',
-                        activeIconPath: 'assets/icons/Paper-color.png',
-                        inactiveIconPath: 'assets/icons/Paper.png',
+                        icon: Icons.receipt_long_rounded,
                         index: 2,
                       ),
                     ),
                     Expanded(
                       child: _buildNavItem(
                         label: 'Profile',
-                        activeIconPath: 'assets/icons/Profile-color.png',
-                        inactiveIconPath: 'assets/icons/Profile.png',
+                        icon: Icons.person_rounded,
                         index: 3,
                       ),
                     ),
@@ -98,8 +94,7 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildNavItem({
     required String label,
-    required String activeIconPath,
-    required String inactiveIconPath,
+    required IconData icon,
     required int index,
   }) {
     final isActive = _currentIndex == index;
@@ -126,10 +121,9 @@ class _MainPageState extends State<MainPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              isActive ? activeIconPath : inactiveIconPath,
-              width: 24,
-              height: 24,
+            Icon(
+              icon,
+              size: 24,
               color: isActive ? AppColors.primary : AppColors.textSecondary,
             ),
             const SizedBox(height: 4),
