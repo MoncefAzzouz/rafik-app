@@ -17,18 +17,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final List<Map<String, String>> _pagesData = [
     {
       'image': 'assets/images/onb0.png',
-      'title': 'Easy Booking',
-      'description': 'Book professional home services with just a few taps. It has never been easier to get help.',
+      'title': 'Everything You Need',
+      'description':
+          'Food, taxi, shopping, deliveries, and home services, all organized in one clean app.',
     },
     {
       'image': 'assets/images/onb1.png',
-      'title': 'Secure & Reliable',
-      'description': 'All our service providers are thoroughly vetted and verified to ensure your complete safety.',
+      'title': 'Track With Confidence',
+      'description':
+          'Follow every ride and order in real time with trusted providers and clear updates.',
     },
     {
       'image': 'assets/images/onb2.png',
-      'title': 'Expert People',
-      'description': 'We have the best in class individuals working just for you. They are well trained and capable of handling anything you need.',
+      'title': 'Tap. Confirm. Done.',
+      'description':
+          'Request what you need in seconds and let Rafik handle the rest, fast and smoothly.',
     },
   ];
 
@@ -58,7 +61,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
       backgroundColor: AppColors.backgroundWhite,
       body: Column(
         children: [
-          // The PageView takes up the remaining space
           Expanded(
             child: PageView.builder(
               controller: _controller,
@@ -71,43 +73,67 @@ class _OnboardingPageState extends State<OnboardingPage> {
               itemBuilder: (context, index) {
                 return Column(
                   children: [
-                    // Top Image Section
                     Expanded(
                       flex: 6,
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Image.asset(
-                          _pagesData[index]['image']!,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.bottomCenter,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(36),
+                          bottomRight: Radius.circular(36),
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.asset(
+                              _pagesData[index]['image']!,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.center,
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: 120,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      AppColors.backgroundWhite.withAlpha(245),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    
-                    // Bottom Text Section
                     Expanded(
                       flex: 4,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
+                        padding: const EdgeInsets.fromLTRB(30, 24, 30, 12),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             Text(
                               _pagesData[index]['title']!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 30,
+                                fontWeight: FontWeight.w900,
                                 color: AppColors.textPrimary,
+                                height: 1.08,
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 16),
                             Text(
                               _pagesData[index]['description']!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 15,
-                                height: 1.5,
+                                height: 1.55,
                                 color: AppColors.textSecondary,
                               ),
                             ),
@@ -120,10 +146,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
               },
             ),
           ),
-          
-          // Bottom Controls (Indicator + Button)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 30),
+            padding: const EdgeInsets.fromLTRB(30, 8, 30, 30),
             child: Column(
               children: [
                 SmoothPageIndicator(
@@ -152,7 +176,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                     ),
                     child: Text(
-                      _currentIndex == _pagesData.length - 1 ? 'Get Started' : 'Next',
+                      _currentIndex == _pagesData.length - 1
+                          ? 'Start with Rafik'
+                          : 'Continue',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
