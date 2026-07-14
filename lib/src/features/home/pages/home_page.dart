@@ -67,6 +67,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
         child: Column(
           children: [
             // 1. Navy Gradient Header Section
