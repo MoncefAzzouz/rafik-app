@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import '../../../core/theme/app_colors.dart';
+import '../services/taxi_location_service.dart';
 
 enum TaxiState {
   input, // Screen 1: Location & Destination Input Screen
@@ -10,13 +13,6 @@ enum TaxiState {
   rideDetails, // Screen 3: Ride Details & Vehicle Selector Screen
   searching, // Screen 4: Searching drivers with pulse animation
   driverFound, // Screen 5: Driver found success screen
-}
-
-class Landmark {
-  final String name;
-  final Offset coord;
-
-  const Landmark(this.name, this.coord);
 }
 
 class TaxiBookingPage extends StatefulWidget {
@@ -32,15 +28,21 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   TaxiState _currentState = TaxiState.input;
   bool _pickingSource = false; // true if picking source, false if destination
 
-  // Locations & Coordinates
-  String _sourceAddress = "Sétif, Sétif, Sétif, Algérie";
+  // Real map & location state
+  final MapController _mapController = MapController();
+  final TaxiLocationService _locationService = TaxiLocationService();
+  String _sourceAddress = "";
   String _destinationAddress = "";
-  Offset _mapOffset = const Offset(
-    0,
-    0,
-  ); // Represents current view center offset
-  Offset _sourceCoord = const Offset(0, 0);
-  Offset _destinationCoord = const Offset(180, -120);
+  LatLng _sourceCoord = kSetifCenter;
+  LatLng? _destinationCoord;
+  LatLng? _userLocation;
+  String? _pickerAddress;
+  Timer? _geocodeDebounce;
+
+  // Route between source and destination (OSRM, falls back to straight line)
+  List<LatLng> _routePoints = [];
+  double? _routeDistanceMeters;
+  double? _routeDurationSeconds;
 
   // Address inputs controllers for simulated keyboard typing
   final TextEditingController _destinationInputController =
@@ -51,40 +53,15 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   String _selectedVehicle = "Classic";
 
   // Animation Controllers
-  late AnimationController _carsAnimationController;
   late AnimationController _pulseAnimationController;
   late AnimationController _pinHoverController;
 
-  // Predefined Landmarks for map lookup
-  final List<Landmark> _landmarks = const [
-    Landmark("Sétif, Sétif, Sétif, Algérie", Offset(0, 0)),
-    Landmark("AM School, Avenue Mokhtar Laaribi", Offset(120, -80)),
-    Landmark("Gare Routière de Sétif SNTF", Offset(-150, 100)),
-    Landmark("Institut des Sciences Médicales, Sétif", Offset(50, 180)),
-    Landmark("8 Mai 1945 Stadium, Sétif", Offset(-220, -120)),
-    Landmark("Aïn Arnats, Sétif, Algérie", Offset(350, -280)),
-    Landmark("Cite El Maabouda, Sétif", Offset(-100, -300)),
-    Landmark("El Hidhab, Sétif, Algérie", Offset(240, 150)),
-  ];
-
-  // List of mock cars with random offsets
-  final List<Offset> _mockCars = [
-    const Offset(-60, 40),
-    const Offset(100, 120),
-    const Offset(-120, -180),
-    const Offset(180, -40),
-    const Offset(-30, 220),
-  ];
+  // Nearby mock taxis scattered around the user's position (no backend yet)
+  List<LatLng> _nearbyTaxis = [];
 
   @override
   void initState() {
     super.initState();
-
-    // Map cars animation controller (micro-movement)
-    _carsAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    )..repeat();
 
     // Searching radar pulse controller
     _pulseAnimationController = AnimationController(
@@ -97,11 +74,13 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
+
+    _initLocation();
   }
 
   @override
   void dispose() {
-    _carsAnimationController.dispose();
+    _geocodeDebounce?.cancel();
     _pulseAnimationController.dispose();
     _pinHoverController.dispose();
     _destinationInputController.dispose();
@@ -109,18 +88,44 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     super.dispose();
   }
 
-  // Find nearest landmark address based on virtual coordinates
-  String _getLandmarkName(Offset coord) {
-    Landmark closest = _landmarks.first;
-    double minDist = double.infinity;
-    for (var l in _landmarks) {
-      double dist = (coord - l.coord).distance;
-      if (dist < minDist) {
-        minDist = dist;
-        closest = l;
+  // Locate the user via GPS (falls back to Sétif center when denied/off)
+  Future<void> _initLocation() async {
+    final position = await _locationService.getCurrentPosition();
+    final center = position ?? kSetifCenter;
+    final address = await _locationService.reverseGeocode(center);
+    if (!mounted) return;
+    setState(() {
+      _userLocation = position;
+      _sourceCoord = center;
+      _sourceAddress = address;
+      _scatterTaxis(center);
+    });
+    _mapController.move(center, 15);
+  }
+
+  // Place mock taxis at small random offsets around a point
+  void _scatterTaxis(LatLng around) {
+    final rng = math.Random(7);
+    _nearbyTaxis = List.generate(
+      5,
+      (_) => LatLng(
+        around.latitude + (rng.nextDouble() - 0.5) * 0.008,
+        around.longitude + (rng.nextDouble() - 0.5) * 0.008,
+      ),
+    );
+  }
+
+  // Reverse-geocode the map center while the user pans the picker (debounced)
+  void _onMapEvent(MapEvent event) {
+    if (_currentState != TaxiState.mapPicker) return;
+    _geocodeDebounce?.cancel();
+    _geocodeDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final center = _mapController.camera.center;
+      final address = await _locationService.reverseGeocode(center);
+      if (mounted && _currentState == TaxiState.mapPicker) {
+        setState(() => _pickerAddress = address);
       }
-    }
-    return closest.name;
+    });
   }
 
   // Navigate to map picker
@@ -128,16 +133,23 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     setState(() {
       _pickingSource = isSource;
       _currentState = TaxiState.mapPicker;
-      // Center map around corresponding coordinates
-      _mapOffset = isSource ? -_sourceCoord : -_destinationCoord;
+      _pickerAddress = isSource
+          ? _sourceAddress
+          : (_destinationAddress.isNotEmpty
+                ? _destinationAddress
+                : _sourceAddress);
       _destinationFocus.unfocus();
     });
+    final target = isSource ? _sourceCoord : (_destinationCoord ?? _sourceCoord);
+    _mapController.move(target, 16);
   }
 
   // Handle Map Picker Confirm
-  void _confirmLocation() {
-    final pickedCoord = -_mapOffset;
-    final address = _getLandmarkName(pickedCoord);
+  Future<void> _confirmLocation() async {
+    final pickedCoord = _mapController.camera.center;
+    final address =
+        _pickerAddress ?? await _locationService.reverseGeocode(pickedCoord);
+    if (!mounted) return;
 
     setState(() {
       if (_pickingSource) {
@@ -149,15 +161,58 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
         _destinationCoord = pickedCoord;
         _destinationInputController.text = address;
         // If source is already chosen, we proceed to details
-        if (_sourceAddress.isNotEmpty) {
-          _currentState = TaxiState.rideDetails;
-          // Zoom out map to fit both coordinates
-          _mapOffset = -(_sourceCoord + _destinationCoord) / 2;
-        } else {
-          _currentState = TaxiState.input;
-        }
+        _currentState = _sourceAddress.isNotEmpty
+            ? TaxiState.rideDetails
+            : TaxiState.input;
       }
     });
+
+    if (!_pickingSource && _currentState == TaxiState.rideDetails) {
+      await _loadRoute();
+    }
+  }
+
+  // Fetch the driving route and fit the camera around it
+  Future<void> _loadRoute() async {
+    final destination = _destinationCoord;
+    if (destination == null) return;
+    final route = await _locationService.fetchRoute(_sourceCoord, destination);
+    if (!mounted) return;
+    setState(() {
+      _routePoints = route.points;
+      _routeDistanceMeters = route.distanceMeters;
+      _routeDurationSeconds = route.durationSeconds;
+    });
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: LatLngBounds.fromPoints([_sourceCoord, destination]),
+        padding: const EdgeInsets.fromLTRB(50, 140, 50, 330),
+      ),
+    );
+  }
+
+  // Distance-based fare estimate in DZD (rounded to 10)
+  int _priceFor(String vehicle) {
+    final km = (_routeDistanceMeters ?? 3000) / 1000;
+    final multiplier = vehicle == "Comfort A/C"
+        ? 1.4
+        : vehicle == "VIP"
+        ? 2.25
+        : 1.0;
+    return (((100 + km * 30) * multiplier) / 10).round() * 10;
+  }
+
+  String _priceLabel(String vehicle) => "${_priceFor(vehicle)} DZD";
+
+  // "HH:mm - N min" arrival estimate (trip duration + driver pickup wait)
+  String _etaDetails(int pickupWaitMinutes) {
+    final trip = Duration(
+      seconds: (_routeDurationSeconds ?? 600).round() + pickupWaitMinutes * 60,
+    );
+    final arrival = DateTime.now().add(trip);
+    final hh = arrival.hour.toString().padLeft(2, '0');
+    final mm = arrival.minute.toString().padLeft(2, '0');
+    return "$hh:$mm - $pickupWaitMinutes min";
   }
 
   // Start Searching
@@ -181,16 +236,25 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     setState(() {
       _currentState = TaxiState.input;
       _destinationAddress = "";
+      _destinationCoord = null;
       _destinationInputController.clear();
-      _mapOffset = const Offset(0, 0);
+      _routePoints = [];
+      _routeDistanceMeters = null;
+      _routeDurationSeconds = null;
     });
+    _mapController.move(_sourceCoord, 15);
   }
 
-  // Reset to default location
-  void _recenterGPS() {
-    setState(() {
-      _mapOffset = _pickingSource ? -_sourceCoord : const Offset(0, 0);
-    });
+  // Recenter the map on the device's real GPS position
+  Future<void> _recenterGPS() async {
+    final position = await _locationService.getCurrentPosition();
+    if (!mounted) return;
+    if (position != null) {
+      setState(() => _userLocation = position);
+      _mapController.move(position, 16);
+    } else {
+      _mapController.move(_sourceCoord, 15);
+    }
   }
 
   @override
@@ -252,31 +316,122 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   Widget _buildMapBackground() {
     // In input mode, the map is hidden behind a full white overlay.
     // However, keeping it rendered underneath allows smooth transitions.
-    return GestureDetector(
-      onPanUpdate: (details) {
-        if (_currentState == TaxiState.mapPicker ||
-            _currentState == TaxiState.rideDetails) {
-          setState(() {
-            _mapOffset += details.delta;
-          });
-        }
-      },
-      child: Container(
-        color: const Color(0xFFECEFF1), // Premium light grey-blue map base
-        child: AnimatedBuilder(
-          animation: _carsAnimationController,
-          builder: (context, child) {
-            return CustomPaint(
-              painter: MockMapPainter(
-                offset: _mapOffset,
-                state: _currentState,
-                sourceCoord: _sourceCoord,
-                destinationCoord: _destinationCoord,
-                nearbyCars: _mockCars,
-                animationVal: _carsAnimationController.value,
+    final bool interactive =
+        _currentState == TaxiState.mapPicker ||
+        _currentState == TaxiState.rideDetails;
+    final destination = _destinationCoord;
+    final bool showRoute =
+        destination != null &&
+        (_currentState == TaxiState.rideDetails ||
+            _currentState == TaxiState.searching ||
+            _currentState == TaxiState.driverFound);
+
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: _sourceCoord,
+        initialZoom: 15,
+        minZoom: 4,
+        maxZoom: 19,
+        interactionOptions: InteractionOptions(
+          flags: interactive
+              ? InteractiveFlag.all & ~InteractiveFlag.rotate
+              : InteractiveFlag.none,
+        ),
+        onMapEvent: _onMapEvent,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.rafik_app',
+        ),
+        if (showRoute && _routePoints.isNotEmpty)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 10,
+                color: AppColors.primary.withAlpha(45),
               ),
-            );
-          },
+              Polyline(
+                points: _routePoints,
+                strokeWidth: 6,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
+        MarkerLayer(
+          markers: [
+            for (final taxi in _nearbyTaxis)
+              Marker(
+                point: taxi,
+                width: 34,
+                height: 34,
+                child: Image.asset(
+                  'assets/icons/tAxos.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            if (_userLocation != null)
+              Marker(
+                point: _userLocation!,
+                width: 22,
+                height: 22,
+                child: _buildUserLocationDot(),
+              ),
+            if (showRoute) ...[
+              Marker(
+                point: _sourceCoord,
+                width: 24,
+                height: 24,
+                child: _buildRingPin(AppColors.cyan),
+              ),
+              Marker(
+                point: destination,
+                width: 24,
+                height: 24,
+                child: _buildRingPin(AppColors.primary),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUserLocationDot() {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.electricBlue,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+      ),
+    );
+  }
+
+  Widget _buildRingPin(Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      child: Center(
+        child: Container(
+          width: 14,
+          height: 14,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+          ),
+          child: Center(
+            child: Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+            ),
+          ),
         ),
       ),
     );
@@ -536,16 +691,16 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
                 _buildHistoryRow(
                   "Sétif",
                   "Sétif, Sétif, Algérie",
-                  const Offset(0, 0),
+                  kSetifCenter,
                 ),
                 const Padding(
                   padding: EdgeInsets.only(left: 48),
                   child: Divider(height: 1, color: Color(0xFFEEEEEE)),
                 ),
                 _buildHistoryRow(
-                  "Aïn Arnats",
-                  "Aïn Arnats, Sétif, Algérie",
-                  const Offset(350, -280),
+                  "Aïn Arnat",
+                  "Aïn Arnat, Sétif, Algérie",
+                  const LatLng(36.1866, 5.3126),
                 ),
                 const Padding(
                   padding: EdgeInsets.only(left: 48),
@@ -584,7 +739,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     );
   }
 
-  Widget _buildHistoryRow(String title, String subtitle, Offset coord) {
+  Widget _buildHistoryRow(String title, String subtitle, LatLng coord) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
@@ -612,9 +767,8 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
           _destinationCoord = coord;
           _destinationInputController.text = subtitle;
           _currentState = TaxiState.rideDetails;
-          // Center camera between source and destination
-          _mapOffset = -(_sourceCoord + _destinationCoord) / 2;
         });
+        _loadRoute();
       },
     );
   }
@@ -623,7 +777,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   // SCREEN 2: MAP LOCATION PICKER
   // ==========================================
   Widget _buildMapPickerScreen() {
-    final String currentAddress = _getLandmarkName(-_mapOffset);
+    final String currentAddress = _pickerAddress ?? "Sétif, Algérie";
 
     return Container(
       key: const ValueKey("mapPickerScreen"),
@@ -1069,23 +1223,23 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
                       children: [
                         _buildVehicleCard(
                           "Classic",
-                          "200 DZD",
-                          "02:09 - 3 min",
+                          _priceLabel("Classic"),
+                          _etaDetails(3),
                           3,
                           AppColors.primary,
                         ),
                         _buildVehicleCard(
                           "Comfort A/C",
-                          "280 DZD",
-                          "02:12 - 5 min",
+                          _priceLabel("Comfort A/C"),
+                          _etaDetails(5),
                           4,
                           AppColors.electricBlue,
                           isAC: true,
                         ),
                         _buildVehicleCard(
                           "VIP",
-                          "450 DZD",
-                          "02:15 - 7 min",
+                          _priceLabel("VIP"),
+                          _etaDetails(7),
                           4,
                           const Color(0xFF37474F),
                           isVIP: true,
@@ -1362,11 +1516,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "$_selectedVehicle • ${_selectedVehicle == 'Classic'
-                        ? '200 DZD'
-                        : _selectedVehicle == 'Comfort A/C'
-                        ? '280 DZD'
-                        : '450 DZD'}",
+                    "$_selectedVehicle • ${_priceLabel(_selectedVehicle)}",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
@@ -1613,11 +1763,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
                           ),
                           SizedBox(height: 3),
                           Text(
-                            _selectedVehicle == "Classic"
-                                ? "200 DZD"
-                                : _selectedVehicle == "Comfort A/C"
-                                ? "280 DZD"
-                                : "450 DZD",
+                            _priceLabel(_selectedVehicle),
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 15,
@@ -1697,246 +1843,6 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
 // ==========================================
 // CUSTOM PAINTERS & DETAILS
 // ==========================================
-
-// Custom Painter to draw the simulated vector map
-class MockMapPainter extends CustomPainter {
-  final Offset offset;
-  final TaxiState state;
-  final Offset sourceCoord;
-  final Offset destinationCoord;
-  final List<Offset> nearbyCars;
-  final double animationVal;
-
-  MockMapPainter({
-    required this.offset,
-    required this.state,
-    required this.sourceCoord,
-    required this.destinationCoord,
-    required this.nearbyCars,
-    required this.animationVal,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double cx = size.width / 2 + offset.dx;
-    final double cy = size.height / 2 + offset.dy;
-
-    // 1. Draw Grid lines (simulated coordinates grid)
-    final Paint gridPaint = Paint()
-      ..color = const Color(0xFFDFE4E8)
-      ..strokeWidth = 1.0;
-
-    const double gridSpace = 60.0;
-    final double startX = offset.dx % gridSpace;
-    final double startY = offset.dy % gridSpace;
-
-    for (double x = startX; x < size.width; x += gridSpace) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = startY; y < size.height; y += gridSpace) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    // 2. Draw Green Parks (Rectangles)
-    final Paint parkPaint = Paint()
-      ..color = const Color(0xFFC8E6C9).withAlpha(160)
-      ..style = PaintingStyle.fill;
-
-    // Draw some parks relative to coordinate space
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 280, cy - 220, 180, 100),
-        const Radius.circular(16),
-      ),
-      parkPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx + 100, cy - 350, 200, 150),
-        const Radius.circular(16),
-      ),
-      parkPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - 380, cy + 200, 250, 120),
-        const Radius.circular(16),
-      ),
-      parkPaint,
-    );
-
-    // 3. Draw Water Body (River / Lake)
-    final Paint waterPaint = Paint()
-      ..color = const Color(0xFFB3E5FC).withAlpha(180)
-      ..style = PaintingStyle.fill;
-    final Path riverPath = Path();
-    riverPath.moveTo(cx - 500, cy + 300);
-    riverPath.quadraticBezierTo(cx - 200, cy + 280, cx, cy + 400);
-    riverPath.quadraticBezierTo(cx + 200, cy + 520, cx + 500, cy + 480);
-    riverPath.lineTo(cx + 500, cy + 600);
-    riverPath.lineTo(cx - 500, cy + 600);
-    riverPath.close();
-    canvas.drawPath(riverPath, waterPaint);
-
-    // 4. Draw Streets / Roads (Thick light grey lines with thin darker border)
-    final Paint roadBorderPaint = Paint()
-      ..color = const Color(0xFFCFD8DC)
-      ..strokeWidth = 24.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final Paint roadPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 20.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final List<List<Offset>> roads = [
-      // Horizontals
-      [Offset(cx - 600, cy - 100), Offset(cx + 600, cy - 100)],
-      [Offset(cx - 600, cy + 150), Offset(cx + 600, cy + 150)],
-      // Verticals
-      [Offset(cx - 150, cy - 500), Offset(cx - 150, cy + 500)],
-      [Offset(cx + 200, cy - 500), Offset(cx + 200, cy + 500)],
-      // Diagonals
-      [Offset(cx - 400, cy - 400), Offset(cx + 400, cy + 400)],
-    ];
-
-    for (var r in roads) {
-      canvas.drawLine(r[0], r[1], roadBorderPaint);
-    }
-    for (var r in roads) {
-      canvas.drawLine(r[0], r[1], roadPaint);
-    }
-
-    // 5. Draw Buildings (Rounded grey/blue shapes)
-    final Paint buildingPaint = Paint()
-      ..color = const Color(0xFFECEFF1)
-      ..style = PaintingStyle.fill;
-    final Paint buildingOutline = Paint()
-      ..color = const Color(0xFFCFD8DC)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final List<Rect> buildings = [
-      Rect.fromLTWH(cx - 80, cy - 250, 50, 60),
-      Rect.fromLTWH(cx + 50, cy - 220, 60, 50),
-      Rect.fromLTWH(cx + 280, cy - 80, 70, 50),
-      Rect.fromLTWH(cx - 300, cy + 40, 80, 60),
-      Rect.fromLTWH(cx - 60, cy + 40, 70, 70),
-      Rect.fromLTWH(cx + 280, cy + 200, 60, 80),
-    ];
-
-    for (var b in buildings) {
-      final rrect = RRect.fromRectAndRadius(b, const Radius.circular(8));
-      canvas.drawRRect(rrect, buildingPaint);
-      canvas.drawRRect(rrect, buildingOutline);
-    }
-
-    // 6. Draw Route Polyline (When in details or searching/found states)
-    if (state == TaxiState.rideDetails ||
-        state == TaxiState.searching ||
-        state == TaxiState.driverFound) {
-      final double sx = size.width / 2 + offset.dx + sourceCoord.dx;
-      final double sy = size.height / 2 + offset.dy + sourceCoord.dy;
-      final double dx = size.width / 2 + offset.dx + destinationCoord.dx;
-      final double dy = size.height / 2 + offset.dy + destinationCoord.dy;
-
-      // Draw polyline with beautiful path
-      final Paint polylineShadowPaint = Paint()
-        ..color = AppColors.primary.withAlpha(45)
-        ..strokeWidth = 10.0
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke;
-
-      final Paint polylinePaint = Paint()
-        ..color = AppColors.primary
-        ..strokeWidth = 6.0
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke;
-
-      // Draw direct route with slight curve or corner
-      final Path routePath = Path();
-      routePath.moveTo(sx, sy);
-      // Route goes along the simulated road intersections (manhattan style road path)
-      routePath.lineTo(dx, sy);
-      routePath.lineTo(dx, dy);
-
-      canvas.drawPath(routePath, polylineShadowPaint);
-      canvas.drawPath(routePath, polylinePaint);
-
-      // Draw Source pin (Red ring)
-      final Paint pinOuterRed = Paint()
-        ..color = AppColors.cyan
-        ..style = PaintingStyle.fill;
-      final Paint pinInnerWhite = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill;
-      final Paint pinDotRed = Paint()
-        ..color = AppColors.cyan
-        ..style = PaintingStyle.fill;
-
-      canvas.drawCircle(Offset(sx, sy), 12, pinOuterRed);
-      canvas.drawCircle(Offset(sx, sy), 8, pinInnerWhite);
-      canvas.drawCircle(Offset(sx, sy), 4, pinDotRed);
-
-      // Draw Destination pin
-      final Paint pinOuterPrimary = Paint()
-        ..color = AppColors.primary
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(dx, dy), 12, pinOuterPrimary);
-      canvas.drawCircle(Offset(dx, dy), 8, pinInnerWhite);
-      canvas.drawCircle(Offset(dx, dy), 4, pinOuterPrimary);
-    }
-
-    // 7. Draw Nearby Taxis (Car Icons)
-    for (int i = 0; i < nearbyCars.length; i++) {
-      // Add subtle micro animation to the car positions based on animationVal
-      final double driftX = math.sin(animationVal * math.pi * 2 + i) * 6;
-      final double driftY = math.cos(animationVal * math.pi * 2 + i) * 3;
-      final double x = cx + nearbyCars[i].dx + driftX;
-      final double y = cy + nearbyCars[i].dy + driftY;
-
-      // Skip drawing if outside bounds
-      if (x < -20 || x > size.width + 20 || y < -20 || y > size.height + 20) {
-        continue;
-      }
-
-      // Draw car body
-      final Paint carPaint = Paint()
-        ..color = AppColors.deepNavy
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(x, y), 8, carPaint);
-
-      // Small yellow roof indicator
-      final Paint taxiSignPaint = Paint()
-        ..color = Colors.amber
-        ..style = PaintingStyle.fill;
-      canvas.drawRect(
-        Rect.fromCenter(center: Offset(x, y), width: 3, height: 6),
-        taxiSignPaint,
-      );
-
-      // Windows
-      final Paint carWindowPaint = Paint()
-        ..color = Colors.white70
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(x - 3, y - 2), 1.5, carWindowPaint);
-      canvas.drawCircle(Offset(x - 3, y + 2), 1.5, carWindowPaint);
-      canvas.drawCircle(Offset(x + 3, y - 2), 1.5, carWindowPaint);
-      canvas.drawCircle(Offset(x + 3, y + 2), 1.5, carWindowPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant MockMapPainter oldDelegate) {
-    return oldDelegate.offset != offset ||
-        oldDelegate.state != state ||
-        oldDelegate.sourceCoord != sourceCoord ||
-        oldDelegate.destinationCoord != destinationCoord ||
-        oldDelegate.animationVal != animationVal;
-  }
-}
 
 // Custom Painter for drawing a dotted connector line
 class DottedLinePainter extends CustomPainter {

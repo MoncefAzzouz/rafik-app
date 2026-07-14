@@ -8,6 +8,7 @@ class AppTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.backgroundWhite,
       primaryColor: AppColors.primary,
+      fontFamily: GoogleFonts.poppins().fontFamily,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.primaryLight,
