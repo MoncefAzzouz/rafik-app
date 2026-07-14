@@ -30,8 +30,8 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF011242), // Darker Navy
-      Color(0xFF021B63), // Deep Navy
+      Color(0xFF063B8F),
+      royalBlue,
     ],
   );
 

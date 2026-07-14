@@ -65,7 +65,7 @@ class _HomePageState extends State<HomePage> {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.deepNavy, // Matches the header background
+      backgroundColor: AppColors.primary,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -163,14 +163,7 @@ class _HomePageState extends State<HomePage> {
                           },
                           itemCount: _banners.length,
                           itemBuilder: (context, index) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(24),
-                              child: Image.asset(
-                                _banners[index],
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            );
+                            return _buildBannerCard(index);
                           },
                         ),
                       ),
@@ -240,7 +233,8 @@ class _HomePageState extends State<HomePage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const TaxiBookingPage(),
+                                    builder: (context) =>
+                                        const TaxiBookingPage(),
                                   ),
                                 );
                               },
@@ -270,7 +264,8 @@ class _HomePageState extends State<HomePage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const ElectricianListPage(),
+                                    builder: (context) =>
+                                        const ElectricianListPage(),
                                   ),
                                 );
                               },
@@ -441,7 +436,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
 
-
                   const SizedBox(
                     height: 120,
                   ), // Spacing for floating bottom nav
@@ -450,6 +444,99 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBannerCard(int index) {
+    final isArabicPromo = index == 0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            _banners[index],
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+          if (isArabicPromo) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    AppColors.primary.withAlpha(210),
+                    AppColors.primary.withAlpha(95),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 20, 18),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 190),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'كل خدماتك\nفي تطبيق واحد',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            height: 1.12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'توصيل، تاكسي، وتسوق',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(230),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Text(
+                              'اطلب الآن',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
