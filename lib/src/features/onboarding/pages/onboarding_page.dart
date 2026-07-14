@@ -74,7 +74,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 return Column(
                   children: [
                     Expanded(
-                      flex: 6,
                       child: ClipRRect(
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(36),
@@ -92,7 +91,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               left: 0,
                               right: 0,
                               bottom: 0,
-                              height: 120,
+                              height: 80,
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -110,35 +109,32 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         ),
                       ),
                     ),
-                    Expanded(
-                      flex: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(30, 24, 30, 12),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Text(
-                              _pagesData[index]['title']!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.textPrimary,
-                                height: 1.08,
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 16, 30, 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _pagesData[index]['title']!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                              height: 1.08,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _pagesData[index]['description']!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                height: 1.55,
-                                color: AppColors.textSecondary,
-                              ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _pagesData[index]['description']!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.55,
+                              color: AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
