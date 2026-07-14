@@ -472,19 +472,19 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 const Text(
                   'Location',
                   style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     height: 1,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 const Divider(height: 1, color: Color(0xFFE8E8E8)),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 _buildLocationRow(
                   icon: Icons.my_location_rounded,
                   title: 'Use my current location',
@@ -506,7 +506,7 @@ class _HomePageState extends State<HomePage> {
                   trailing: Icons.chevron_right_rounded,
                   onTap: () {},
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -596,11 +596,11 @@ class _HomePageState extends State<HomePage> {
             Directionality(
               textDirection: TextDirection.rtl,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 18, 20, 18),
+                padding: const EdgeInsets.fromLTRB(2, 18, 20, 18),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 165),
+                    constraints: const BoxConstraints(maxWidth: 150),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
