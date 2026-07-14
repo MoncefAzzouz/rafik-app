@@ -85,67 +85,6 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-// ── Send OTP (simulated) ──
-router.post('/send-otp', async (req: Request, res: Response) => {
-  const { phone } = req.body;
-  console.log(`[OTP] Sending code 1234 to phone: ${phone}`);
-  res.json({ success: true, message: 'OTP code sent' });
-});
-
-// ── Verify OTP ──
-router.post('/verify-otp', async (req: Request, res: Response) => {
-  const { phone, code } = req.body;
-  if (code !== '1234') {
-    res.status(400).json({ error: 'Invalid verification code' });
-    return;
-  }
-  try {
-    const user = await prisma.user.findUnique({ where: { phone } });
-    if (user) {
-      const token = signToken(user.id, user.role);
-      res.json({ success: true, token, user: serializeUser(user) });
-    } else {
-      res.json({ success: true, isNewUser: true });
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── Register via phone (after OTP) ──
-router.post('/register-phone', async (req: Request, res: Response) => {
-  const { fullName, phone, email } = req.body;
-  if (!fullName || !phone) {
-    res.status(400).json({ error: 'Missing required fields' });
-    return;
-  }
-  try {
-    const existing = await prisma.user.findUnique({ where: { phone } });
-    if (existing) {
-      const token = signToken(existing.id, existing.role);
-      res.json({ token, user: serializeUser(existing) });
-      return;
-    }
-    const userEmail = email || `${phone.replace(/\D/g, '')}@rafik.app`;
-    const passwordHash = await bcrypt.hash('otp_default_password', 10);
-    const user = await prisma.user.create({
-      data: {
-        email: userEmail,
-        phone,
-        passwordHash,
-        fullName,
-        role: 'CLIENT',
-      },
-    });
-    const token = signToken(user.id, user.role);
-    res.json({ token, user: serializeUser(user) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // ── Get current user ──
 router.get('/me', authenticateToken, async (req: Request, res: Response) => {
   const userId = (req as AuthenticatedRequest).user?.userId;
@@ -203,6 +142,17 @@ router.delete('/delete-account', authenticateToken, async (req: Request, res: Re
     return;
   }
   try {
+    // If this account is a worker, remove the linked professional profile too
+    // (reviews cascade; bookings keep the record, so block if any exist)
+    const professional = await prisma.professional.findUnique({ where: { userId } });
+    if (professional) {
+      const bookingCount = await prisma.booking.count({ where: { workerId: professional.id } });
+      if (bookingCount > 0) {
+        res.status(409).json({ error: 'This worker account has bookings; ask an admin to remove it' });
+        return;
+      }
+      await prisma.professional.delete({ where: { id: professional.id } });
+    }
     await prisma.user.delete({ where: { id: userId } });
     res.json({ success: true, message: 'Account deleted' });
   } catch (err) {

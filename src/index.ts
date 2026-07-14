@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
+import http from 'http';
 
 import authRoutes from './routes/auth';
 import categoriesRoutes from './routes/categories';
@@ -9,6 +9,10 @@ import professionalsRoutes from './routes/professionals';
 import bookingsRoutes from './routes/bookings';
 import reviewsRoutes from './routes/reviews';
 import uploadRoutes, { UPLOADS_DIR } from './routes/upload';
+import settingsRoutes from './routes/settings';
+import earningsRoutes from './routes/earnings';
+import chatRoutes from './routes/chat';
+import { initSocket } from './lib/socket';
 
 dotenv.config();
 
@@ -42,9 +46,15 @@ app.use('/api/professionals', professionalsRoutes);
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/earnings', earningsRoutes);
+app.use('/api/chat', chatRoutes);
 
 const PORT = process.env.PORT || 4000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+const server = http.createServer(app);
+initSocket(server, corsOrigins);
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT} (REST + Socket.IO)`);
 });

@@ -1,13 +1,20 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
-import { authenticateToken, requireRole } from '../middlewares/auth';
+import { authenticateToken, requireRole, AuthenticatedRequest } from '../middlewares/auth';
+import { getEffectiveModes } from '../lib/settings';
+import { isValidLocation } from '../lib/locations';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
 const PORTFOLIO_DIR = path.join(__dirname, '../../uploads/professionals');
 if (!fs.existsSync(PORTFOLIO_DIR)) fs.mkdirSync(PORTFOLIO_DIR, { recursive: true });
+
+const IMAGE_TYPES = /image\/(jpeg|png|gif|webp)/;
+
+const PROFILES_DIR = path.join(__dirname, '../../uploads/profiles');
+if (!fs.existsSync(PROFILES_DIR)) fs.mkdirSync(PROFILES_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, PORTFOLIO_DIR),
@@ -16,15 +23,47 @@ const storage = multer.diskStorage({
     cb(null, `portfolio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, IMAGE_TYPES.test(file.mimetype)),
+});
+
+const profileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, PROFILES_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+const uploadProfile = multer({
+  storage: profileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => cb(null, IMAGE_TYPES.test(file.mimetype)),
+});
 
 const router = Router();
 
-// GET all professionals (with reviews)
-router.get('/', async (_req: Request, res: Response) => {
+function getUser(req: Request) {
+  return (req as AuthenticatedRequest).user!;
+}
+
+const MEDIATION_MODES = ['MEDIATED', 'DIRECT'];
+const COMMISSION_MODES = ['PERCENTAGE', 'SUBSCRIPTION'];
+
+// GET all professionals (public — powers "choose a worker" lists)
+// Filters: ?category=&wilaya=&commune=&status=
+router.get('/', async (req: Request, res: Response) => {
+  const { category, wilaya, commune, status } = req.query;
   try {
     const professionals = await prisma.professional.findMany({
-      include: { reviews: true },
+      where: {
+        ...(category && { category: category as string }),
+        ...(wilaya && { wilaya: wilaya as string }),
+        ...(commune && { commune: commune as string }),
+        ...(status && { status: status as string }),
+      },
+      include: { reviews: true, portfolioPosts: { orderBy: { createdAt: 'desc' } } },
       orderBy: { name: 'asc' },
     });
     res.json(professionals);
@@ -34,13 +73,33 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-// GET single professional
+// GET own professional record (worker self-service)
+router.get('/me', authenticateToken, requireRole('WORKER'), async (req: Request, res: Response) => {
+  const user = getUser(req);
+  try {
+    const professional = await prisma.professional.findUnique({
+      where: { userId: user.userId },
+      include: { reviews: true, portfolioPosts: { orderBy: { createdAt: 'desc' } }, bookings: { include: { statusHistory: true, conversation: true } } },
+    });
+    if (!professional) {
+      res.status(404).json({ error: 'No professional record linked to this account' });
+      return;
+    }
+    const effectiveModes = await getEffectiveModes(professional);
+    res.json({ ...professional, effectiveModes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET single professional (public)
 router.get('/:id', async (req: Request, res: Response) => {
   const id = req.params.id as string;
   try {
     const professional = await prisma.professional.findUnique({
       where: { id },
-      include: { reviews: true, bookings: { include: { statusHistory: true } } },
+      include: { reviews: true, portfolioPosts: { orderBy: { createdAt: 'desc' } }, bookings: { include: { statusHistory: true } } },
     });
     if (!professional) {
       res.status(404).json({ error: 'Professional not found' });
@@ -53,12 +112,41 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET resolved modes for one worker (override ?? global)
+router.get('/:id/effective-modes', authenticateToken, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  try {
+    const professional = await prisma.professional.findUnique({ where: { id } });
+    if (!professional) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    const modes = await getEffectiveModes(professional);
+    res.json({
+      ...modes,
+      overrides: {
+        mediationModeOverride: professional.mediationModeOverride,
+        commissionModeOverride: professional.commissionModeOverride,
+        commissionPercentOverride: professional.commissionPercentOverride,
+        subscriptionFeeOverride: professional.subscriptionFeeOverride,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST create professional (also creates a User with WORKER role)
 router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { id, name, category, phone, verified, rate, experience, bio, availableTimes, email, password } = req.body;
+  const { id, name, category, phone, verified, rate, experience, bio, availableTimes, email, password, wilaya, commune, address } = req.body;
 
   if (!id || !name || !category || !phone) {
     res.status(400).json({ error: 'Missing required fields (id, name, category, phone)' });
+    return;
+  }
+  if (wilaya && !isValidLocation(wilaya as string, (commune as string) || null)) {
+    res.status(400).json({ error: 'Invalid wilaya/commune' });
     return;
   }
 
@@ -89,8 +177,16 @@ router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, r
         joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         availableTimes: (availableTimes as string[]) || [],
         portfolio: [],
+        wilaya: (wilaya as string) || null,
+        commune: (commune as string) || null,
+        address: (address as string) || null,
         userId: user.id,
       },
+    });
+
+    await prisma.category.updateMany({
+      where: { name: category as string },
+      data: { pros: { increment: 1 } },
     });
 
     res.status(201).json(professional);
@@ -104,12 +200,64 @@ router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, r
   }
 });
 
-// PUT update professional
+// PUT set per-worker mode/commission overrides (null = follow global)
+router.put('/:id/overrides', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const { mediationModeOverride, commissionModeOverride, commissionPercentOverride, subscriptionFeeOverride } = req.body;
+
+  if (mediationModeOverride != null && !MEDIATION_MODES.includes(mediationModeOverride)) {
+    res.status(400).json({ error: 'mediationModeOverride must be MEDIATED, DIRECT, or null' });
+    return;
+  }
+  if (commissionModeOverride != null && !COMMISSION_MODES.includes(commissionModeOverride)) {
+    res.status(400).json({ error: 'commissionModeOverride must be PERCENTAGE, SUBSCRIPTION, or null' });
+    return;
+  }
+
+  try {
+    const professional = await prisma.professional.update({
+      where: { id },
+      data: {
+        ...(mediationModeOverride !== undefined && { mediationModeOverride }),
+        ...(commissionModeOverride !== undefined && { commissionModeOverride }),
+        ...(commissionPercentOverride !== undefined && {
+          commissionPercentOverride: commissionPercentOverride === null ? null : parseFloat(commissionPercentOverride),
+        }),
+        ...(subscriptionFeeOverride !== undefined && {
+          subscriptionFeeOverride: subscriptionFeeOverride === null ? null : parseInt(subscriptionFeeOverride),
+        }),
+      },
+    });
+    const effectiveModes = await getEffectiveModes(professional);
+    res.json({ ...professional, effectiveModes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT update professional (admin, or the worker who owns the record)
 router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const data = req.body;
+  const user = getUser(req);
 
   try {
+    const existing = await prisma.professional.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    const isAdmin = user.role === 'ADMIN';
+    if (!isAdmin && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    if (data.wilaya && !isValidLocation(data.wilaya as string, (data.commune as string) || null)) {
+      res.status(400).json({ error: 'Invalid wilaya/commune' });
+      return;
+    }
+
     const professional = await prisma.professional.update({
       where: { id },
       data: {
@@ -117,14 +265,21 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
         ...(data.category !== undefined && { category: data.category as string }),
         ...(data.phone !== undefined && { phone: data.phone as string }),
         ...(data.status !== undefined && { status: data.status as string }),
-        ...(data.verified !== undefined && { verified: !!data.verified }),
         ...(data.rate !== undefined && { rate: data.rate as string }),
         ...(data.experience !== undefined && { experience: data.experience as string }),
         ...(data.bio !== undefined && { bio: data.bio as string }),
         ...(data.availableTimes !== undefined && { availableTimes: data.availableTimes as string[] }),
         ...(data.portfolio !== undefined && { portfolio: data.portfolio as string[] }),
-        ...(data.jobs !== undefined && { jobs: parseInt(data.jobs) }),
-        ...(data.rating !== undefined && { rating: parseFloat(data.rating) }),
+        ...(data.profileImage !== undefined && { profileImage: (data.profileImage as string) || null }),
+        ...(data.wilaya !== undefined && { wilaya: (data.wilaya as string) || null }),
+        ...(data.commune !== undefined && { commune: (data.commune as string) || null }),
+        ...(data.address !== undefined && { address: (data.address as string) || null }),
+        ...(data.lat !== undefined && { lat: data.lat === null ? null : parseFloat(data.lat) }),
+        ...(data.lng !== undefined && { lng: data.lng === null ? null : parseFloat(data.lng) }),
+        // Only admins may touch trust/metric fields
+        ...(isAdmin && data.verified !== undefined && { verified: !!data.verified }),
+        ...(isAdmin && data.jobs !== undefined && { jobs: parseInt(data.jobs) }),
+        ...(isAdmin && data.rating !== undefined && { rating: parseFloat(data.rating) }),
       },
       include: { reviews: true },
     });
@@ -139,11 +294,21 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
 router.put('/:id/status', authenticateToken, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const { status } = req.body;
+  const user = getUser(req);
   if (!['online', 'busy', 'offline'].includes(status)) {
     res.status(400).json({ error: 'Status must be online, busy, or offline' });
     return;
   }
   try {
+    const existing = await prisma.professional.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    if (user.role !== 'ADMIN' && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const professional = await prisma.professional.update({
       where: { id },
       data: { status: status as string },
@@ -155,11 +320,21 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
   }
 });
 
-// PUT update available times
+// PUT update available times (admin or owner)
 router.put('/:id/available-times', authenticateToken, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const { availableTimes } = req.body;
+  const user = getUser(req);
   try {
+    const existing = await prisma.professional.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    if (user.role !== 'ADMIN' && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
     const professional = await prisma.professional.update({
       where: { id },
       data: { availableTimes: availableTimes as string[] },
@@ -171,10 +346,56 @@ router.put('/:id/available-times', authenticateToken, async (req: Request, res: 
   }
 });
 
-// POST upload portfolio images
+// POST upload / replace profile picture (admin or owner)
+router.post('/:id/profile-image', authenticateToken, uploadProfile.single('image'), async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const user = getUser(req);
+  if (!req.file) {
+    res.status(400).json({ error: 'No image uploaded (images only, max 5MB)' });
+    return;
+  }
+  try {
+    const existing = await prisma.professional.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    if (user.role !== 'ADMIN' && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+
+    const newImage = `/uploads/profiles/${req.file.filename}`;
+
+    // Remove the previous local avatar file
+    if (existing.profileImage && existing.profileImage.startsWith('/uploads/')) {
+      const oldPath = path.join(__dirname, '../../', existing.profileImage);
+      if (oldPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    const professional = await prisma.professional.update({
+      where: { id },
+      data: { profileImage: newImage },
+    });
+    // Keep the linked user account's avatar in sync
+    if (existing.userId) {
+      await prisma.user.update({ where: { id: existing.userId }, data: { profileImage: newImage } }).catch(() => {});
+    }
+    res.json(professional);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST publish portfolio posts (admin or owner) — each image becomes a post with an optional caption
 router.post('/:id/portfolio', authenticateToken, upload.array('images', 10), async (req: Request, res: Response) => {
   const id = req.params.id as string;
+  const user = getUser(req);
   const files = req.files as Express.Multer.File[];
+  const caption = (req.body?.caption as string) || null;
   if (!files || files.length === 0) {
     res.status(400).json({ error: 'No images uploaded' });
     return;
@@ -185,10 +406,20 @@ router.post('/:id/portfolio', authenticateToken, upload.array('images', 10), asy
       res.status(404).json({ error: 'Professional not found' });
       return;
     }
-    const newPaths = files.map(f => `/uploads/professionals/${f.filename}`);
-    const professional = await prisma.professional.update({
+    if (user.role !== 'ADMIN' && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    await prisma.portfolioPost.createMany({
+      data: files.map(f => ({
+        professionalId: id,
+        image: `/uploads/professionals/${f.filename}`,
+        caption,
+      })),
+    });
+    const professional = await prisma.professional.findUnique({
       where: { id },
-      data: { portfolio: [...existing.portfolio, ...newPaths] },
+      include: { reviews: true, portfolioPosts: { orderBy: { createdAt: 'desc' } } },
     });
     res.json(professional);
   } catch (err) {
@@ -197,7 +428,41 @@ router.post('/:id/portfolio', authenticateToken, upload.array('images', 10), asy
   }
 });
 
-// DELETE professional
+// DELETE a portfolio post (admin or owner)
+router.delete('/:id/portfolio/:postId', authenticateToken, async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const postId = req.params.postId as string;
+  const user = getUser(req);
+  try {
+    const existing = await prisma.professional.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Professional not found' });
+      return;
+    }
+    if (user.role !== 'ADMIN' && existing.userId !== user.userId) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    const post = await prisma.portfolioPost.findUnique({ where: { id: postId } });
+    if (!post || post.professionalId !== id) {
+      res.status(404).json({ error: 'Post not found' });
+      return;
+    }
+    if (post.image.startsWith('/uploads/')) {
+      const fullPath = path.join(__dirname, '../../', post.image);
+      if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    }
+    await prisma.portfolioPost.delete({ where: { id: postId } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE professional (admin)
 router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
   try {
@@ -210,11 +475,22 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
     // Delete related reviews first
     await prisma.review.deleteMany({ where: { professionalId: id } });
 
+    // Delete portfolio post image files (rows cascade with the professional)
+    const posts = await prisma.portfolioPost.findMany({ where: { professionalId: id } });
+    for (const post of posts) {
+      if (post.image.startsWith('/uploads/')) {
+        const fullPath = path.join(__dirname, '../../', post.image);
+        if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+    }
+
     // Delete professional portfolio images from filesystem
     if (pro.portfolio && pro.portfolio.length > 0) {
       for (const imgPath of pro.portfolio) {
         const fullPath = path.join(__dirname, '../../', imgPath);
-        if (fs.existsSync(fullPath)) {
+        if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
           fs.unlinkSync(fullPath);
         }
       }
@@ -222,6 +498,11 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
 
     // Delete professional record
     await prisma.professional.delete({ where: { id } });
+
+    await prisma.category.updateMany({
+      where: { name: pro.category, pros: { gt: 0 } },
+      data: { pros: { decrement: 1 } },
+    });
 
     // Delete linked user and their profileImage if they exist
     if (pro.userId) {

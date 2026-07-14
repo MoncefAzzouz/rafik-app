@@ -12,6 +12,31 @@ enum Role {
   CLIENT
 }
 
+// MEDIATED = admin sits between worker and client (relays quotes/contact)
+// DIRECT   = worker and client talk directly (chat enabled), admin only observes
+enum MediationMode {
+  MEDIATED
+  DIRECT
+}
+
+// PERCENTAGE   = platform takes a % of each completed job
+// SUBSCRIPTION = worker pays a fixed monthly fee, keeps 100% of job money
+enum CommissionMode {
+  PERCENTAGE
+  SUBSCRIPTION
+}
+
+// Singleton row (id = "global") holding the platform-wide defaults.
+// Per-worker overrides live on Professional and win when set.
+model PlatformSettings {
+  id                String         @id @default("global")
+  mediationMode     MediationMode  @default(MEDIATED)
+  commissionMode    CommissionMode @default(PERCENTAGE)
+  commissionPercent Float          @default(15)
+  subscriptionFee   Int            @default(3000)
+  updatedAt         DateTime       @updatedAt
+}
+
 model User {
   id            String        @id @default(uuid())
   email         String        @unique
@@ -20,6 +45,9 @@ model User {
   fullName      String
   role          Role          @default(CLIENT)
   profileImage  String?
+  wilaya        String?
+  commune       String?
+  address       String?
   createdAt     DateTime      @default(now())
   professional  Professional?
 }
@@ -47,12 +75,26 @@ model Professional {
   rate           String
   experience     String
   bio            String
-  portfolio      String[]
+  profileImage   String?
+  portfolio      String[]  // legacy flat image list — new work uses PortfolioPost
+  portfolioPosts PortfolioPost[]
   availableTimes String[]
+  // Location (start: Sétif) — lat/lng optional, for future GPS from mobile
+  wilaya         String?
+  commune        String?
+  address        String?
+  lat            Float?
+  lng            Float?
+  // Per-worker overrides; null = follow the global PlatformSettings
+  mediationModeOverride     MediationMode?
+  commissionModeOverride    CommissionMode?
+  commissionPercentOverride Float?
+  subscriptionFeeOverride   Int?
   userId         String?   @unique
   user           User?     @relation(fields: [userId], references: [id])
   reviews        Review[]
   bookings       Booking[]
+  subscriptionPayments SubscriptionPayment[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -70,9 +112,14 @@ model Review {
 
 model Booking {
   id              String          @id
+  clientId        String?
   clientName      String
   clientPhone     String
   clientAddress   String
+  clientWilaya    String?
+  clientCommune   String?
+  clientLat       Float?
+  clientLng       Float?
   serviceCategory String
   worker          Professional    @relation(fields: [workerId], references: [id])
   workerId        String
@@ -85,6 +132,14 @@ model Booking {
   clientPhotos    String[]
   workerQuote     Int?
   quoteStatus     String          @default("none")
+  // Mode the booking runs under, frozen at creation
+  mediationModeSnapshot MediationMode?
+  // Money snapshot frozen at completion so later settings changes don't rewrite history
+  finalPrice                Int?
+  commissionModeSnapshot    CommissionMode?
+  commissionPercentSnapshot Float?
+  commissionAmount          Int?
+  conversation    Conversation?
   statusHistory   StatusHistory[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -96,4 +151,50 @@ model StatusHistory {
   timestamp String
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   bookingId String
+}
+
+// One conversation per booking (created for DIRECT-mode bookings)
+model Conversation {
+  id        String    @id @default(cuid())
+  bookingId String    @unique
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  senderRole     Role
+  text           String
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+// A portfolio entry published by a worker — like a small post: photo + caption
+model PortfolioPost {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  image          String
+  caption        String?
+  createdAt      DateTime     @default(now())
+
+  @@index([professionalId, createdAt])
+}
+
+// Admin-recorded subscription payments from SUBSCRIPTION-mode workers
+model SubscriptionPayment {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  amount         Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  paidAt         DateTime     @default(now())
+  note           String?
 }

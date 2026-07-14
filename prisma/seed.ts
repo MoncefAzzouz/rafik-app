@@ -4,12 +4,29 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('Clearing database...');
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.subscriptionPayment.deleteMany();
+  await prisma.portfolioPost.deleteMany();
   await prisma.statusHistory.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.review.deleteMany();
   await prisma.professional.deleteMany();
   await prisma.category.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.platformSettings.deleteMany();
+
+  console.log('Seeding platform settings...');
+  // Global defaults: admin-mediated flow, 15% commission, 3000 DZD/month subscription
+  await prisma.platformSettings.create({
+    data: {
+      id: 'global',
+      mediationMode: 'MEDIATED',
+      commissionMode: 'PERCENTAGE',
+      commissionPercent: 15,
+      subscriptionFee: 3000,
+    },
+  });
 
   console.log('Seeding users...');
 
@@ -211,6 +228,37 @@ async function main() {
     }
   ];
 
+  // Demo profile pictures + portfolio post captions
+  const workerAvatars: Record<string, string> = {
+    'PRO-1': 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=200&q=80',
+    'PRO-2': 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=200&q=80',
+    'PRO-3': 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&q=80',
+    'PRO-4': 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=200&q=80',
+    'PRO-5': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
+    'PRO-6': 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80',
+    'PRO-7': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&q=80',
+  };
+  const portfolioCaptions: Record<string, string[]> = {
+    'PRO-1': ['Panel board rewiring — villa in Sétif', 'New lighting installation for a shop', 'Short circuit diagnostics and repair'],
+    'PRO-2': ['Bathroom pipe replacement, finished today', 'Water pump installation for a 3-floor building'],
+    'PRO-3': ['Split AC install + gas recharge', 'Compressor maintenance before summer'],
+    'PRO-4': ['Post-renovation deep clean', 'Full apartment cleaning before move-in'],
+    'PRO-5': ['Matte accent wall for a living room', 'Exterior facade repaint'],
+    'PRO-6': ['Custom kitchen counters in solid wood', 'Wardrobe fitting and door adjustment'],
+    'PRO-7': ['Breaker replacement and safety check'],
+  };
+
+  // Launch coverage: Sétif wilaya
+  const workerLocations: Record<string, { wilaya: string; commune: string; address: string }> = {
+    'PRO-1': { wilaya: 'Sétif', commune: 'Sétif', address: 'Cité El Hidhab' },
+    'PRO-2': { wilaya: 'Sétif', commune: 'Sétif', address: 'Avenue de l\'ALN, centre-ville' },
+    'PRO-3': { wilaya: 'Sétif', commune: 'El Eulma', address: 'Cité Dubai' },
+    'PRO-4': { wilaya: 'Sétif', commune: 'Sétif', address: 'Cité Yahiaoui' },
+    'PRO-5': { wilaya: 'Sétif', commune: 'Aïn Arnat', address: 'Route de l\'aéroport' },
+    'PRO-6': { wilaya: 'Sétif', commune: 'Sétif', address: 'Cité Bel Air' },
+    'PRO-7': { wilaya: 'Sétif', commune: 'El Eulma', address: 'Rue des frères Khelfaoui' },
+  };
+
   console.log('Seeding workers and reviews...');
   for (const w of workers) {
     // Create linked user account first
@@ -239,10 +287,24 @@ async function main() {
         experience: w.experience,
         bio: w.bio,
         portfolio: w.portfolio,
+        profileImage: workerAvatars[w.id],
         availableTimes: w.availableTimes,
+        ...workerLocations[w.id],
         userId: u.id,
       }
     });
+
+    // Portfolio posts: one post per image, with a caption
+    const captions = portfolioCaptions[w.id] || [];
+    for (let i = 0; i < w.portfolio.length; i++) {
+      await prisma.portfolioPost.create({
+        data: {
+          professionalId: pro.id,
+          image: w.portfolio[i],
+          caption: captions[i] || null,
+        }
+      });
+    }
 
     // Create reviews
     for (const rev of w.reviews) {
@@ -389,14 +451,25 @@ async function main() {
     }
   ];
 
+  // Client locations for the demo bookings (Sétif launch area)
+  const bookingLocations: Record<string, { clientWilaya: string; clientCommune: string }> = {
+    'SV-3421': { clientWilaya: 'Sétif', clientCommune: 'Sétif' },
+    'SV-3420': { clientWilaya: 'Sétif', clientCommune: 'Sétif' },
+    'SV-3419': { clientWilaya: 'Sétif', clientCommune: 'El Eulma' },
+    'SV-3418': { clientWilaya: 'Sétif', clientCommune: 'Sétif' },
+    'SV-3417': { clientWilaya: 'Sétif', clientCommune: 'Aïn Arnat' },
+  };
+
   console.log('Seeding bookings and history...');
   for (const b of bookingsData) {
+    const isCompleted = b.status === 'completed';
     const booking = await prisma.booking.create({
       data: {
         id: b.id,
         clientName: b.clientName,
         clientPhone: b.clientPhone,
         clientAddress: b.clientAddress,
+        ...bookingLocations[b.id],
         serviceCategory: b.serviceCategory,
         workerId: b.workerId,
         status: b.status,
@@ -408,6 +481,14 @@ async function main() {
         clientPhotos: b.clientPhotos,
         workerQuote: b.workerQuote,
         quoteStatus: b.quoteStatus,
+        mediationModeSnapshot: 'MEDIATED',
+        // Completed bookings carry the frozen money snapshot (15% commission at completion)
+        ...(isCompleted && b.workerQuote && {
+          finalPrice: b.workerQuote,
+          commissionModeSnapshot: 'PERCENTAGE' as const,
+          commissionPercentSnapshot: 15,
+          commissionAmount: Math.round((b.workerQuote * 15) / 100),
+        }),
       }
     });
 
