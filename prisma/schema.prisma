@@ -42,6 +42,11 @@ model PlatformSettings {
   foodDeliveryFeePerKm Float @default(0)   // DZD per km
   // Revenue→subscription tier grid: [{minRevenue, maxRevenue|null, fee}]
   restaurantSubscriptionGrid Json?
+  // Taxi config (inDrive/Yassir-style)
+  taxiBaseFare          Int   @default(100) // DZD flag-fall
+  taxiPerKm             Float @default(30)  // DZD per km
+  taxiMinFare           Int   @default(150) // DZD floor
+  taxiCommissionPercent Float @default(10)  // platform % of each completed ride
   updatedAt         DateTime       @updatedAt
 }
 
