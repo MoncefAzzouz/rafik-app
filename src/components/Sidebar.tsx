@@ -39,8 +39,8 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "restaurants", label: "Restaurants", icon: Store },
     { id: "orders", label: "Orders", icon: ShoppingBag },
-    { id: "menu", label: "Menu & Categories", icon: Utensils },
-    { id: "earnings", label: "Earnings", icon: TrendingUp },
+    { id: "drivers", label: "Drivers", icon: Car },
+    { id: "subscriptions", label: "Subscriptions", icon: TrendingUp },
   ],
   services: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
