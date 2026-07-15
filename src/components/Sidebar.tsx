@@ -19,6 +19,7 @@ import {
   TrendingUp,
   MessageSquare,
   BarChart3,
+  ShieldAlert,
 } from "lucide-react";
 
 interface NavItem {
@@ -32,7 +33,7 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "rides", label: "Rides", icon: Car },
     { id: "drivers", label: "Drivers", icon: Users },
-    { id: "zones", label: "Zones & Maps", icon: MapPin },
+    { id: "security", label: "Anti-Scam", icon: ShieldAlert },
     { id: "earnings", label: "Earnings", icon: TrendingUp },
   ],
   food: [
