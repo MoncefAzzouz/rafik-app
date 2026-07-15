@@ -10,6 +10,9 @@ enum Role {
   ADMIN
   WORKER
   CLIENT
+  RESTAURANT
+  DRIVER
+  CASHIER
 }
 
 // MEDIATED = admin sits between worker and client (relays quotes/contact)
@@ -34,6 +37,11 @@ model PlatformSettings {
   commissionMode    CommissionMode @default(PERCENTAGE)
   commissionPercent Float          @default(15)
   subscriptionFee   Int            @default(3000)
+  // Food delivery config (Tawsil-style)
+  foodDeliveryFeeBase  Int   @default(200) // DZD, base delivery fee
+  foodDeliveryFeePerKm Float @default(0)   // DZD per km
+  // Revenue→subscription tier grid: [{minRevenue, maxRevenue|null, fee}]
+  restaurantSubscriptionGrid Json?
   updatedAt         DateTime       @updatedAt
 }
 
@@ -185,6 +193,271 @@ model PortfolioPost {
   createdAt      DateTime     @default(now())
 
   @@index([professionalId, createdAt])
+}
+
+// ═══════════════════ FOOD DELIVERY (Tawsil-style) ═══════════════════
+
+enum RestaurantStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum AvailabilityStatus {
+  OPEN
+  CLOSED
+  VACATION
+  SATURATED
+  OTHER
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  BICYCLE
+  SCOOTER
+  CAR
+}
+
+enum DriverStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+  SUSPENDED
+}
+
+enum OrderType {
+  DELIVERY
+  PICKUP
+}
+
+enum FoodPaymentMethod {
+  CASH_ON_DELIVERY
+  BARIDI_MOB
+  BANK_TRANSFER
+}
+
+model Restaurant {
+  id                 String             @id @default(cuid())
+  userId             String?            @unique
+  name               String
+  description        String?
+  address            String?
+  phone              String
+  email              String?
+  image              String?
+  rating             Float              @default(0)
+  isActive           Boolean            @default(true)
+  isPremium          Boolean            @default(false)
+  status             RestaurantStatus   @default(PENDING)
+  availabilityStatus AvailabilityStatus @default(OPEN)
+  availabilityNote   String?
+  openingHours       Json?
+  wilaya             String?
+  commune            String?
+  lat                Float?
+  lng                Float?
+  categories         FoodMenuCategory[]
+  menuItems          MenuItem[]
+  orders             FoodOrder[]
+  cashiers           Cashier[]
+  subscriptionPayments RestaurantSubscriptionPayment[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model FoodMenuCategory {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  image        String?
+  displayOrder Int        @default(0)
+  menuItems    MenuItem[]
+  createdAt    DateTime   @default(now())
+}
+
+model MenuItem {
+  id           String            @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     FoodMenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  name         String
+  description  String?
+  price        Int               // DZD
+  image        String?
+  isAvailable  Boolean           @default(true)
+  prepTime     Int               @default(20) // minutes
+  optionGroups OptionGroup[]
+  additions    Addition[]
+  orderItems   FoodOrderItem[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+// Add-on option groups (e.g. "Sauce" required, "Extras" optional)
+model OptionGroup {
+  id           String     @id @default(cuid())
+  menuItemId   String
+  menuItem     MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name         String
+  isRequired   Boolean    @default(false)
+  displayOrder Int        @default(0)
+  additions    Addition[]
+}
+
+model Addition {
+  id            String       @id @default(cuid())
+  menuItemId    String
+  menuItem      MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  optionGroupId String?
+  optionGroup   OptionGroup? @relation(fields: [optionGroupId], references: [id], onDelete: SetNull)
+  name          String
+  price         Int          @default(0) // DZD
+  isAvailable   Boolean      @default(true)
+  orderItemAdditions FoodOrderItemAddition[]
+}
+
+model Driver {
+  id                String       @id @default(cuid())
+  userId            String?      @unique
+  driverCode        String       @unique // DRV-0001
+  name              String
+  phone             String       @unique
+  email             String?
+  profileImage      String?
+  vehicleType       VehicleType  @default(MOTORCYCLE)
+  vehiclePlate      String?
+  licenseNumber     String?
+  status            DriverStatus @default(OFFLINE)
+  lat               Float?
+  lng               Float?
+  rating            Float        @default(0)
+  totalDeliveries   Int          @default(0)
+  maxOrdersCapacity Int          @default(5)
+  isVerified        Boolean      @default(false)
+  isActive          Boolean      @default(true)
+  cancellationCount Int          @default(0)
+  wilaya            String?
+  commune           String?
+  notes             String?
+  orders            FoodOrder[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model Cashier {
+  id           String     @id @default(cuid())
+  userId       String?    @unique
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  cashierCode  String     @unique // CSH-0001
+  name         String
+  phone        String?
+  email        String?
+  isActive     Boolean    @default(true)
+  ordersCreated FoodOrder[]
+  createdAt    DateTime   @default(now())
+}
+
+model FoodOrder {
+  id                   String             @id @default(cuid())
+  orderNumber          String             @unique // DEL-YYYYMMDD-0001 / PKP-...
+  clientId             String?            // User.id when ordered from the app
+  createdByCashierId   String?
+  createdByCashier     Cashier?           @relation(fields: [createdByCashierId], references: [id])
+  restaurantId         String
+  restaurant           Restaurant         @relation(fields: [restaurantId], references: [id])
+  driverId             String?
+  driver               Driver?            @relation(fields: [driverId], references: [id])
+  orderType            OrderType          @default(DELIVERY)
+  clientName           String
+  clientPhone          String
+  deliveryAddress      String?
+  deliveryWilaya       String?
+  deliveryCommune      String?
+  deliveryLat          Float?
+  deliveryLng          Float?
+  deliveryInstructions String?
+  // pending → accepted → preparing → assigned → arrived → delivering → delivered | declined | cancelled
+  status               String             @default("pending")
+  paymentMethod        FoodPaymentMethod  @default(CASH_ON_DELIVERY)
+  subtotal             Int                @default(0)
+  deliveryFee          Int                @default(0)
+  deliveryDistance     Float?             // km
+  totalAmount          Int                @default(0)
+  prepTime             Int?               // minutes, set on accept
+  declineReason        String?
+  // stage timestamps
+  acceptedAt           DateTime?
+  preparingAt          DateTime?
+  assignedAt           DateTime?
+  arrivedAt            DateTime?
+  deliveringAt         DateTime?
+  deliveredAt          DateTime?
+  // ratings after delivery
+  restaurantRating     Float?
+  driverRating         Float?
+  restaurantComment    String?
+  driverComment        String?
+  items                FoodOrderItem[]
+  statusHistory        FoodOrderStatusHistory[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+model FoodOrderItem {
+  id                  String     @id @default(cuid())
+  orderId             String
+  order               FoodOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId          String
+  menuItem            MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  quantity            Int        @default(1)
+  unitPrice           Int
+  totalPrice          Int
+  specialInstructions String?
+  additions           FoodOrderItemAddition[]
+}
+
+model FoodOrderItemAddition {
+  id          String        @id @default(cuid())
+  orderItemId String
+  orderItem   FoodOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  additionId  String
+  addition    Addition      @relation(fields: [additionId], references: [id], onDelete: Restrict)
+  quantity    Int           @default(1)
+  unitPrice   Int
+  totalPrice  Int
+}
+
+model FoodOrderStatusHistory {
+  id        String    @id @default(cuid())
+  orderId   String
+  order     FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  timestamp DateTime  @default(now())
+}
+
+// Monthly restaurant subscription (Tawsil-style revenue tiers instead of per-order commission)
+model RestaurantSubscriptionPayment {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  monthKey      String     // YYYY-MM
+  revenueAmount Int        @default(0)
+  ordersCount   Int        @default(0)
+  tierLevel     Int        @default(1)
+  totalDue      Int        @default(0)
+  paidAmount    Int        @default(0)
+  status        String     @default("unpaid") // unpaid | partial | paid
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([restaurantId, monthKey])
 }
 
 // Admin-recorded subscription payments from SUBSCRIPTION-mode workers

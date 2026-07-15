@@ -4,6 +4,20 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('Clearing database...');
+  // Food module tables
+  await prisma.foodOrderItemAddition.deleteMany();
+  await prisma.foodOrderItem.deleteMany();
+  await prisma.foodOrderStatusHistory.deleteMany();
+  await prisma.foodOrder.deleteMany();
+  await prisma.restaurantSubscriptionPayment.deleteMany();
+  await prisma.addition.deleteMany();
+  await prisma.optionGroup.deleteMany();
+  await prisma.menuItem.deleteMany();
+  await prisma.foodMenuCategory.deleteMany();
+  await prisma.cashier.deleteMany();
+  await prisma.driver.deleteMany();
+  await prisma.restaurant.deleteMany();
+  // Services module tables
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.subscriptionPayment.deleteMany();
@@ -502,6 +516,252 @@ async function main() {
       });
     }
   }
+
+  // ═══════════ FOOD DELIVERY MODULE (Tawsil-style) ═══════════
+  console.log('Seeding restaurants, menus, drivers, food orders...');
+
+  const restoPassword = await bcrypt.hash('resto123', 10);
+  const driverPassword = await bcrypt.hash('driver123', 10);
+
+  const restaurantsData = [
+    {
+      name: 'Pizzeria El Bahdja',
+      description: 'Pizzas au feu de bois et cuisine italienne',
+      phone: '+213 555 20 10 10',
+      email: 'elbahdja@rafik.app',
+      address: 'Avenue de l\'ALN, centre-ville',
+      commune: 'Sétif',
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80',
+      status: 'APPROVED' as const,
+      isPremium: true,
+      lat: 36.1911, lng: 5.4137,
+      categories: [
+        {
+          name: 'Pizzas',
+          items: [
+            { name: 'Pizza Margherita', price: 650, prepTime: 15, image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&q=80', additions: [{ name: 'Extra fromage', price: 100 }, { name: 'Olives', price: 50 }] },
+            { name: 'Pizza 4 Saisons', price: 900, prepTime: 20, image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80', additions: [{ name: 'Extra fromage', price: 100 }] },
+            { name: 'Pizza Thon', price: 800, prepTime: 18, image: 'https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=400&q=80', additions: [] },
+          ],
+        },
+        {
+          name: 'Boissons',
+          items: [
+            { name: 'Soda 33cl', price: 100, prepTime: 1, image: null, additions: [] },
+            { name: 'Eau minérale 50cl', price: 50, prepTime: 1, image: null, additions: [] },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Tacos King Sétif',
+      description: 'Tacos, burgers et sandwichs',
+      phone: '+213 555 20 20 20',
+      email: 'tacosking@rafik.app',
+      address: 'Cité Yahiaoui',
+      commune: 'Sétif',
+      image: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=400&q=80',
+      status: 'APPROVED' as const,
+      isPremium: false,
+      lat: 36.1998, lng: 5.4090,
+      categories: [
+        {
+          name: 'Tacos',
+          items: [
+            { name: 'Tacos Poulet', price: 450, prepTime: 12, image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=400&q=80', additions: [{ name: 'Sauce fromagère', price: 50 }, { name: 'Frites incluses', price: 0 }, { name: 'Double viande', price: 200 }] },
+            { name: 'Tacos Viande Hachée', price: 550, prepTime: 12, image: null, additions: [{ name: 'Sauce fromagère', price: 50 }, { name: 'Double viande', price: 200 }] },
+          ],
+        },
+        {
+          name: 'Burgers',
+          items: [
+            { name: 'Burger Classique', price: 400, prepTime: 10, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80', additions: [{ name: 'Cheddar', price: 80 }, { name: 'Bacon de dinde', price: 120 }] },
+            { name: 'Double Burger', price: 650, prepTime: 14, image: null, additions: [{ name: 'Cheddar', price: 80 }] },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'Dar El Couscous',
+      description: 'Cuisine traditionnelle algérienne',
+      phone: '+213 555 20 30 30',
+      email: 'darelcouscous@rafik.app',
+      address: 'El Eulma centre',
+      commune: 'El Eulma',
+      image: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=400&q=80',
+      status: 'PENDING' as const,
+      isPremium: false,
+      lat: 36.1526, lng: 5.6900,
+      categories: [
+        {
+          name: 'Plats traditionnels',
+          items: [
+            { name: 'Couscous Poulet', price: 700, prepTime: 25, image: null, additions: [] },
+            { name: 'Chakhchoukha', price: 650, prepTime: 25, image: null, additions: [] },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const menuItemIds: Record<string, { id: string; price: number; additionIds: { id: string; price: number }[] }[]> = {};
+  const restaurantIds: string[] = [];
+
+  for (const r of restaurantsData) {
+    const owner = await prisma.user.create({
+      data: { email: r.email, phone: r.phone, passwordHash: restoPassword, fullName: r.name, role: Role.RESTAURANT },
+    });
+    const restaurant = await prisma.restaurant.create({
+      data: {
+        userId: owner.id,
+        name: r.name,
+        description: r.description,
+        address: r.address,
+        phone: r.phone,
+        email: r.email,
+        image: r.image,
+        status: r.status,
+        isPremium: r.isPremium,
+        wilaya: 'Sétif',
+        commune: r.commune,
+        lat: r.lat,
+        lng: r.lng,
+        openingHours: { mon: '11:00-23:00', tue: '11:00-23:00', wed: '11:00-23:00', thu: '11:00-23:00', fri: '13:00-23:00', sat: '11:00-23:00', sun: '11:00-23:00' },
+      },
+    });
+    restaurantIds.push(restaurant.id);
+    menuItemIds[restaurant.id] = [];
+
+    for (const cat of r.categories) {
+      const category = await prisma.foodMenuCategory.create({
+        data: { restaurantId: restaurant.id, name: cat.name },
+      });
+      for (const item of cat.items) {
+        const menuItem = await prisma.menuItem.create({
+          data: {
+            restaurantId: restaurant.id,
+            categoryId: category.id,
+            name: item.name,
+            price: item.price,
+            prepTime: item.prepTime,
+            image: item.image,
+          },
+        });
+        const additionRecords: { id: string; price: number }[] = [];
+        for (const add of item.additions) {
+          const addition = await prisma.addition.create({
+            data: { menuItemId: menuItem.id, name: add.name, price: add.price },
+          });
+          additionRecords.push({ id: addition.id, price: add.price });
+        }
+        menuItemIds[restaurant.id].push({ id: menuItem.id, price: item.price, additionIds: additionRecords });
+      }
+    }
+  }
+
+  // Cashier for the first restaurant
+  const cashierUser = await prisma.user.create({
+    data: { email: 'cashier1@rafik.app', phone: '+213 555 20 40 40', passwordHash: restoPassword, fullName: 'Walid B.', role: Role.CASHIER },
+  });
+  await prisma.cashier.create({
+    data: { userId: cashierUser.id, restaurantId: restaurantIds[0], cashierCode: 'CSH-0001', name: 'Walid B.', phone: '+213 555 20 40 40', email: 'cashier1@rafik.app' },
+  });
+
+  // Drivers
+  const driversData = [
+    { code: 'DRV-0001', name: 'Bilal H.', phone: '+213 661 30 10 10', vehicleType: 'MOTORCYCLE' as const, status: 'AVAILABLE' as const, isVerified: true, rating: 4.8, totalDeliveries: 210, commune: 'Sétif' },
+    { code: 'DRV-0002', name: 'Yacine M.', phone: '+213 661 30 20 20', vehicleType: 'SCOOTER' as const, status: 'AVAILABLE' as const, isVerified: true, rating: 4.6, totalDeliveries: 134, commune: 'Sétif' },
+    { code: 'DRV-0003', name: 'Islam K.', phone: '+213 661 30 30 30', vehicleType: 'MOTORCYCLE' as const, status: 'OFFLINE' as const, isVerified: true, rating: 4.9, totalDeliveries: 301, commune: 'El Eulma' },
+    { code: 'DRV-0004', name: 'Ahmed Z.', phone: '+213 661 30 40 40', vehicleType: 'BICYCLE' as const, status: 'OFFLINE' as const, isVerified: false, rating: 0, totalDeliveries: 0, commune: 'Sétif' },
+  ];
+  const driverIds: string[] = [];
+  for (const d of driversData) {
+    const du = await prisma.user.create({
+      data: { email: `${d.code.toLowerCase()}@rafik.app`, phone: d.phone, passwordHash: driverPassword, fullName: d.name, role: Role.DRIVER },
+    });
+    const driver = await prisma.driver.create({
+      data: {
+        userId: du.id, driverCode: d.code, name: d.name, phone: d.phone, email: `${d.code.toLowerCase()}@rafik.app`,
+        vehicleType: d.vehicleType, status: d.status, isVerified: d.isVerified, rating: d.rating,
+        totalDeliveries: d.totalDeliveries, wilaya: 'Sétif', commune: d.commune,
+      },
+    });
+    driverIds.push(driver.id);
+  }
+
+  // Sample food orders across the lifecycle
+  const pizzeria = restaurantIds[0];
+  const tacos = restaurantIds[1];
+  const pizzaItems = menuItemIds[pizzeria];
+  const tacosItems = menuItemIds[tacos];
+
+  async function seedOrder(opts: {
+    num: string; restaurantId: string; items: { id: string; price: number; additionIds: { id: string; price: number }[] }[];
+    qty: number[]; status: string; driverId?: string; clientName: string; clientPhone: string; commune: string;
+    history: string[]; deliveredDaysAgo?: number;
+  }) {
+    const subtotal = opts.items.reduce((s, it, i) => s + it.price * opts.qty[i], 0);
+    const deliveryFee = 200;
+    const deliveredAt = opts.status === 'delivered'
+      ? new Date(Date.now() - (opts.deliveredDaysAgo ?? 0) * 86400000)
+      : null;
+    const order = await prisma.foodOrder.create({
+      data: {
+        orderNumber: opts.num,
+        restaurantId: opts.restaurantId,
+        driverId: opts.driverId ?? null,
+        clientName: opts.clientName,
+        clientPhone: opts.clientPhone,
+        deliveryAddress: 'Cité El Hidhab, Bt 4',
+        deliveryWilaya: 'Sétif',
+        deliveryCommune: opts.commune,
+        status: opts.status,
+        subtotal,
+        deliveryFee,
+        totalAmount: subtotal + deliveryFee,
+        ...(opts.status === 'delivered' && { deliveredAt, restaurantRating: 4.5, driverRating: 5 }),
+        items: {
+          create: opts.items.map((it, i) => ({
+            menuItemId: it.id,
+            quantity: opts.qty[i],
+            unitPrice: it.price,
+            totalPrice: it.price * opts.qty[i],
+          })),
+        },
+        statusHistory: { create: opts.history.map(s => ({ status: s })) },
+      },
+    });
+    return order;
+  }
+
+  await seedOrder({
+    num: 'DEL-20260714-0001', restaurantId: pizzeria, items: [pizzaItems[0], pizzaItems[3]], qty: [2, 2],
+    status: 'delivered', driverId: driverIds[0], clientName: 'Amine Touati', clientPhone: '+213 770 12 34 56', commune: 'Sétif',
+    history: ['pending', 'accepted', 'preparing', 'assigned', 'arrived', 'delivering', 'delivered'], deliveredDaysAgo: 1,
+  });
+  await seedOrder({
+    num: 'DEL-20260714-0002', restaurantId: tacos, items: [tacosItems[0]], qty: [3],
+    status: 'delivered', driverId: driverIds[1], clientName: 'Sara Kouadri', clientPhone: '+213 659 99 88 77', commune: 'Sétif',
+    history: ['pending', 'accepted', 'preparing', 'assigned', 'arrived', 'delivering', 'delivered'], deliveredDaysAgo: 0,
+  });
+  await seedOrder({
+    num: 'DEL-20260715-0001', restaurantId: pizzeria, items: [pizzaItems[1]], qty: [1],
+    status: 'delivering', driverId: driverIds[0], clientName: 'Nadia Mansouri', clientPhone: '+213 665 44 33 22', commune: 'Sétif',
+    history: ['pending', 'accepted', 'preparing', 'assigned', 'arrived', 'delivering'],
+  });
+  await seedOrder({
+    num: 'DEL-20260715-0002', restaurantId: tacos, items: [tacosItems[2], tacosItems[0]], qty: [2, 1],
+    status: 'preparing', clientName: 'Fodil B.', clientPhone: '+213 661 22 33 44', commune: 'Sétif',
+    history: ['pending', 'accepted', 'preparing'],
+  });
+  await seedOrder({
+    num: 'DEL-20260715-0003', restaurantId: pizzeria, items: [pizzaItems[2]], qty: [1],
+    status: 'pending', clientName: 'Meriem Cherif', clientPhone: '+213 672 55 66 77', commune: 'Aïn Arnat',
+    history: ['pending'],
+  });
+
+  // Driver 1 is carrying an active order
+  await prisma.driver.update({ where: { id: driverIds[0] }, data: { status: 'BUSY' } });
 
   console.log('Seeding successfully completed!');
 }

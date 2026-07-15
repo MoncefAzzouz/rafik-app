@@ -12,6 +12,10 @@ import uploadRoutes, { UPLOADS_DIR } from './routes/upload';
 import settingsRoutes from './routes/settings';
 import earningsRoutes from './routes/earnings';
 import chatRoutes from './routes/chat';
+import restaurantsRoutes from './routes/restaurants';
+import driversRoutes from './routes/drivers';
+import foodOrdersRoutes from './routes/foodOrders';
+import foodAdminRoutes from './routes/foodAdmin';
 import { initSocket } from './lib/socket';
 
 dotenv.config();
@@ -49,6 +53,11 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/earnings', earningsRoutes);
 app.use('/api/chat', chatRoutes);
+// Food delivery module (Tawsil-style)
+app.use('/api/restaurants', restaurantsRoutes);
+app.use('/api/drivers', driversRoutes);
+app.use('/api/food-orders', foodOrdersRoutes);
+app.use('/api/food', foodAdminRoutes);
 
 const PORT = process.env.PORT || 4000;
 
