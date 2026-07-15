@@ -231,6 +231,32 @@ enum DriverStatus {
   SUSPENDED
 }
 
+// Which vertical a driver works for
+enum ServiceKind {
+  FOOD
+  TAXI
+  BOTH
+}
+
+enum RideCancelledBy {
+  CLIENT
+  DRIVER
+  ADMIN
+}
+
+enum FraudAlertType {
+  DRIVER_EXCESSIVE_CANCELLATIONS
+  CLIENT_EXCESSIVE_CANCELLATIONS
+  PAIR_COLLUSION
+  LATE_CANCEL_PATTERN
+}
+
+enum FraudSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 enum OrderType {
   DELIVERY
   PICKUP
@@ -335,7 +361,10 @@ model Driver {
   profileImage      String?
   vehicleType       VehicleType  @default(MOTORCYCLE)
   vehiclePlate      String?
+  vehicleModel      String?      // e.g. "Hyundai i10" (taxi)
+  vehicleColor      String?
   licenseNumber     String?
+  service           ServiceKind  @default(FOOD)
   status            DriverStatus @default(OFFLINE)
   lat               Float?
   lng               Float?
@@ -349,8 +378,99 @@ model Driver {
   commune           String?
   notes             String?
   orders            FoodOrder[]
+  taxiRides         TaxiRide[]
+  rideOffers        TaxiRideOffer[]
+  fraudAlerts       FraudAlert[]
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+}
+
+// ─── TAXI (inDrive-style negotiation + Yassir-style dispatch) ───
+
+model TaxiRide {
+  id            String   @id @default(cuid())
+  rideNumber    String   @unique // TX-YYYYMMDD-0001
+  clientId      String?  // User.id when requested from the app
+  clientName    String
+  clientPhone   String
+  // Pickup / destination
+  pickupAddress      String
+  pickupWilaya       String?
+  pickupCommune      String?
+  pickupLat          Float?
+  pickupLng          Float?
+  destinationAddress String
+  destinationLat     Float?
+  destinationLng     Float?
+  distanceKm         Float?
+  // Money (inDrive-style): app estimates, client proposes, driver counters, one price is agreed
+  estimatedFare Int?   // computed: max(minFare, base + km*perKm)
+  proposedFare  Int?   // client's own offer
+  agreedFare    Int?   // final price locked at acceptance
+  // requested → accepted → driver_arrived → in_ride → completed
+  // cancelled_by_client / cancelled_by_driver / cancelled_by_admin / expired terminal
+  status        String  @default("requested")
+  driverId      String?
+  driver        Driver? @relation(fields: [driverId], references: [id])
+  offers        TaxiRideOffer[]
+  // Commission snapshot frozen at completion
+  commissionPercentSnapshot Float?
+  commissionAmount          Int?
+  driverEarnings            Int?
+  // Cancellation forensics (feeds the fraud detector)
+  cancelledBy   RideCancelledBy?
+  cancelReason  String?
+  cancelStage   String? // status the ride was in when cancelled
+  // Ratings
+  clientRating  Float?
+  driverRating  Float?
+  // Timers
+  acceptedAt    DateTime?
+  arrivedAt     DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([driverId, status])
+  @@index([clientPhone])
+}
+
+// A driver's price offer on a ride (inDrive negotiation)
+model TaxiRideOffer {
+  id        String   @id @default(cuid())
+  rideId    String
+  ride      TaxiRide @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  amount    Int      // DZD
+  status    String   @default("pending") // pending | accepted | rejected | withdrawn
+  createdAt DateTime @default(now())
+
+  @@unique([rideId, driverId])
+}
+
+// Anti-scam alerts raised by the fraud detection engine
+model FraudAlert {
+  id          String         @id @default(cuid())
+  type        FraudAlertType
+  severity    FraudSeverity  @default(MEDIUM)
+  driverId    String?
+  driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  clientPhone String?
+  clientName  String?
+  rideId      String?
+  message     String
+  details     Json?          // counters/evidence snapshot
+  isResolved  Boolean        @default(false)
+  resolvedBy  String?        // admin User.id
+  resolvedAt  DateTime?
+  action      String?        // suspended | warned | dismissed | auto_suspended
+  createdAt   DateTime       @default(now())
+
+  @@index([driverId, isResolved])
+  @@index([clientPhone, isResolved])
 }
 
 model Cashier {

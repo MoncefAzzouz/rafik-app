@@ -22,11 +22,12 @@ async function canManageDriver(req: Request, driverId: string): Promise<boolean>
 
 // ── GET all drivers (auth; filters ?status=&verified=&wilaya=&search=) ──
 router.get('/', authenticateToken, async (req: Request, res: Response) => {
-  const { status, verified, wilaya, search } = req.query;
+  const { status, verified, wilaya, search, service } = req.query;
   try {
     const drivers = await prisma.driver.findMany({
       where: {
         ...(status && { status: status as any }),
+        ...(service && { service: { in: [service as any, 'BOTH'] } }),
         ...(verified !== undefined && verified !== '' && { isVerified: verified === 'true' }),
         ...(wilaya && { wilaya: wilaya as string }),
         ...(search && { name: { contains: search as string, mode: 'insensitive' } }),
@@ -65,7 +66,7 @@ router.get('/me', authenticateToken, requireRole('DRIVER'), async (req: Request,
 
 // ── POST create driver (admin) — also creates a DRIVER user account ──
 router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { name, phone, email, vehicleType, vehiclePlate, licenseNumber, wilaya, commune, password, isVerified } = req.body;
+  const { name, phone, email, vehicleType, vehiclePlate, vehicleModel, vehicleColor, licenseNumber, wilaya, commune, password, isVerified, service } = req.body;
   if (!name || !phone) {
     res.status(400).json({ error: 'Missing required fields (name, phone)' });
     return;
@@ -90,7 +91,10 @@ router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, r
         email: driverEmail,
         vehicleType: (vehicleType as any) || 'MOTORCYCLE',
         vehiclePlate: (vehiclePlate as string) || null,
+        vehicleModel: (vehicleModel as string) || null,
+        vehicleColor: (vehicleColor as string) || null,
         licenseNumber: (licenseNumber as string) || null,
+        service: ['FOOD', 'TAXI', 'BOTH'].includes(service) ? (service as any) : 'FOOD',
         wilaya: (wilaya as string) || null,
         commune: (commune as string) || null,
         isVerified: !!isVerified,
@@ -130,6 +134,8 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
         ...(data.email !== undefined && { email: data.email }),
         ...(data.vehicleType !== undefined && { vehicleType: data.vehicleType }),
         ...(data.vehiclePlate !== undefined && { vehiclePlate: data.vehiclePlate }),
+        ...(data.vehicleModel !== undefined && { vehicleModel: data.vehicleModel }),
+        ...(data.vehicleColor !== undefined && { vehicleColor: data.vehicleColor }),
         ...(data.licenseNumber !== undefined && { licenseNumber: data.licenseNumber }),
         ...(data.wilaya !== undefined && { wilaya: data.wilaya }),
         ...(data.commune !== undefined && { commune: data.commune }),
@@ -138,6 +144,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.profileImage !== undefined && { profileImage: data.profileImage }),
         // Admin-only fields
+        ...(isAdmin && data.service !== undefined && ['FOOD', 'TAXI', 'BOTH'].includes(data.service) && { service: data.service }),
         ...(isAdmin && data.isVerified !== undefined && { isVerified: !!data.isVerified }),
         ...(isAdmin && data.isActive !== undefined && { isActive: !!data.isActive }),
         ...(isAdmin && data.maxOrdersCapacity !== undefined && { maxOrdersCapacity: parseInt(data.maxOrdersCapacity) }),

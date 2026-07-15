@@ -4,6 +4,10 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('Clearing database...');
+  // Taxi module tables
+  await prisma.fraudAlert.deleteMany();
+  await prisma.taxiRideOffer.deleteMany();
+  await prisma.taxiRide.deleteMany();
   // Food module tables
   await prisma.foodOrderItemAddition.deleteMany();
   await prisma.foodOrderItem.deleteMany();
@@ -762,6 +766,113 @@ async function main() {
 
   // Driver 1 is carrying an active order
   await prisma.driver.update({ where: { id: driverIds[0] }, data: { status: 'BUSY' } });
+
+  // ────────────────────────────────────────────
+  // TAXI MODULE (inDrive/Yassir-style)
+  // ────────────────────────────────────────────
+  console.log('Seeding taxi drivers, rides, and fraud scenario...');
+
+  const taxiDriversData = [
+    { code: 'DRV-1001', name: 'Walid B.', phone: '+213 550 10 10 10', model: 'Hyundai i10', color: 'White', plate: '01234-119-19' },
+    { code: 'DRV-1002', name: 'Samir K.', phone: '+213 550 20 20 20', model: 'Renault Symbol', color: 'Silver', plate: '04567-119-19' },
+    { code: 'DRV-1003', name: 'Adel M.', phone: '+213 550 30 30 30', model: 'Dacia Logan', color: 'Black', plate: '07890-119-19' },
+  ];
+  const taxiDriverIds: string[] = [];
+  for (const d of taxiDriversData) {
+    const du = await prisma.user.create({
+      data: { email: `${d.code.toLowerCase()}@rafik.app`, phone: d.phone, passwordHash: driverPassword, fullName: d.name, role: Role.DRIVER },
+    });
+    const driver = await prisma.driver.create({
+      data: {
+        userId: du.id, driverCode: d.code, name: d.name, phone: d.phone,
+        email: `${d.code.toLowerCase()}@rafik.app`,
+        vehicleType: 'CAR', vehicleModel: d.model, vehicleColor: d.color, vehiclePlate: d.plate,
+        service: 'TAXI', status: 'AVAILABLE', isVerified: true,
+        wilaya: 'Sétif', commune: 'Sétif', rating: 4.8,
+      },
+    });
+    taxiDriverIds.push(driver.id);
+  }
+
+  const today = new Date();
+  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+  let rideSeq = 0;
+  const rideNum = () => `TX-${ymd}-${String(++rideSeq).padStart(4, '0')}`;
+
+  const mkRide = (opts: {
+    client: string; phone: string; from: string; to: string; km: number;
+    status: string; driverIdx?: number; fare?: number; proposed?: number;
+    cancelledBy?: 'CLIENT' | 'DRIVER'; arrived?: boolean;
+  }) => {
+    const estimated = Math.max(150, Math.round((100 + opts.km * 30) / 10) * 10);
+    const fare = opts.fare ?? estimated;
+    const done = opts.status === 'completed';
+    const cancelled = opts.status.startsWith('cancelled');
+    const matched = opts.driverIdx !== undefined;
+    return prisma.taxiRide.create({
+      data: {
+        rideNumber: rideNum(),
+        clientName: opts.client, clientPhone: opts.phone,
+        pickupAddress: opts.from, pickupWilaya: 'Sétif', pickupCommune: 'Sétif',
+        destinationAddress: opts.to, distanceKm: opts.km,
+        estimatedFare: estimated,
+        proposedFare: opts.proposed ?? null,
+        agreedFare: matched ? fare : null,
+        status: opts.status,
+        driverId: matched ? taxiDriverIds[opts.driverIdx!] : null,
+        ...(matched && { acceptedAt: new Date(Date.now() - 3600e3) }),
+        ...(opts.arrived && { arrivedAt: new Date(Date.now() - 3000e3) }),
+        ...(done && {
+          startedAt: new Date(Date.now() - 2400e3),
+          completedAt: new Date(Date.now() - 1800e3),
+          commissionPercentSnapshot: 10,
+          commissionAmount: Math.round(fare * 0.1),
+          driverEarnings: fare - Math.round(fare * 0.1),
+          clientRating: 5, driverRating: 4.8,
+        }),
+        ...(cancelled && {
+          cancelledBy: opts.cancelledBy,
+          cancelStage: opts.arrived ? 'driver_arrived' : 'accepted',
+          cancelReason: opts.cancelledBy === 'DRIVER' ? 'Changed my mind' : 'Found another taxi',
+          cancelledAt: new Date(Date.now() - 1200e3),
+        }),
+      },
+    });
+  };
+
+  // Completed rides (money flows) + one active + one open request with offers
+  await mkRide({ client: 'Ahmed Belkacem', phone: '+213 661 22 33 44', from: 'Cité El Hidhab', to: 'Gare routière Sétif', km: 4.2, status: 'completed', driverIdx: 0, fare: 250 });
+  await mkRide({ client: 'Fatima Zohra', phone: '+213 672 55 66 77', from: 'Parc Mall Sétif', to: 'El Eulma centre', km: 27, status: 'completed', driverIdx: 1, fare: 900 });
+  await mkRide({ client: 'Sara Kouadri', phone: '+213 659 99 88 77', from: 'Université Ferhat Abbas', to: 'Cité Yahiaoui', km: 6.5, status: 'completed', driverIdx: 0, fare: 300 });
+  await mkRide({ client: 'Mourad L.', phone: '+213 555 44 22 11', from: 'Hôpital CHU Sétif', to: 'Aïn Arnat', km: 9, status: 'in_ride', driverIdx: 1, fare: 380 });
+  const openRide = await mkRide({ client: 'Nadia Mansouri', phone: '+213 665 44 33 22', from: 'Centre-ville Sétif', to: 'Parc d\'attractions', km: 3.5, status: 'requested', proposed: 180 });
+  await prisma.taxiRideOffer.create({ data: { rideId: openRide.id, driverId: taxiDriverIds[0], amount: 220 } });
+  await prisma.taxiRideOffer.create({ data: { rideId: openRide.id, driverId: taxiDriverIds[2], amount: 200 } });
+
+  // ⚠ Fraud scenario: driver DRV-1003 (Adel) + client Bilal repeatedly match then cancel
+  // (the off-app cash deal pattern) + one late cancel after arrival
+  await mkRide({ client: 'Bilal S.', phone: '+213 699 00 11 22', from: 'Cité Bel Air', to: 'Zone industrielle', km: 7, status: 'cancelled_by_driver', driverIdx: 2, cancelledBy: 'DRIVER' });
+  await mkRide({ client: 'Bilal S.', phone: '+213 699 00 11 22', from: 'Cité Bel Air', to: 'El Eulma', km: 26, status: 'cancelled_by_driver', driverIdx: 2, cancelledBy: 'DRIVER', arrived: true });
+  await mkRide({ client: 'Bilal S.', phone: '+213 699 00 11 22', from: 'Cité Bel Air', to: 'Guedjel', km: 12, status: 'cancelled_by_client', driverIdx: 2, cancelledBy: 'CLIENT', arrived: true });
+  await prisma.driver.update({ where: { id: taxiDriverIds[2] }, data: { cancellationCount: 2 } });
+  await prisma.fraudAlert.create({
+    data: {
+      type: 'PAIR_COLLUSION', severity: 'HIGH',
+      driverId: taxiDriverIds[2], clientPhone: '+213 699 00 11 22', clientName: 'Bilal S.',
+      message: 'Driver Adel M. and client Bilal S. (+213 699 00 11 22) matched and cancelled 3 times — they are probably completing rides in cash outside the app.',
+      details: { pairCancels: 3 },
+    },
+  });
+  await prisma.fraudAlert.create({
+    data: {
+      type: 'LATE_CANCEL_PATTERN', severity: 'HIGH',
+      driverId: taxiDriverIds[2],
+      message: '2 rides of driver Adel M. were cancelled AFTER the driver arrived at pickup — classic off-app cash deal pattern.',
+      details: { lateCancels: 2 },
+    },
+  });
+  // Driver 2 (Samir) is on an active ride
+  await prisma.driver.update({ where: { id: taxiDriverIds[1] }, data: { status: 'BUSY' } });
 
   console.log('Seeding successfully completed!');
 }
