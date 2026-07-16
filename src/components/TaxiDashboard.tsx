@@ -17,20 +17,16 @@ interface TaxiDriverLite {
   profileImage?: string | null;
 }
 
-interface RideOffer {
-  id: string; amount: number; status: "pending" | "accepted" | "rejected" | "withdrawn";
-  driver: TaxiDriverLite; createdAt: string;
-}
-
 interface TaxiRide {
   id: string; rideNumber: string;
   clientName: string; clientPhone: string;
   pickupAddress: string; pickupWilaya?: string | null; pickupCommune?: string | null;
   destinationAddress: string; distanceKm?: number | null;
-  estimatedFare?: number | null; proposedFare?: number | null; agreedFare?: number | null;
+  // Price is calculated by the admin's formula — no negotiation
+  estimatedFare?: number | null; promoDiscount?: number | null; promoCodeId?: string | null;
+  agreedFare?: number | null;
   status: string;
   driverId?: string | null; driver?: TaxiDriverLite | null;
-  offers: RideOffer[];
   commissionPercentSnapshot?: number | null; commissionAmount?: number | null; driverEarnings?: number | null;
   cancelledBy?: string | null; cancelReason?: string | null; cancelStage?: string | null;
   acceptedAt?: string | null; arrivedAt?: string | null; startedAt?: string | null; completedAt?: string | null;
@@ -41,7 +37,7 @@ interface DriverStats {
   id: string; driverCode: string; name: string; phone: string; status: string; service: string;
   isVerified: boolean; vehicleModel?: string | null; vehicleColor?: string | null; vehiclePlate?: string | null;
   rating: number;
-  offersMade: number; offersAccepted: number; matchedRides: number; completedRides: number;
+  matchedRides: number; completedRides: number;
   cancelledByDriver: number; cancelledByClient: number; lateCancels: number;
   cancelRate: number; completionRate: number;
   grossFares: number; commissionPaid: number; earnings: number;
@@ -217,14 +213,6 @@ export default function TaxiDashboard({ activePage }: TaxiDashboardProps) {
           drivers={driverStats}
           onClose={() => setSelectedRide(null)}
           onAction={rideAction}
-          onMakeOffer={async (rideId, driverId, amount) => {
-            const res = await fetch(`${API_URL}/api/taxi/rides/${rideId}/offers`, {
-              method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ driverId, amount }),
-            });
-            if (res.ok) { fetchAll(); showToast("Offer registered ✓"); }
-            else { const d = await res.json().catch(() => ({})); showToast(`⚠ ${d.error || "Offer failed"}`); }
-          }}
         />
       )}
 
@@ -337,7 +325,7 @@ function OverviewPage({ stats, rides, alerts, onSelect, onRefresh }: {
                   </div>
                   <div className="text-right space-y-1">
                     <span className={`text-[9px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider border ${st.cls}`}>{st.label}</span>
-                    <p className="text-xs font-black text-slate-700">{dzd(r.agreedFare ?? r.proposedFare ?? r.estimatedFare)}</p>
+                    <p className="text-xs font-black text-slate-700">{dzd(r.agreedFare ?? r.estimatedFare)}</p>
                   </div>
                 </div>
               );
@@ -410,8 +398,8 @@ function RidesPage({ rides, onSelect, onNewRide, onRefresh }: {
                 <th className="pb-4 font-black">Client</th>
                 <th className="pb-4 font-black">Route</th>
                 <th className="pb-4 font-black text-center">Km</th>
-                <th className="pb-4 font-black text-right">Fare</th>
-                <th className="pb-4 font-black text-center">Offers</th>
+                <th className="pb-4 font-black text-right">Price</th>
+                <th className="pb-4 font-black text-center">Promo</th>
                 <th className="pb-4 font-black">Driver</th>
                 <th className="pb-4 font-black text-center">Status</th>
               </tr>
@@ -428,10 +416,10 @@ function RidesPage({ rides, onSelect, onNewRide, onRefresh }: {
                     </td>
                     <td className="py-4 text-[11px] max-w-56 truncate">{r.pickupAddress} → {r.destinationAddress}</td>
                     <td className="py-4 text-center">{r.distanceKm ?? "—"}</td>
-                    <td className="py-4 text-right font-black text-slate-800">{dzd(r.agreedFare ?? r.proposedFare ?? r.estimatedFare)}</td>
+                    <td className="py-4 text-right font-black text-slate-800">{dzd(r.agreedFare ?? r.estimatedFare)}</td>
                     <td className="py-4 text-center">
-                      {r.status === "requested" && r.offers.filter(o => o.status === "pending").length > 0 ? (
-                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-lg text-[10px] font-black">{r.offers.filter(o => o.status === "pending").length}</span>
+                      {r.promoDiscount ? (
+                        <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg text-[10px] font-black">−{r.promoDiscount}</span>
                       ) : "—"}
                     </td>
                     <td className="py-4 text-[11px] font-black">{r.driver?.name ?? "—"}</td>
@@ -451,16 +439,12 @@ function RidesPage({ rides, onSelect, onNewRide, onRefresh }: {
 
 // ══════════════════ RIDE DRAWER (negotiation + lifecycle) ══════════════════
 
-function RideDrawer({ ride, drivers, onClose, onAction, onMakeOffer }: {
+function RideDrawer({ ride, drivers, onClose, onAction }: {
   ride: TaxiRide; drivers: DriverStats[];
   onClose: () => void;
   onAction: (id: string, action: string, body?: object, label?: string) => Promise<unknown>;
-  onMakeOffer: (rideId: string, driverId: string, amount: number) => Promise<void>;
 }) {
   const [assignDriverId, setAssignDriverId] = useState("");
-  const [assignFare, setAssignFare] = useState(ride.proposedFare ? String(ride.proposedFare) : ride.estimatedFare ? String(ride.estimatedFare) : "");
-  const [offerDriverId, setOfferDriverId] = useState("");
-  const [offerAmount, setOfferAmount] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
 
@@ -501,13 +485,13 @@ function RideDrawer({ ride, drivers, onClose, onAction, onMakeOffer }: {
           </div>
         </div>
 
-        {/* Money box */}
+        {/* Money box — price is calculated by the formula, never negotiated */}
         <div className="bg-emerald-50/60 border border-emerald-100 p-5 rounded-3xl space-y-2">
-          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5"><HandCoins size={12} /> Money</span>
+          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-1.5"><HandCoins size={12} /> Fixed Price (calculated)</span>
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div><p className="text-[9px] font-black text-slate-400 uppercase">App Estimate</p><p className="text-sm font-black text-slate-700">{dzd(ride.estimatedFare)}</p></div>
-            <div><p className="text-[9px] font-black text-slate-400 uppercase">Client Offer</p><p className="text-sm font-black text-amber-600">{ride.proposedFare ? dzd(ride.proposedFare) : "—"}</p></div>
-            <div><p className="text-[9px] font-black text-slate-400 uppercase">Agreed</p><p className="text-sm font-black text-emerald-600">{ride.agreedFare ? dzd(ride.agreedFare) : "—"}</p></div>
+            <div><p className="text-[9px] font-black text-slate-400 uppercase">Calculated</p><p className="text-sm font-black text-slate-700">{dzd(ride.estimatedFare)}</p></div>
+            <div><p className="text-[9px] font-black text-slate-400 uppercase">Promo</p><p className="text-sm font-black text-amber-600">{ride.promoDiscount ? `− ${dzd(ride.promoDiscount)}` : "—"}</p></div>
+            <div><p className="text-[9px] font-black text-slate-400 uppercase">Client Pays</p><p className="text-sm font-black text-emerald-600">{dzd(ride.agreedFare ?? ride.estimatedFare)}</p></div>
           </div>
           {ride.status === "completed" && (
             <div className="border-t border-emerald-100 pt-2 grid grid-cols-2 gap-3 text-center">
@@ -530,82 +514,26 @@ function RideDrawer({ ride, drivers, onClose, onAction, onMakeOffer }: {
           </div>
         )}
 
-        {/* OPEN REQUEST: offers (inDrive negotiation) + direct assign (Yassir dispatch) */}
+        {/* OPEN REQUEST: dispatch a driver — the fare is already fixed by the formula */}
         {isOpen && (
-          <>
-            <div className="space-y-3">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Driver Offers ({ride.offers.filter(o => o.status === "pending").length} pending)</span>
-              {ride.offers.length === 0 ? (
-                <p className="text-[10px] text-slate-400 font-bold font-inter bg-slate-50 border border-dashed border-slate-100 rounded-2xl p-4 text-center">No offers yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {ride.offers.map(o => (
-                    <div key={o.id} className={`border p-4 rounded-2xl flex items-center justify-between ${o.status === "accepted" ? "border-emerald-200 bg-emerald-50" : o.status === "rejected" ? "border-slate-100 opacity-50" : "border-slate-100"}`}>
-                      <div>
-                        <p className="text-xs font-black text-slate-800">{o.driver.name} <span className="text-slate-400 font-bold">⭐ {o.driver.rating}</span></p>
-                        <p className="text-[10px] font-bold text-slate-400 font-inter">{[o.driver.vehicleModel, o.driver.vehicleColor].filter(Boolean).join(" · ")}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-amber-600">{dzd(o.amount)}</span>
-                        {o.status === "pending" ? (
-                          <button
-                            onClick={() => onAction(ride.id, `offers/${o.id}/accept`, undefined, `Offer accepted — ${o.driver.name} at ${dzd(o.amount)}`)}
-                            className="px-3 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all cursor-pointer"
-                          >
-                            Accept
-                          </button>
-                        ) : (
-                          <span className="text-[9px] font-black uppercase text-slate-400">{o.status}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Register an offer on a driver's behalf (phone negotiation) */}
-              <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl space-y-2">
-                <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Register a driver&apos;s counter-offer</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <select value={offerDriverId} onChange={e => setOfferDriverId(e.target.value)}
-                    className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none">
-                    <option value="">Driver…</option>
-                    {eligibleDrivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.driverCode})</option>)}
-                  </select>
-                  <input type="number" placeholder="Amount DZD" value={offerAmount} onChange={e => setOfferAmount(e.target.value)}
-                    className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none" />
-                </div>
-                <button
-                  onClick={() => { if (offerDriverId && offerAmount) { onMakeOffer(ride.id, offerDriverId, parseInt(offerAmount)); setOfferAmount(""); } }}
-                  disabled={!offerDriverId || !offerAmount}
-                  className="w-full py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all cursor-pointer disabled:opacity-40"
-                >
-                  Add Offer
-                </button>
-              </div>
-            </div>
-
-            {/* Direct dispatch */}
-            <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl space-y-2">
-              <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest">Direct dispatch (skip negotiation)</span>
-              <div className="grid grid-cols-2 gap-2">
-                <select value={assignDriverId} onChange={e => setAssignDriverId(e.target.value)}
-                  className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none">
-                  <option value="">Driver…</option>
-                  {eligibleDrivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.status})</option>)}
-                </select>
-                <input type="number" placeholder="Fare DZD" value={assignFare} onChange={e => setAssignFare(e.target.value)}
-                  className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none" />
-              </div>
-              <button
-                onClick={() => assignDriverId && onAction(ride.id, "assign", { driverId: assignDriverId, fare: assignFare || undefined }, "Driver assigned ✓")}
-                disabled={!assignDriverId}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all cursor-pointer disabled:opacity-40"
-              >
-                Assign Driver
-              </button>
-            </div>
-          </>
+          <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl space-y-2">
+            <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest">Dispatch a driver</span>
+            <p className="text-[10px] font-bold text-slate-500 font-inter">
+              The client pays the calculated price of <strong className="text-slate-800">{dzd(ride.agreedFare ?? ride.estimatedFare)}</strong> — no negotiation.
+            </p>
+            <select value={assignDriverId} onChange={e => setAssignDriverId(e.target.value)}
+              className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none">
+              <option value="">Choose a driver…</option>
+              {eligibleDrivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.status})</option>)}
+            </select>
+            <button
+              onClick={() => assignDriverId && onAction(ride.id, "assign", { driverId: assignDriverId }, "Driver dispatched ✓")}
+              disabled={!assignDriverId}
+              className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all cursor-pointer disabled:opacity-40"
+            >
+              Dispatch Driver
+            </button>
+          </div>
         )}
 
         {/* Lifecycle buttons */}
@@ -738,10 +666,8 @@ function DriversPage({ drivers, onAddDriver, onRefresh, onDriverUpdate, onSetSta
               </div>
 
               {/* Statistics — approvals & cancels */}
-              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 flex-1 text-center">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 flex-1 text-center">
                 {[
-                  { label: "Offers", value: d.offersMade, cls: "" },
-                  { label: "Approved", value: d.offersAccepted, cls: "text-emerald-600" },
                   { label: "Matched", value: d.matchedRides, cls: "" },
                   { label: "Completed", value: d.completedRides, cls: "text-emerald-600" },
                   { label: "He Cancelled", value: d.cancelledByDriver, cls: d.cancelledByDriver > 0 ? "text-rose-600" : "" },
@@ -1017,7 +943,7 @@ function NewRideModal({ config, onClose, onSubmit }: {
   const [pickupAddress, setPickupAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [km, setKm] = useState("");
-  const [proposedFare, setProposedFare] = useState("");
+  const [promoCode, setPromoCode] = useState("");
 
   const est = config && km
     ? Math.max(config.taxiMinFare, Math.round((config.taxiBaseFare + parseFloat(km) * config.taxiPerKm) / 10) * 10)
@@ -1061,14 +987,15 @@ function NewRideModal({ config, onClose, onSubmit }: {
               className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" />
           </div>
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Client&apos;s Price Offer (DZD)</label>
-            <input type="number" value={proposedFare} onChange={e => setProposedFare(e.target.value)} placeholder={est ? `App estimate: ${est}` : "Optional (inDrive-style)"}
-              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" />
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Promo Code (optional)</label>
+            <input value={promoCode} onChange={e => setPromoCode(e.target.value.toUpperCase())} placeholder="e.g. TAXI50"
+              className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black font-mono uppercase outline-none focus:bg-white" />
           </div>
         </div>
         {est !== null && (
           <p className="text-[11px] font-bold text-slate-500 font-inter bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-            📐 App estimate for {km} km: <strong className="text-amber-700">{est.toLocaleString()} DZD</strong>
+            📐 Calculated price for {km} km: <strong className="text-amber-700">{est.toLocaleString()} DZD</strong>
+            {promoCode && <span className="text-emerald-700"> — the promo code discount is applied automatically</span>}
           </p>
         )}
 
@@ -1079,7 +1006,7 @@ function NewRideModal({ config, onClose, onSubmit }: {
               clientName, clientPhone, pickupAddress, destinationAddress,
               pickupWilaya: "Sétif", pickupCommune: "Sétif",
               ...(km && { distanceKm: parseFloat(km) }),
-              ...(proposedFare && { proposedFare: parseInt(proposedFare) }),
+              ...(promoCode && { promoCode }),
             });
           }}
           className="w-full py-4 bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-amber-600 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"

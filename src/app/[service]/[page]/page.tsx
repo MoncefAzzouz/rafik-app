@@ -11,6 +11,7 @@ import FoodDashboard from "@/components/FoodDashboard";
 import ServicesDashboard from "@/components/ServicesDashboard";
 import SettingsPage from "@/components/SettingsPage";
 import ChatMonitor from "@/components/ChatMonitor";
+import PromoCodesPage from "@/components/PromoCodesPage";
 
 function AdminShellWrapper() {
   const params = useParams();
@@ -34,6 +35,8 @@ function AdminShellWrapper() {
   const renderContent = () => {
     if (page === "settings") return <SettingsPage />;
     if (page === "chats") return <ChatMonitor />;
+    // Promo codes are shared by taxi, food, and services
+    if (page === "promos") return <PromoCodesPage />;
 
     switch (service) {
       case "taxi":

@@ -20,6 +20,7 @@ import {
   MessageSquare,
   BarChart3,
   ShieldAlert,
+  Ticket,
 } from "lucide-react";
 
 interface NavItem {
@@ -34,6 +35,7 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "rides", label: "Rides", icon: Car },
     { id: "drivers", label: "Drivers", icon: Users },
     { id: "security", label: "Anti-Scam", icon: ShieldAlert },
+    { id: "promos", label: "Promo Codes", icon: Ticket },
     { id: "earnings", label: "Earnings", icon: TrendingUp },
   ],
   food: [
@@ -41,6 +43,7 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "restaurants", label: "Restaurants", icon: Store },
     { id: "orders", label: "Orders", icon: ShoppingBag },
     { id: "drivers", label: "Drivers", icon: Car },
+    { id: "promos", label: "Promo Codes", icon: Ticket },
     { id: "subscriptions", label: "Subscriptions", icon: TrendingUp },
   ],
   services: [
@@ -52,6 +55,7 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "reviews", label: "Reviews", icon: MessageSquare },
     { id: "clients", label: "Clients", icon: Users },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
+    { id: "promos", label: "Promo Codes", icon: Ticket },
     { id: "earnings", label: "Earnings", icon: TrendingUp },
   ],
 };
