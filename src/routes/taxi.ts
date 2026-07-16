@@ -6,6 +6,7 @@ import {
   canRideTransition, nextRideNumber, haversineKm, estimateFare,
   computeCommission, runFraudDetection, CANCELLED_STATUSES, RIDE_STATUSES,
 } from '../lib/taxi';
+import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 
 const router = Router();
 
@@ -15,7 +16,6 @@ function getUser(req: Request) {
 
 const rideInclude = {
   driver: { select: { id: true, name: true, phone: true, vehicleType: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, rating: true, status: true, profileImage: true } },
-  offers: { include: { driver: { select: { id: true, name: true, rating: true, vehicleModel: true, vehicleColor: true, status: true } } }, orderBy: { amount: 'asc' as const } },
 };
 
 async function getOwnDriver(userId: string) {
@@ -100,7 +100,7 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
   const {
     clientName, clientPhone, pickupAddress, pickupWilaya, pickupCommune,
     pickupLat, pickupLng, destinationAddress, destinationLat, destinationLng,
-    distanceKm, proposedFare,
+    distanceKm, promoCode,
   } = req.body;
 
   if (!clientName || !clientPhone || !pickupAddress || !destinationAddress) {
@@ -116,7 +116,24 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
     if (km === null && pickupLat != null && pickupLng != null && destinationLat != null && destinationLng != null) {
       km = Math.round(haversineKm(parseFloat(pickupLat), parseFloat(pickupLng), parseFloat(destinationLat), parseFloat(destinationLng)) * 10) / 10;
     }
+    // Price is fixed by the admin's formula — the client does NOT negotiate
     const { estimatedFare: fare } = await estimateFare(km);
+
+    // Optional promo code lowers the fixed fare
+    let promoDiscount = 0;
+    let promoValidation: PromoResult | null = null;
+    if (promoCode) {
+      promoValidation = await validatePromo({
+        code: promoCode as string, vertical: 'taxi', amount: fare,
+        userId: user.userId, clientPhone: clientPhone as string,
+      });
+      if (!promoValidation.valid) {
+        res.status(400).json({ error: promoValidation.error || 'Invalid promo code' });
+        return;
+      }
+      promoDiscount = promoValidation.discount;
+    }
+    const agreedFare = fare - promoDiscount;
 
     const ride = await prisma.taxiRide.create({
       data: {
@@ -134,11 +151,23 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
         destinationLng: destinationLng != null ? parseFloat(destinationLng) : null,
         distanceKm: km,
         estimatedFare: fare,
-        proposedFare: proposedFare ? parseInt(proposedFare) : null,
+        promoDiscount,
+        promoCodeId: promoValidation?.promo?.id ?? null,
+        // Fixed price the client will pay (calculated − promo)
+        agreedFare,
         status: 'requested',
       },
       include: rideInclude,
     });
+
+    // Consume the promo now that the ride exists
+    if (promoValidation?.valid && promoValidation.promo) {
+      await redeemPromo({
+        promoId: promoValidation.promo.id, vertical: 'taxi', refId: ride.id,
+        discount: promoDiscount, userId: user.userId, clientPhone: clientPhone as string,
+      });
+    }
+
     res.status(201).json(ride);
   } catch (err) {
     console.error(err);
@@ -146,108 +175,10 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
   }
 });
 
-// ── POST driver makes a price offer (inDrive negotiation) ──
-// Driver offers on an open request; admin can register an offer on a driver's behalf.
-router.post('/rides/:id/offers', authenticateToken, requireRole('DRIVER', 'ADMIN'), async (req: Request, res: Response) => {
-  const id = req.params.id as string;
-  const { amount, driverId: bodyDriverId } = req.body;
-  const user = getUser(req);
-
-  if (!amount || isNaN(parseInt(amount)) || parseInt(amount) <= 0) {
-    res.status(400).json({ error: 'A positive amount (DZD) is required' });
-    return;
-  }
-
-  try {
-    const ride = await prisma.taxiRide.findUnique({ where: { id } });
-    if (!ride) {
-      res.status(404).json({ error: 'Ride not found' });
-      return;
-    }
-    if (ride.status !== 'requested') {
-      res.status(400).json({ error: `Offers are only possible while the ride is "requested" (now: "${ride.status}")` });
-      return;
-    }
-
-    let driverId: string;
-    if (user.role === 'DRIVER') {
-      const driver = await getOwnDriver(user.userId);
-      if (!driver) {
-        res.status(404).json({ error: 'No driver record linked to this account' });
-        return;
-      }
-      if (driver.status === 'SUSPENDED' || !driver.isActive || !driver.isVerified) {
-        res.status(403).json({ error: 'Your driver account is not allowed to take rides (suspended or unverified)' });
-        return;
-      }
-      driverId = driver.id;
-    } else {
-      if (!bodyDriverId) {
-        res.status(400).json({ error: 'driverId is required when an admin registers an offer' });
-        return;
-      }
-      driverId = bodyDriverId as string;
-    }
-
-    const offer = await prisma.taxiRideOffer.upsert({
-      where: { rideId_driverId: { rideId: id, driverId } },
-      update: { amount: parseInt(amount), status: 'pending' },
-      create: { rideId: id, driverId, amount: parseInt(amount) },
-      include: { driver: { select: { id: true, name: true, rating: true, vehicleModel: true, vehicleColor: true } } },
-    });
-    res.status(201).json(offer);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── POST accept an offer (client who owns the ride, or admin) — locks driver + agreed fare ──
-router.post('/rides/:id/offers/:offerId/accept', authenticateToken, async (req: Request, res: Response) => {
-  const id = req.params.id as string;
-  const offerId = req.params.offerId as string;
-  const user = getUser(req);
-  try {
-    const ride = await prisma.taxiRide.findUnique({ where: { id } });
-    if (!ride) {
-      res.status(404).json({ error: 'Ride not found' });
-      return;
-    }
-    if (user.role !== 'ADMIN' && ride.clientId !== user.userId) {
-      res.status(403).json({ error: 'Insufficient permissions' });
-      return;
-    }
-    if (ride.status !== 'requested') {
-      res.status(400).json({ error: `Ride is already "${ride.status}"` });
-      return;
-    }
-    const offer = await prisma.taxiRideOffer.findUnique({ where: { id: offerId } });
-    if (!offer || offer.rideId !== id || offer.status !== 'pending') {
-      res.status(404).json({ error: 'Offer not found or no longer available' });
-      return;
-    }
-
-    const [, , updated] = await prisma.$transaction([
-      prisma.taxiRideOffer.update({ where: { id: offerId }, data: { status: 'accepted' } }),
-      prisma.taxiRideOffer.updateMany({ where: { rideId: id, id: { not: offerId }, status: 'pending' }, data: { status: 'rejected' } }),
-      prisma.taxiRide.update({
-        where: { id },
-        data: { status: 'accepted', driverId: offer.driverId, agreedFare: offer.amount, acceptedAt: new Date() },
-        include: rideInclude,
-      }),
-      prisma.driver.update({ where: { id: offer.driverId }, data: { status: 'BUSY' } }),
-    ]);
-    res.json(updated);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── POST direct assignment (admin, Yassir-style dispatch: pick driver + fare in one step) ──
+// ── POST dispatch a driver (admin picks a driver; the fare is already fixed by the formula) ──
 router.post('/rides/:id/assign', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const { driverId, fare } = req.body;
+  const { driverId } = req.body;
   if (!driverId) {
     res.status(400).json({ error: 'driverId is required' });
     return;
@@ -271,7 +202,8 @@ router.post('/rides/:id/assign', authenticateToken, requireRole('ADMIN'), async 
       res.status(400).json({ error: 'This driver is suspended or inactive' });
       return;
     }
-    const agreedFare = fare ? parseInt(fare) : ride.proposedFare ?? ride.estimatedFare ?? 0;
+    // Fare is the calculated price (already net of any promo); no negotiation
+    const agreedFare = ride.agreedFare ?? ride.estimatedFare ?? 0;
     const [updated] = await prisma.$transaction([
       prisma.taxiRide.update({
         where: { id },
@@ -347,7 +279,8 @@ router.post('/rides/:id/complete', authenticateToken, async (req: Request, res: 
       return;
     }
 
-    const fare = finalFare ? parseInt(finalFare) : ride.agreedFare ?? ride.proposedFare ?? ride.estimatedFare ?? 0;
+    // The fare was fixed by the formula at request time (already net of promo)
+    const fare = ride.agreedFare ?? ride.estimatedFare ?? 0;
     const { percent, commissionAmount, driverEarnings } = await computeCommission(fare);
 
     const ops: any[] = [

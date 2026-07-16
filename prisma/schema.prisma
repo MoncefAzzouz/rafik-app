@@ -42,7 +42,7 @@ model PlatformSettings {
   foodDeliveryFeePerKm Float @default(0)   // DZD per km
   // Revenue→subscription tier grid: [{minRevenue, maxRevenue|null, fee}]
   restaurantSubscriptionGrid Json?
-  // Taxi config (inDrive/Yassir-style)
+  // Taxi config (fixed formula — the price is calculated, the client does NOT negotiate)
   taxiBaseFare          Int   @default(100) // DZD flag-fall
   taxiPerKm             Float @default(30)  // DZD per km
   taxiMinFare           Int   @default(150) // DZD floor
@@ -149,6 +149,8 @@ model Booking {
   mediationModeSnapshot MediationMode?
   // Money snapshot frozen at completion so later settings changes don't rewrite history
   finalPrice                Int?
+  promoCodeId               String?
+  promoDiscount             Int?            @default(0) // DZD off from a promo code
   commissionModeSnapshot    CommissionMode?
   commissionPercentSnapshot Float?
   commissionAmount          Int?
@@ -255,6 +257,19 @@ enum FraudSeverity {
   LOW
   MEDIUM
   HIGH
+}
+
+// Which vertical(s) a promo code applies to
+enum PromoScope {
+  TAXI
+  FOOD
+  SERVICES
+  ALL
+}
+
+enum PromoDiscountType {
+  PERCENTAGE // percent off (with optional cap)
+  FIXED      // flat DZD off
 }
 
 enum OrderType {
@@ -403,10 +418,12 @@ model TaxiRide {
   destinationLat     Float?
   destinationLng     Float?
   distanceKm         Float?
-  // Money (inDrive-style): app estimates, client proposes, driver counters, one price is agreed
+  // Money (fixed formula — no negotiation): app calculates, admin sets the formula
   estimatedFare Int?   // computed: max(minFare, base + km*perKm)
-  proposedFare  Int?   // client's own offer
-  agreedFare    Int?   // final price locked at acceptance
+  proposedFare  Int?   // deprecated (client negotiation removed) — kept for old rows
+  promoCodeId   String?
+  promoDiscount Int?   @default(0) // DZD off from a promo code
+  agreedFare    Int?   // final price the client pays (estimate − promo)
   // requested → accepted → driver_arrived → in_ride → completed
   // cancelled_by_client / cancelled_by_driver / cancelled_by_admin / expired terminal
   status        String  @default("requested")
@@ -512,7 +529,9 @@ model FoodOrder {
   subtotal             Int                @default(0)
   deliveryFee          Int                @default(0)
   deliveryDistance     Float?             // km
-  totalAmount          Int                @default(0)
+  promoCodeId          String?
+  promoDiscount        Int                @default(0) // DZD off from a promo code
+  totalAmount          Int                @default(0) // subtotal + deliveryFee − promoDiscount
   prepTime             Int?               // minutes, set on accept
   declineReason        String?
   // stage timestamps
@@ -595,4 +614,42 @@ model SubscriptionPayment {
   periodEnd      DateTime
   paidAt         DateTime     @default(now())
   note           String?
+}
+
+// ─── PROMO CODES (shared by taxi, food, and services) ───
+model PromoCode {
+  id             String            @id @default(cuid())
+  code           String            @unique // stored UPPERCASE, e.g. WELCOME20
+  description    String?
+  scope          PromoScope        @default(ALL)
+  discountType   PromoDiscountType @default(PERCENTAGE)
+  discountValue  Float             // 20 (=20%) or 500 (=500 DZD)
+  maxDiscount    Int?              // cap for percentage discounts (DZD); null = no cap
+  minOrderAmount Int?              // minimum order/fare to qualify (DZD)
+  maxUses        Int?              // total redemptions allowed; null = unlimited
+  maxUsesPerUser Int               @default(1)
+  usedCount      Int               @default(0)
+  startsAt       DateTime?         // becomes usable from this date
+  expiresAt      DateTime?         // deadline; after this the code is dead
+  isActive       Boolean           @default(true)
+  redemptions    PromoRedemption[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+// One row per successful use — powers maxUses and per-user limits
+model PromoRedemption {
+  id          String     @id @default(cuid())
+  promoCodeId String
+  promoCode   PromoCode  @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  userId      String?    // User.id when logged in
+  clientPhone String?    // fallback identity for phone bookings
+  scope       PromoScope
+  refType     String     // "taxi" | "food" | "booking"
+  refId       String     // the ride/order/booking id
+  discount    Int        // DZD actually applied
+  createdAt   DateTime   @default(now())
+
+  @@index([promoCodeId, userId])
+  @@index([promoCodeId, clientPhone])
 }

@@ -4,6 +4,9 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('Clearing database...');
+  // Promo codes
+  await prisma.promoRedemption.deleteMany();
+  await prisma.promoCode.deleteMany();
   // Taxi module tables
   await prisma.fraudAlert.deleteMany();
   await prisma.taxiRideOffer.deleteMany();
@@ -873,6 +876,23 @@ async function main() {
   });
   // Driver 2 (Samir) is on an active ride
   await prisma.driver.update({ where: { id: taxiDriverIds[1] }, data: { status: 'BUSY' } });
+
+  // ────────────────────────────────────────────
+  // PROMO CODES (shared across taxi, food, services)
+  // ────────────────────────────────────────────
+  console.log('Seeding promo codes...');
+  const in30days = new Date(Date.now() + 30 * 24 * 3600e3);
+  const yesterday = new Date(Date.now() - 24 * 3600e3);
+  await prisma.promoCode.createMany({
+    data: [
+      { code: 'WELCOME20', description: '20% off your first order (max 300 DZD)', scope: 'ALL', discountType: 'PERCENTAGE', discountValue: 20, maxDiscount: 300, maxUses: 1000, maxUsesPerUser: 1, expiresAt: in30days, isActive: true },
+      { code: 'TAXI50', description: '50 DZD off any ride', scope: 'TAXI', discountType: 'FIXED', discountValue: 50, maxUsesPerUser: 3, expiresAt: in30days, isActive: true },
+      { code: 'FOOD15', description: '15% off food orders over 1000 DZD', scope: 'FOOD', discountType: 'PERCENTAGE', discountValue: 15, minOrderAmount: 1000, maxUses: 500, maxUsesPerUser: 5, expiresAt: in30days, isActive: true },
+      { code: 'SERVICE100', description: '100 DZD off a service booking', scope: 'SERVICES', discountType: 'FIXED', discountValue: 100, maxUsesPerUser: 2, isActive: true },
+      { code: 'RAMADAN', description: 'Ramadan promo (expired demo)', scope: 'ALL', discountType: 'PERCENTAGE', discountValue: 25, expiresAt: yesterday, isActive: true },
+      { code: 'PAUSED10', description: '10% — currently disabled', scope: 'ALL', discountType: 'PERCENTAGE', discountValue: 10, isActive: false },
+    ],
+  });
 
   console.log('Seeding successfully completed!');
 }

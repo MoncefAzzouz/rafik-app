@@ -5,6 +5,7 @@ import {
   canFoodTransition, FOOD_ORDER_STATUSES, generateFoodOrderNumber,
   computeDeliveryFee, haversineKm,
 } from '../lib/food';
+import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 
 const router = Router();
 
@@ -108,7 +109,7 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
 router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT', 'CASHIER', 'RESTAURANT'), async (req: Request, res: Response) => {
   const {
     restaurantId, orderType, clientName, clientPhone, deliveryAddress, deliveryWilaya, deliveryCommune,
-    deliveryLat, deliveryLng, deliveryInstructions, paymentMethod, items,
+    deliveryLat, deliveryLng, deliveryInstructions, paymentMethod, items, promoCode,
   } = req.body;
   const user = getUser(req);
 
@@ -179,7 +180,23 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT', 'CASHIER', 'R
       distanceKm = Math.round(haversineKm(restaurant.lat, restaurant.lng, parseFloat(deliveryLat), parseFloat(deliveryLng)) * 100) / 100;
     }
     const deliveryFee = await computeDeliveryFee(type, distanceKm);
-    const totalAmount = subtotal + deliveryFee;
+
+    // Optional promo code discounts the (subtotal + delivery) total
+    const grossTotal = subtotal + deliveryFee;
+    let promoDiscount = 0;
+    let promoValidation: PromoResult | null = null;
+    if (promoCode) {
+      promoValidation = await validatePromo({
+        code: promoCode as string, vertical: 'food', amount: grossTotal,
+        userId: user.userId, clientPhone: clientPhone as string,
+      });
+      if (!promoValidation.valid) {
+        res.status(400).json({ error: promoValidation.error || 'Invalid promo code' });
+        return;
+      }
+      promoDiscount = promoValidation.discount;
+    }
+    const totalAmount = grossTotal - promoDiscount;
 
     const orderNumber = await generateFoodOrderNumber(type);
     const cashier = user.role === 'CASHIER'
@@ -205,6 +222,8 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT', 'CASHIER', 'R
         subtotal,
         deliveryFee,
         deliveryDistance: distanceKm,
+        promoDiscount,
+        promoCodeId: promoValidation?.promo?.id ?? null,
         totalAmount,
         statusHistory: { create: { status: 'pending' } },
         items: {
@@ -220,6 +239,15 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT', 'CASHIER', 'R
       },
       include: ORDER_INCLUDE,
     });
+
+    // Consume the promo now that the order exists
+    if (promoValidation?.valid && promoValidation.promo) {
+      await redeemPromo({
+        promoId: promoValidation.promo.id, vertical: 'food', refId: order.id,
+        discount: promoDiscount, userId: user.userId, clientPhone: clientPhone as string,
+      });
+    }
+
     res.status(201).json(order);
   } catch (err) {
     console.error(err);

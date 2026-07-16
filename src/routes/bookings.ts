@@ -4,6 +4,7 @@ import { authenticateToken, requireRole, AuthenticatedRequest } from '../middlew
 import { getEffectiveModes } from '../lib/settings';
 import { isValidLocation } from '../lib/locations';
 import { canTransition, isKnownStatus, newBookingId } from '../lib/bookingStatus';
+import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -380,7 +381,7 @@ router.put('/:id/decline', authenticateToken, (req, res) => workerAcceptDecline(
 // PUT complete a booking — freezes the money snapshot (commission or subscription)
 router.put('/:id/complete', authenticateToken, async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const { finalPrice } = req.body;
+  const { finalPrice, promoCode } = req.body;
   const user = getUser(req);
 
   try {
@@ -399,9 +400,26 @@ router.put('/:id/complete', authenticateToken, async (req: Request, res: Respons
       return;
     }
 
-    const price = finalPrice !== undefined && finalPrice !== null && `${finalPrice}` !== ''
+    const grossPrice = finalPrice !== undefined && finalPrice !== null && `${finalPrice}` !== ''
       ? parseInt(finalPrice)
       : existing.workerQuote ?? 0;
+
+    // Optional promo code discounts what the client pays (validated against the job price)
+    let promoDiscount = 0;
+    let promoValidation: PromoResult | null = null;
+    const code = promoCode || existing.promoCodeId ? promoCode : null;
+    if (code) {
+      promoValidation = await validatePromo({
+        code: code as string, vertical: 'booking', amount: grossPrice,
+        userId: existing.clientId, clientPhone: existing.clientPhone,
+      });
+      if (!promoValidation.valid) {
+        res.status(400).json({ error: promoValidation.error || 'Invalid promo code' });
+        return;
+      }
+      promoDiscount = promoValidation.discount;
+    }
+    const price = grossPrice - promoDiscount;
 
     const modes = await getEffectiveModes(existing.worker);
     const commissionAmount = modes.commissionMode === 'PERCENTAGE'
@@ -421,6 +439,8 @@ router.put('/:id/complete', authenticateToken, async (req: Request, res: Respons
         data: {
           status: 'completed',
           finalPrice: price,
+          promoDiscount,
+          promoCodeId: promoValidation?.promo?.id ?? null,
           commissionModeSnapshot: modes.commissionMode,
           commissionPercentSnapshot: modes.commissionMode === 'PERCENTAGE' ? modes.commissionPercent : null,
           commissionAmount,
@@ -429,6 +449,14 @@ router.put('/:id/complete', authenticateToken, async (req: Request, res: Respons
         include: { statusHistory: true, worker: true },
       }),
     ]);
+
+    if (promoValidation?.valid && promoValidation.promo) {
+      await redeemPromo({
+        promoId: promoValidation.promo.id, vertical: 'booking', refId: id,
+        discount: promoDiscount, userId: existing.clientId, clientPhone: existing.clientPhone,
+      });
+    }
+
     res.json(booking);
   } catch (err) {
     console.error(err);
