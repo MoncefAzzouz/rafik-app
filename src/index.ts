@@ -18,6 +18,7 @@ import foodOrdersRoutes from './routes/foodOrders';
 import foodAdminRoutes from './routes/foodAdmin';
 import taxiRoutes from './routes/taxi';
 import promosRoutes from './routes/promos';
+import truckRoutes from './routes/truck';
 import { initSocket } from './lib/socket';
 
 dotenv.config();
@@ -62,8 +63,10 @@ app.use('/api/food-orders', foodOrdersRoutes);
 app.use('/api/food', foodAdminRoutes);
 // Taxi module (inDrive/Yassir-style)
 app.use('/api/taxi', taxiRoutes);
-// Promo codes (shared across taxi, food, services)
+// Promo codes (shared across taxi, food, services, truck)
 app.use('/api/promos', promosRoutes);
+// Truck freight module
+app.use('/api/truck', truckRoutes);
 
 const PORT = process.env.PORT || 4000;
 

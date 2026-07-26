@@ -13,6 +13,7 @@ enum Role {
   RESTAURANT
   DRIVER
   CASHIER
+  TRUCKER
 }
 
 // MEDIATED = admin sits between worker and client (relays quotes/contact)
@@ -47,6 +48,12 @@ model PlatformSettings {
   taxiPerKm             Float @default(30)  // DZD per km
   taxiMinFare           Int   @default(150) // DZD floor
   taxiCommissionPercent Float @default(10)  // platform % of each completed ride
+  // Truck freight config (editable pricing formula)
+  // price = max(min, round((base + km*perKm) * truckType.priceMultiplier + category.surcharge))
+  truckBaseFare          Int   @default(500)  // DZD base for a freight job
+  truckPerKm             Float @default(60)   // DZD per km
+  truckMinFare           Int   @default(800)  // DZD floor
+  truckCommissionPercent Float @default(12)   // platform % of each completed freight job
   updatedAt         DateTime       @updatedAt
 }
 
@@ -264,7 +271,15 @@ enum PromoScope {
   TAXI
   FOOD
   SERVICES
+  TRUCK
   ALL
+}
+
+// Client's answer to "do you have the required invoice for the cargo?"
+enum InvoiceStatus {
+  HAS_INVOICE
+  NO_INVOICE
+  NOT_REQUIRED
 }
 
 enum PromoDiscountType {
@@ -616,7 +631,132 @@ model SubscriptionPayment {
   note           String?
 }
 
-// ─── PROMO CODES (shared by taxi, food, and services) ───
+// ─── TRUCK FREIGHT (house moving, towing, construction materials, refrigerated, fuels…) ───
+
+// A kind of truck the admin defines (Flatbed, Refrigerated 10T, Tow truck…)
+model TruckType {
+  id              String              @id @default(cuid())
+  name            String              @unique
+  description     String?
+  image           String?
+  capacityLabel   String?             // e.g. "up to 10 tons"
+  priceMultiplier Float               @default(1) // multiplies the base freight fare
+  isActive        Boolean             @default(true)
+  categories      TruckCategoryType[]
+  trucks          Truck[]
+  orders          TruckOrder[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+// A freight service category (House moving, Towing, Construction materials…)
+model TruckCategory {
+  id           String              @id @default(cuid())
+  name         String              @unique
+  description  String?
+  image        String?
+  isActive     Boolean             @default(true)
+  allowedTypes TruckCategoryType[] // which truck types can serve this category
+  orders       TruckOrder[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+// Join: which truck types are allowed in a category
+model TruckCategoryType {
+  id          String        @id @default(cuid())
+  categoryId  String
+  category    TruckCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  truckTypeId String
+  truckType   TruckType     @relation(fields: [truckTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, truckTypeId])
+}
+
+// A physical truck + its driver account
+model Truck {
+  id                String       @id @default(cuid())
+  userId            String?      @unique
+  truckCode         String       @unique // TRK-0001
+  driverName        String
+  phone             String       @unique
+  email             String?
+  plate             String?
+  truckTypeId       String?
+  truckType         TruckType?   @relation(fields: [truckTypeId], references: [id])
+  status            String       @default("offline") // available | busy | offline | suspended
+  lat               Float?
+  lng               Float?
+  wilaya            String?
+  commune           String?
+  rating            Float        @default(0)
+  totalTrips        Int          @default(0)
+  isVerified        Boolean      @default(false)
+  isActive          Boolean      @default(true)
+  cancellationCount Int          @default(0)
+  profileImage      String?
+  notes             String?
+  orders            TruckOrder[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model TruckOrder {
+  id                 String         @id @default(cuid())
+  orderNumber        String         @unique // TRK-YYYYMMDD-0001
+  clientId           String?
+  clientName         String
+  clientPhone        String
+  categoryId         String
+  category           TruckCategory  @relation(fields: [categoryId], references: [id])
+  truckTypeId        String?
+  truckType          TruckType?     @relation(fields: [truckTypeId], references: [id])
+  // Positions: current + next move (destination)
+  pickupAddress      String
+  pickupWilaya       String?
+  pickupCommune      String?
+  pickupLat          Float?
+  pickupLng          Float?
+  destinationAddress String
+  destinationLat     Float?
+  destinationLng     Float?
+  distanceKm         Float?
+  description        String
+  // "do you have the required invoice for the cargo?"
+  invoiceStatus      InvoiceStatus  @default(NOT_REQUIRED)
+  // now, or a chosen day
+  scheduledType      String         @default("now") // now | scheduled
+  scheduledDate      String?
+  // Money — calculated by the editable formula
+  estimatedPrice     Int?
+  promoCodeId        String?
+  promoDiscount      Int?           @default(0)
+  agreedPrice        Int?
+  commissionPercentSnapshot Float?
+  commissionAmount   Int?
+  driverEarnings     Int?
+  // Lifecycle: requested → accepted → arrived → loading → in_transit → delivered
+  status             String         @default("requested")
+  truckId            String?
+  truck              Truck?         @relation(fields: [truckId], references: [id])
+  cancelledBy        RideCancelledBy?
+  cancelReason       String?
+  cancelStage        String?
+  clientRating       Float?
+  acceptedAt         DateTime?
+  arrivedAt          DateTime?
+  loadingAt          DateTime?
+  transitAt          DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([truckId, status])
+  @@index([clientPhone])
+}
+
+// ─── PROMO CODES (shared by taxi, food, services, and truck) ───
 model PromoCode {
   id             String            @id @default(cuid())
   code           String            @unique // stored UPPERCASE, e.g. WELCOME20

@@ -5,7 +5,7 @@ import { validatePromo, Vertical } from '../lib/promo';
 
 const router = Router();
 
-const SCOPES = ['TAXI', 'FOOD', 'SERVICES', 'ALL'];
+const SCOPES = ['TAXI', 'FOOD', 'SERVICES', 'TRUCK', 'ALL'];
 const TYPES = ['PERCENTAGE', 'FIXED'];
 
 function getUser(req: Request) {
@@ -47,8 +47,8 @@ router.post('/validate', authenticateToken, async (req: Request, res: Response) 
     res.status(400).json({ error: 'Missing code, vertical, or amount' });
     return;
   }
-  if (!['taxi', 'food', 'booking'].includes(vertical)) {
-    res.status(400).json({ error: 'vertical must be taxi, food, or booking' });
+  if (!['taxi', 'food', 'booking', 'truck'].includes(vertical)) {
+    res.status(400).json({ error: 'vertical must be taxi, food, booking, or truck' });
     return;
   }
   try {

@@ -1,12 +1,13 @@
 import prisma from './prisma';
 import { PromoCode, PromoScope } from '@prisma/client';
 
-export type Vertical = 'taxi' | 'food' | 'booking';
+export type Vertical = 'taxi' | 'food' | 'booking' | 'truck';
 
 const SCOPE_FOR: Record<Vertical, PromoScope> = {
   taxi: 'TAXI',
   food: 'FOOD',
   booking: 'SERVICES',
+  truck: 'TRUCK',
 };
 
 export interface PromoResult {

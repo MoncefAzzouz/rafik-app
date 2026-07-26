@@ -4,6 +4,12 @@ import bcrypt from 'bcryptjs';
 
 async function main() {
   console.log('Clearing database...');
+  // Truck module
+  await prisma.truckOrder.deleteMany();
+  await prisma.truckCategoryType.deleteMany();
+  await prisma.truck.deleteMany();
+  await prisma.truckCategory.deleteMany();
+  await prisma.truckType.deleteMany();
   // Promo codes
   await prisma.promoRedemption.deleteMany();
   await prisma.promoCode.deleteMany();
@@ -878,7 +884,115 @@ async function main() {
   await prisma.driver.update({ where: { id: taxiDriverIds[1] }, data: { status: 'BUSY' } });
 
   // ────────────────────────────────────────────
-  // PROMO CODES (shared across taxi, food, services)
+  // TRUCK FREIGHT MODULE
+  // ────────────────────────────────────────────
+  console.log('Seeding truck types, categories, trucks, orders...');
+
+  // Truck types (with price multipliers — heavier/specialized = pricier)
+  const truckTypesData = [
+    { name: 'Small Van', capacityLabel: 'up to 1 ton', priceMultiplier: 1.0, description: 'Light parcels and small moves' },
+    { name: 'Pickup Truck', capacityLabel: 'up to 2 tons', priceMultiplier: 1.2, description: 'Appliances and medium loads' },
+    { name: 'Flatbed 5T', capacityLabel: 'up to 5 tons', priceMultiplier: 1.6, description: 'Furniture, construction materials' },
+    { name: 'Box Truck 10T', capacityLabel: 'up to 10 tons', priceMultiplier: 2.0, description: 'Full house moves, merchandise' },
+    { name: 'Refrigerated Truck', capacityLabel: 'up to 8 tons', priceMultiplier: 2.4, description: 'Cold-chain / perishable goods' },
+    { name: 'Tow Truck', capacityLabel: '1 vehicle', priceMultiplier: 1.8, description: 'Vehicle towing / breakdown' },
+    { name: 'Tanker', capacityLabel: 'up to 12,000 L', priceMultiplier: 2.8, description: 'Water, fuels and chemicals' },
+    { name: 'Heavy Lowboy', capacityLabel: 'up to 30 tons', priceMultiplier: 3.5, description: 'Heavy equipment and machinery' },
+  ];
+  const truckTypeIds: Record<string, string> = {};
+  for (const t of truckTypesData) {
+    const tt = await prisma.truckType.create({ data: t });
+    truckTypeIds[t.name] = tt.id;
+  }
+
+  // Categories, each allowing a curated set of truck types + a surcharge
+  const truckCategoriesData: { name: string; description: string; types: string[] }[] = [
+    { name: 'House Moving', description: 'Moving homes and furniture', types: ['Pickup Truck', 'Flatbed 5T', 'Box Truck 10T'] },
+    { name: 'Commercial Merchandise', description: 'Store and warehouse goods', types: ['Small Van', 'Pickup Truck', 'Box Truck 10T'] },
+    { name: 'Appliances', description: 'Fridges, washers, ovens…', types: ['Small Van', 'Pickup Truck'] },
+    { name: 'Towing', description: 'Vehicle breakdown & towing', types: ['Tow Truck'] },
+    { name: 'Construction Materials', description: 'Cement, bricks, steel…', types: ['Flatbed 5T', 'Box Truck 10T', 'Heavy Lowboy'] },
+    { name: 'Heavy Equipment', description: 'Machinery and heavy gear', types: ['Flatbed 5T', 'Heavy Lowboy'] },
+    { name: 'Refrigerated Merchandise', description: 'Cold-chain perishable goods', types: ['Refrigerated Truck'] },
+    { name: 'Water', description: 'Potable / construction water', types: ['Tanker'] },
+    { name: 'Fuels & Chemicals', description: 'Regulated liquids', types: ['Tanker'] },
+  ];
+  const truckCategoryIds: Record<string, string> = {};
+  for (const c of truckCategoriesData) {
+    const cat = await prisma.truckCategory.create({
+      data: {
+        name: c.name, description: c.description,
+        allowedTypes: { create: c.types.map(tn => ({ truckTypeId: truckTypeIds[tn] })) },
+      },
+    });
+    truckCategoryIds[c.name] = cat.id;
+  }
+
+  // Trucks (each is a driver account)
+  const truckerPassword = await bcrypt.hash('trucker123', 10);
+  const trucksData = [
+    { code: 'TRK-0001', name: 'Rabah Z.', phone: '+213 551 10 10 10', type: 'Box Truck 10T', plate: '00111-119-19' },
+    { code: 'TRK-0002', name: 'Slimane B.', phone: '+213 551 20 20 20', type: 'Flatbed 5T', plate: '00222-119-19' },
+    { code: 'TRK-0003', name: 'Nadir F.', phone: '+213 551 30 30 30', type: 'Refrigerated Truck', plate: '00333-119-19' },
+    { code: 'TRK-0004', name: 'Kamel T.', phone: '+213 551 40 40 40', type: 'Tow Truck', plate: '00444-119-19' },
+    { code: 'TRK-0005', name: 'Yacine H.', phone: '+213 551 50 50 50', type: 'Tanker', plate: '00555-119-19' },
+  ];
+  const truckIds: string[] = [];
+  for (const t of trucksData) {
+    const tu = await prisma.user.create({
+      data: { email: `${t.code.toLowerCase()}@rafik.app`, phone: t.phone, passwordHash: truckerPassword, fullName: t.name, role: Role.TRUCKER },
+    });
+    const truck = await prisma.truck.create({
+      data: {
+        userId: tu.id, truckCode: t.code, driverName: t.name, phone: t.phone, email: `${t.code.toLowerCase()}@rafik.app`,
+        plate: t.plate, truckTypeId: truckTypeIds[t.type], status: 'available', isVerified: true,
+        wilaya: 'Sétif', commune: 'Sétif', rating: 4.7,
+      },
+    });
+    truckIds.push(truck.id);
+  }
+
+  // Sample orders across the lifecycle
+  const tday = new Date();
+  const tymd = `${tday.getFullYear()}${String(tday.getMonth() + 1).padStart(2, '0')}${String(tday.getDate()).padStart(2, '0')}`;
+  let tSeq = 0;
+  const tNum = () => `TRK-${tymd}-${String(++tSeq).padStart(4, '0')}`;
+  const mkTruckOrder = async (o: {
+    client: string; phone: string; category: string; type: string; from: string; to: string; km: number;
+    desc: string; invoice: 'HAS_INVOICE' | 'NO_INVOICE' | 'NOT_REQUIRED'; status: string; truckIdx?: number; scheduled?: string;
+  }) => {
+    const mult = truckTypesData.find(t => t.name === o.type)!.priceMultiplier;
+    const price = Math.max(800, Math.round(((500 + o.km * 60) * mult) / 10) * 10);
+    const done = o.status === 'delivered';
+    return prisma.truckOrder.create({
+      data: {
+        orderNumber: tNum(), clientName: o.client, clientPhone: o.phone,
+        categoryId: truckCategoryIds[o.category], truckTypeId: truckTypeIds[o.type],
+        pickupAddress: o.from, pickupWilaya: 'Sétif', pickupCommune: 'Sétif', destinationAddress: o.to, distanceKm: o.km,
+        description: o.desc, invoiceStatus: o.invoice,
+        scheduledType: o.scheduled ? 'scheduled' : 'now', scheduledDate: o.scheduled ?? null,
+        estimatedPrice: price, agreedPrice: price, status: o.status,
+        truckId: o.truckIdx != null ? truckIds[o.truckIdx] : null,
+        ...(o.truckIdx != null && { acceptedAt: new Date(Date.now() - 3600e3) }),
+        ...(done && {
+          deliveredAt: new Date(Date.now() - 1800e3),
+          commissionPercentSnapshot: 12, commissionAmount: Math.round(price * 0.12), driverEarnings: price - Math.round(price * 0.12),
+        }),
+      },
+    });
+  };
+
+  await mkTruckOrder({ client: 'Farid Meziane', phone: '+213 661 11 22 33', category: 'House Moving', type: 'Box Truck 10T', from: 'Cité El Hidhab', to: 'El Eulma centre', km: 27, desc: 'Full 3-room apartment move', invoice: 'NOT_REQUIRED', status: 'delivered', truckIdx: 0 });
+  await mkTruckOrder({ client: 'Nabil Cherfaoui', phone: '+213 662 44 55 66', category: 'Construction Materials', type: 'Flatbed 5T', from: 'Dépôt Sétif', to: 'Chantier Aïn Arnat', km: 12, desc: '2 tons of cement bags', invoice: 'HAS_INVOICE', status: 'delivered', truckIdx: 1 });
+  await mkTruckOrder({ client: 'Souad Belkadi', phone: '+213 663 77 88 99', category: 'Refrigerated Merchandise', type: 'Refrigerated Truck', from: 'Marché de gros', to: 'Supérette Guedjel', km: 18, desc: 'Frozen goods delivery', invoice: 'HAS_INVOICE', status: 'in_transit', truckIdx: 2 });
+  await mkTruckOrder({ client: 'Amine Rahmani', phone: '+213 664 00 11 22', category: 'Towing', type: 'Tow Truck', from: 'Route nationale RN5', to: 'Garage centre-ville', km: 8, desc: 'Broken-down car towing', invoice: 'NOT_REQUIRED', status: 'requested' });
+  await mkTruckOrder({ client: 'Hakim Ould', phone: '+213 665 33 44 55', category: 'Appliances', type: 'Pickup Truck', from: 'Magasin électro', to: 'Cité Yahiaoui', km: 5, desc: 'Fridge + washing machine', invoice: 'NO_INVOICE', status: 'requested', scheduled: '2026-07-30' });
+
+  // Truck 2 is on an active job
+  await prisma.truck.update({ where: { id: truckIds[2] }, data: { status: 'busy' } });
+
+  // ────────────────────────────────────────────
+  // PROMO CODES (shared across taxi, food, services, truck)
   // ────────────────────────────────────────────
   console.log('Seeding promo codes...');
   const in30days = new Date(Date.now() + 30 * 24 * 3600e3);
@@ -889,6 +1003,7 @@ async function main() {
       { code: 'TAXI50', description: '50 DZD off any ride', scope: 'TAXI', discountType: 'FIXED', discountValue: 50, maxUsesPerUser: 3, expiresAt: in30days, isActive: true },
       { code: 'FOOD15', description: '15% off food orders over 1000 DZD', scope: 'FOOD', discountType: 'PERCENTAGE', discountValue: 15, minOrderAmount: 1000, maxUses: 500, maxUsesPerUser: 5, expiresAt: in30days, isActive: true },
       { code: 'SERVICE100', description: '100 DZD off a service booking', scope: 'SERVICES', discountType: 'FIXED', discountValue: 100, maxUsesPerUser: 2, isActive: true },
+      { code: 'TRUCK10', description: '10% off freight (max 1000 DZD)', scope: 'TRUCK', discountType: 'PERCENTAGE', discountValue: 10, maxDiscount: 1000, maxUsesPerUser: 3, expiresAt: in30days, isActive: true },
       { code: 'RAMADAN', description: 'Ramadan promo (expired demo)', scope: 'ALL', discountType: 'PERCENTAGE', discountValue: 25, expiresAt: yesterday, isActive: true },
       { code: 'PAUSED10', description: '10% — currently disabled', scope: 'ALL', discountType: 'PERCENTAGE', discountValue: 10, isActive: false },
     ],
