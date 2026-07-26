@@ -8,6 +8,7 @@ import TopBar from "@/components/TopBar";
 import Sidebar from "@/components/Sidebar";
 import TaxiDashboard from "@/components/TaxiDashboard";
 import FoodDashboard from "@/components/FoodDashboard";
+import TruckDashboard from "@/components/TruckDashboard";
 import ServicesDashboard from "@/components/ServicesDashboard";
 import SettingsPage from "@/components/SettingsPage";
 import ChatMonitor from "@/components/ChatMonitor";
@@ -23,7 +24,7 @@ function AdminShellWrapper() {
 
   // Sync parameters with context state
   useEffect(() => {
-    if (["taxi", "food", "services"].includes(service)) {
+    if (["taxi", "food", "services", "truck"].includes(service)) {
       setActiveService(service as any);
     }
   }, [service, setActiveService]);
@@ -43,6 +44,8 @@ function AdminShellWrapper() {
         return <TaxiDashboard activePage={page} />;
       case "food":
         return <FoodDashboard activePage={page} />;
+      case "truck":
+        return <TruckDashboard activePage={page} />;
       case "services":
         return <ServicesDashboard activePage={page} />;
       default:

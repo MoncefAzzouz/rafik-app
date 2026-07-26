@@ -21,6 +21,8 @@ import {
   BarChart3,
   ShieldAlert,
   Ticket,
+  Truck,
+  ClipboardList,
 } from "lucide-react";
 
 interface NavItem {
@@ -45,6 +47,15 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "drivers", label: "Drivers", icon: Car },
     { id: "promos", label: "Promo Codes", icon: Ticket },
     { id: "subscriptions", label: "Subscriptions", icon: TrendingUp },
+  ],
+  truck: [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "orders", label: "Freight Orders", icon: ClipboardList },
+    { id: "categories", label: "Categories", icon: FolderKanban },
+    { id: "types", label: "Truck Types", icon: Truck },
+    { id: "trucks", label: "Trucks", icon: Truck },
+    { id: "promos", label: "Promo Codes", icon: Ticket },
+    { id: "pricing", label: "Pricing & Earnings", icon: TrendingUp },
   ],
   services: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },

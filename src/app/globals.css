@@ -39,6 +39,13 @@
   --primary-400: #6366F1;
 }
 
+/* ===== TRUCK THEME (Slate/Steel) ===== */
+.theme-truck {
+  --primary: #0F766E;
+  --primary-600: #115E59;
+  --primary-400: #14B8A6;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-export type ServiceType = "taxi" | "food" | "services";
+export type ServiceType = "taxi" | "food" | "services" | "truck";
 
 export interface ServiceConfig {
   id: ServiceType;
@@ -33,6 +33,13 @@ export const SERVICE_CONFIGS: Record<ServiceType, ServiceConfig> = {
     themeClass: "theme-services",
     emoji: "🔧",
     description: "On-Demand Services",
+  },
+  truck: {
+    id: "truck",
+    label: "Truck",
+    themeClass: "theme-truck",
+    emoji: "🚚",
+    description: "Freight & Cargo",
   },
 };
 

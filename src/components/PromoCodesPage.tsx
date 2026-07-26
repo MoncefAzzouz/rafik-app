@@ -5,10 +5,10 @@ import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/lib/api";
 import {
   Ticket, Plus, X, Check, Trash2, Loader2, RefreshCw, Percent, Calendar,
-  Users, Power, Edit2, Car, Utensils, Wrench, Globe,
+  Users, Power, Edit2, Car, Utensils, Wrench, Globe, Truck,
 } from "lucide-react";
 
-type PromoScope = "TAXI" | "FOOD" | "SERVICES" | "ALL";
+type PromoScope = "TAXI" | "FOOD" | "SERVICES" | "TRUCK" | "ALL";
 type DiscountType = "PERCENTAGE" | "FIXED";
 type PromoStatus = "active" | "inactive" | "scheduled" | "expired" | "used_up";
 
@@ -37,6 +37,7 @@ const SCOPE_META: Record<PromoScope, { label: string; icon: React.ComponentType<
   TAXI: { label: "Taxi", icon: Car, cls: "bg-amber-50 text-amber-700" },
   FOOD: { label: "Food", icon: Utensils, cls: "bg-orange-50 text-orange-700" },
   SERVICES: { label: "Services", icon: Wrench, cls: "bg-indigo-50 text-indigo-700" },
+  TRUCK: { label: "Truck", icon: Truck, cls: "bg-teal-50 text-teal-700" },
 };
 
 const STATUS_META: Record<PromoStatus, { label: string; cls: string }> = {
@@ -156,6 +157,7 @@ export default function PromoCodesPage() {
           { v: "TAXI" as const, label: "🚕 Taxi" },
           { v: "FOOD" as const, label: "🍔 Food" },
           { v: "SERVICES" as const, label: "🔧 Services" },
+          { v: "TRUCK" as const, label: "🚚 Truck" },
           { v: "ALL" as const, label: "🌐 All-services codes" },
         ]).map(f => (
           <button key={f.v} onClick={() => setScopeFilter(f.v)}
@@ -319,7 +321,7 @@ function PromoModal({ promo, onClose, onSave }: {
         <div>
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Where does it work? *</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {(["ALL", "TAXI", "FOOD", "SERVICES"] as PromoScope[]).map(s => {
+            {(["ALL", "TAXI", "FOOD", "SERVICES", "TRUCK"] as PromoScope[]).map(s => {
               const m = SCOPE_META[s];
               const Icon = m.icon;
               return (
