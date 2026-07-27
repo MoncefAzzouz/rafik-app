@@ -34,6 +34,15 @@ class ActivityItem {
 class ActivitiesPage extends StatefulWidget {
   const ActivitiesPage({super.key});
 
+  // Static list so other widgets (e.g. MainPage) can read the count
+  static final List<ActivityItem> allActivities = [];
+
+  // Public static count of scheduled/active items
+  static int get scheduledCount =>
+      _ActivitiesPageState._allItemsInternal
+          .where((a) => a.status == 'Scheduled')
+          .length;
+
   @override
   State<ActivitiesPage> createState() => _ActivitiesPageState();
 }
@@ -44,7 +53,10 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
 
   final List<String> _filters = ['All', 'Completed', 'Scheduled', 'Cancelled'];
 
-  final List<ActivityItem> _activities = [
+  // Instance reference to static list for convenience
+  List<ActivityItem> get _activities => _allItemsInternal;
+
+  static final List<ActivityItem> _allItemsInternal = [
     // Rides Tab Items
     ActivityItem(
       id: '1',
@@ -231,23 +243,23 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
           Text(title),
           if (count > 0) ...[
             const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF3B30),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
-              ),
-              child: Center(
+            SizedBox(
+              height: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF3B30),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                constraints: const BoxConstraints(minWidth: 16),
+                alignment: Alignment.center,
                 child: Text(
                   '$count',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
+                    height: 1,
                   ),
                 ),
               ),
@@ -293,10 +305,13 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                 // Tab Bar
                 TabBar(
                   controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
                   indicatorColor: Colors.white,
                   indicatorWeight: 3,
                   labelColor: Colors.white,
                   unselectedLabelColor: Colors.white70,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
                   labelStyle: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,

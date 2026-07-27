@@ -5,6 +5,7 @@ import 'home_page.dart';
 import 'offers_page.dart';
 import 'activities_page.dart';
 import '../../profile/pages/profile_page.dart';
+import '../../parcel_transport/pages/parcel_dashboard_page.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -70,8 +71,14 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
+  int _getActivityCount() {
+    // Scheduled items from activities data + active parcel orders
+    return ActivitiesPage.scheduledCount + ParcelDashboardPage.activeOrders.length;
+  }
+
   Widget _buildNavItem({required String label, required int index}) {
     final isActive = _currentIndex == index;
+    final count = index == 2 ? _getActivityCount() : 0;
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -89,13 +96,41 @@ class _MainPageState extends State<MainPage> {
         decoration: BoxDecoration(
           color: isActive
               ? AppColors.primary.withAlpha(30)
-              : Colors.transparent, // ~0.12 opacity
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(30),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildNavIcon(index, isActive),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _buildNavIcon(index, isActive),
+                if (count > 0)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF3B30),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               label,
