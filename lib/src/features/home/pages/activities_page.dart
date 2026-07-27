@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../restaurant/pages/food_page.dart';
+import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../../core/utils/smooth_page_route.dart';
 
 class ActivityItem {
   final String id;
@@ -129,12 +131,38 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
       destinationName: 'Service address',
       destinationAddress: 'Setif Center, Algeria',
     ),
+
+    // Parcel Tab Items
+    ActivityItem(
+      id: '8',
+      date: 'Jul 26, 2026 at 16:42',
+      price: '1,200 DA',
+      type: 'Parcel',
+      status: 'Completed',
+      storeName: '📦 هاربين - نقل طرود',
+      pickupName: 'استلام البضائع',
+      pickupAddress: 'Sétif, الجزائر',
+      destinationName: 'مكان التفريغ',
+      destinationAddress: 'Alger, الجزائر',
+    ),
+    ActivityItem(
+      id: '9',
+      date: 'Jul 27, 2026 at 13:50',
+      price: '1,500 DA',
+      type: 'Parcel',
+      status: 'Scheduled',
+      storeName: '📦 فورغون - نقل طرود',
+      pickupName: 'استلام البضائع',
+      pickupAddress: 'Sétif, الجزائر',
+      destinationName: 'مكان التفريغ',
+      destinationAddress: 'Oran, الجزائر',
+    ),
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       setState(() {});
     });
@@ -175,9 +203,57 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                 context,
                 MaterialPageRoute(builder: (context) => const FoodPage()),
               );
+            } else if (item.type == 'Parcel') {
+              Navigator.push(
+                context,
+                SmoothPageRoute(
+                  page: const ParcelDashboardPage(),
+                  settings: const RouteSettings(name: 'parcel_dashboard'),
+                ),
+              );
             }
           },
         ),
+      ),
+    );
+  }
+
+  int _getNewCount(String tabType) {
+    return _activities.where((item) => item.type == tabType && item.status == 'Scheduled').length;
+  }
+
+  Widget _buildTabHeader(String title, String type) {
+    final count = _getNewCount(type);
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title),
+          if (count > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF3B30),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 16,
+                minHeight: 16,
+              ),
+              child: Center(
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -229,11 +305,12 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                     fontSize: 14,
                     fontWeight: FontWeight.normal,
                   ),
-                  tabs: const [
-                    Tab(text: 'Rides'),
-                    Tab(text: 'Food'),
-                    Tab(text: 'Shop'),
-                    Tab(text: 'Market'),
+                  tabs: [
+                    _buildTabHeader('Rides', 'Rides'),
+                    _buildTabHeader('Food', 'Food'),
+                    _buildTabHeader('Parcel', 'Parcel'),
+                    _buildTabHeader('Shop', 'Shop'),
+                    _buildTabHeader('Market', 'Market'),
                   ],
                 ),
               ],
@@ -302,6 +379,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                     children: [
                       _buildTabList('Rides'),
                       _buildTabList('Food'),
+                      _buildTabList('Parcel'),
                       _buildTabList('Shop'),
                       _buildTabList('Market'),
                     ],
