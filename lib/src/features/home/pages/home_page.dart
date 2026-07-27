@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../electricity/pages/electrician_list_page.dart';
+import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../../core/utils/smooth_page_route.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,6 +24,7 @@ class _HomePageState extends State<HomePage> {
     'assets/imagesss/banner.PNG',
     'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg',
     'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg',
+    'assets/imagesss/IMG_0046.PNG',
   ];
 
   @override
@@ -286,6 +289,15 @@ class _HomePageState extends State<HomePage> {
                             _buildServiceItem(
                               'assets/imagesss/IMG_0043.PNG',
                               'Parcel\nTransport',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  SmoothPageRoute(
+                                    page: const ParcelDashboardPage(),
+                                    settings: const RouteSettings(name: 'parcel_dashboard'),
+                                  ),
+                                );
+                              },
                             ),
                             _buildServiceItem('', 'More', isCustomMore: true),
                             const Expanded(child: SizedBox()),
@@ -678,6 +690,12 @@ class _HomePageState extends State<HomePage> {
           'title': 'مشوارك جاهز\nفي دقائق',
           'subtitle': 'تنقل بسهولة وأمان',
           'action': 'احجز الآن',
+        };
+      case 3:
+        return {
+          'title': 'توصيل السلع\nبين الولايات',
+          'subtitle': 'في كامل الجزائر',
+          'action': 'أرسل الآن',
         };
       default:
         return null;
