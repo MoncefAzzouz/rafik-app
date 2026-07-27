@@ -19,7 +19,7 @@ class RafikApp extends StatelessWidget {
           title: 'Rafik App',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
-          // Apply RTL for Arabic, LTR for French & English
+          // Direction follows language — RTL for Arabic, LTR for French/English
           builder: (context, child) => Directionality(
             textDirection: AppLanguage.instance.textDirection,
             child: child!,

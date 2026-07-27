@@ -24,9 +24,9 @@ class AppLanguage extends ValueNotifier<AppLang> {
     }
   }
 
-  TextDirection get textDirection {
-    return value == AppLang.ar ? TextDirection.rtl : TextDirection.ltr;
-  }
+  // Direction follows language selection
+  TextDirection get textDirection =>
+      value == AppLang.ar ? TextDirection.rtl : TextDirection.ltr;
 }
 
 /// All UI strings mapped to the 3 supported languages.

@@ -17,7 +17,8 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context, lang, _) {
         final s = AppStrings(lang);
         return Directionality(
-          textDirection: AppLanguage.instance.textDirection,
+          // Profile page direction responds to language changes
+          textDirection: lang == AppLang.ar ? TextDirection.rtl : TextDirection.ltr,
           child: Scaffold(
             backgroundColor: const Color(0xFFF6F8FD),
             body: SingleChildScrollView(
@@ -177,22 +178,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
 
-                  // ── Quick Actions ────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    child: Row(
-                      children: [
-                        _buildQuickActionCard(icon: Icons.history_rounded, label: s.activityTitle),
-                        const SizedBox(width: 10),
-                        _buildQuickActionCard(icon: Icons.percent_rounded, label: s.navPromos),
-                        const SizedBox(width: 10),
-                        _buildQuickActionCard(icon: Icons.location_on_outlined, label: s.profileAccount),
-                      ],
-                    ),
-                  ),
 
-                  // ── Language Picker Card ─────────────────────────────
-                  Container(
+                  // ── Language Picker Card — always LTR so it never flips ─
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Container(
                     margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -277,6 +267,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       ],
                     ),
+                  ),
                   ),
 
                   // ── Settings Menu ────────────────────────────────────
