@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/utils/smooth_page_route.dart';
+import 'edit_profile_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,7 +19,6 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context, lang, _) {
         final s = AppStrings(lang);
         return Directionality(
-          // Profile page direction responds to language changes
           textDirection: lang == AppLang.ar ? TextDirection.rtl : TextDirection.ltr,
           child: Scaffold(
             backgroundColor: const Color(0xFFF6F8FD),
@@ -40,234 +41,175 @@ class _ProfilePageState extends State<ProfilePage> {
                       right: 20,
                       bottom: 24,
                     ),
-                    child: Column(
+                    child: Row(
                       children: [
-                        Row(
+                        // Avatar with 60% badge
+                        Stack(
+                          alignment: Alignment.bottomCenter,
                           children: [
-                            // Avatar
-                            Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const CircleAvatar(
-                                    radius: 30,
-                                    backgroundColor: AppColors.royalBlue,
-                                    child: Text(
-                                      'M',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: -4,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.royalBlue,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.white, width: 1.5),
-                                    ),
-                                    child: const Text(
-                                      '60%',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 14),
-                            // Name & phone
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Moncef Azzouz',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '+213 550 123 456',
-                                    style: TextStyle(
-                                      color: Colors.white.withAlpha(190),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Edit button
                             Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(30),
+                              padding: const EdgeInsets.all(3),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.edit_outlined,
-                                color: Colors.white,
-                                size: 18,
+                              child: const CircleAvatar(
+                                radius: 30,
+                                backgroundColor: AppColors.royalBlue,
+                                child: Text(
+                                  'M',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: -4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.royalBlue,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                ),
+                                child: const Text(
+                                  '60%',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                        // Rafik Plus banner
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
+                        const SizedBox(width: 14),
+                        // Name & phone
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Unlimited free delivery & more!',
-                                      style: TextStyle(
-                                        color: Color(0xFF1E1E2C),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'As low as 667 DZD per month with Rafik Plus!',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade700,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ],
+                              const Text(
+                                'Moncef Azzouz',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              const Icon(
-                                Icons.delivery_dining_rounded,
-                                color: AppColors.royalBlue,
-                                size: 32,
+                              const SizedBox(height: 4),
+                              Text(
+                                '+213 550 123 456',
+                                style: TextStyle(
+                                  color: Colors.white.withAlpha(190),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
+                          ),
+                        ),
+                        // Edit button
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            SmoothPageRoute(page: const EditProfilePage()),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(30),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit_outlined,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-
 
                   // ── Language Picker Card — always LTR so it never flips ─
                   Directionality(
                     textDirection: TextDirection.ltr,
                     child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(6),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.grey.shade100, width: 1.5),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Section header
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withAlpha(15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.language_rounded,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  s.profileLanguage,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                      margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(6),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(color: Colors.grey.shade100, width: 1.5),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Section header
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withAlpha(15),
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                Text(
-                                  s.profileLanguageSubtitle,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                child: const Icon(
+                                  Icons.language_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Language buttons
-                        Row(
-                          children: [
-                            _buildLangButton(
-                              lang: lang,
-                              target: AppLang.ar,
-                              flag: '🇩🇿',
-                              label: s.langArabic,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildLangButton(
-                              lang: lang,
-                              target: AppLang.fr,
-                              flag: '🇫🇷',
-                              label: s.langFrench,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildLangButton(
-                              lang: lang,
-                              target: AppLang.en,
-                              flag: '🇬🇧',
-                              label: s.langEnglish,
-                            ),
-                          ],
-                        ),
-                      ],
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    s.profileLanguage,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  Text(
+                                    s.profileLanguageSubtitle,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Language buttons
+                          Row(
+                            children: [
+                              _buildLangButton(lang: lang, target: AppLang.ar, flag: '🇩🇿', label: s.langArabic),
+                              const SizedBox(width: 8),
+                              _buildLangButton(lang: lang, target: AppLang.fr, flag: '🇫🇷', label: s.langFrench),
+                              const SizedBox(width: 8),
+                              _buildLangButton(lang: lang, target: AppLang.en, flag: '🇬🇧', label: s.langEnglish),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
 
                   // ── Settings Menu ────────────────────────────────────
@@ -290,6 +232,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         _buildMenuTile(
                           icon: Icons.person_outline_rounded,
                           label: s.profileAccount,
+                          onTap: () => Navigator.push(
+                            context,
+                            SmoothPageRoute(page: const EditProfilePage()),
+                          ),
                           badgeText: lang == AppLang.ar ? 'معلومات ناقصة' : lang == AppLang.fr ? 'Infos manquantes' : 'Missing details',
                           badgeColor: const Color(0xFFFFECE0),
                           badgeTextColor: const Color(0xFFE65100),
@@ -326,7 +272,6 @@ class _ProfilePageState extends State<ProfilePage> {
                           icon: Icons.exit_to_app_rounded,
                           label: s.profileLogout,
                           iconColor: Colors.red.shade400,
-                          showArrow: false,
                         ),
                       ],
                     ),
@@ -342,7 +287,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ── Language Button ────────────────────────────────────────────
   Widget _buildLangButton({
     required AppLang lang,
     required AppLang target,
@@ -364,13 +308,7 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 1.5,
             ),
             boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withAlpha(40),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    )
-                  ]
+                ? [BoxShadow(color: AppColors.primary.withAlpha(40), blurRadius: 8, offset: const Offset(0, 3))]
                 : null,
           ),
           child: Column(
@@ -393,41 +331,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildQuickActionCard({required IconData icon, required String label}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade100),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(4),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.deepNavy, size: 26),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMenuTile({
     required IconData icon,
     required String label,
@@ -436,8 +339,9 @@ class _ProfilePageState extends State<ProfilePage> {
     Color? badgeColor,
     Color? badgeTextColor,
     bool showArrow = false,
+    VoidCallback? onTap,
   }) {
-    return Padding(
+    final tile = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
@@ -462,11 +366,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Text(
                 badgeText,
-                style: TextStyle(
-                  color: badgeTextColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(color: badgeTextColor, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
           if (showArrow)
@@ -474,6 +374,10 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
+    if (onTap != null) {
+      return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(24), child: tile);
+    }
+    return tile;
   }
 
   Widget _buildMenuDivider() {

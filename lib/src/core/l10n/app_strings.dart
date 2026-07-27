@@ -92,6 +92,14 @@ class AppStrings {
   String get profileHelp => _s('مساعدة ودعم', 'Aide & support', 'Help & Support');
   String get profileLogout => _s('تسجيل الخروج', 'Déconnexion', 'Log Out');
 
+  // Edit Profile
+  String get editProfile => _s('تعديل الملف الشخصي', 'Modifier le profil', 'Edit Profile');
+  String get editProfilePhoto => _s('تغيير الصورة', 'Changer la photo', 'Change photo');
+  String get editProfileName => _s('الاسم الكامل', 'Nom complet', 'Full name');
+  String get editProfilePhone => _s('رقم الهاتف', 'Numéro de téléphone', 'Phone number');
+  String get editProfileEmail => _s('البريد الإلكتروني', 'Adresse e-mail', 'Email address');
+  String get editProfileSave => _s('حفظ التغييرات', 'Enregistrer', 'Save changes');
+
   // ── Parcel Dashboard ──────────────────────────────────────────
   String get parcelTitle => _s('نقل الطرود', 'Transport de colis', 'Parcel Transport');
   String get parcelEmpty => _s('لا يوجد طلب!', 'Aucune commande!', 'No orders!');
