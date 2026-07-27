@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'parcel_map_page.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class VehicleType {
@@ -112,7 +113,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                       ),
                       child: const Icon(
                         Icons.local_shipping_outlined,
-                        color: Colors.red,
+                        color: AppColors.primary,
                         size: 26,
                       ),
                     ),
@@ -169,13 +170,13 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                           color: const Color(0xFFF9FAFB),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected ? Colors.red.shade600 : Colors.transparent,
+                            color: isSelected ? AppColors.primary : Colors.transparent,
                             width: 2,
                           ),
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: Colors.red.shade50,
+                                    color: AppColors.primary.withAlpha(20),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
@@ -205,7 +206,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                             Text(
                               vehicle.name,
                               style: TextStyle(
-                                color: isSelected ? Colors.red.shade600 : Colors.black87,
+                                color: isSelected ? AppColors.primary : Colors.black87,
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                               ),

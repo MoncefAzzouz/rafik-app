@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'parcel_details_page.dart';
 import 'parcel_vehicle_select_page.dart'; // import VehicleType
+import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class Wilaya {
@@ -317,7 +318,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
                           height: 40,
                           child: const Icon(
                             Icons.location_on_rounded,
-                            color: Colors.red,
+                            color: AppColors.primary,
                             size: 38,
                           ),
                         ),
@@ -411,7 +412,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
                             children: [
                               Icon(
                                 Icons.bookmark_border_rounded,
-                                color: Colors.red.shade600,
+                                color: AppColors.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -454,7 +455,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
                             children: [
                               const Icon(
                                 Icons.location_on_rounded,
-                                color: Colors.red,
+                                color: AppColors.primary,
                                 size: 22,
                               ),
                               const SizedBox(width: 14),

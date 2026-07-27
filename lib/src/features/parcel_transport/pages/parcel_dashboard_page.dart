@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'parcel_vehicle_select_page.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class ParcelOrder {
@@ -111,14 +112,14 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              // Profile picture (MA red circle)
+                              // Profile picture (MA brand gradient)
                               Container(
                                 width: 44,
                                 height: 44,
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   gradient: LinearGradient(
-                                    colors: [Color(0xFFFF8A80), Color(0xFFFF5252)],
+                                    colors: [AppColors.royalBlue, AppColors.electricBlue],
                                   ),
                                 ),
                                 child: const Center(
@@ -203,14 +204,14 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                               children: [
                                 Icon(
                                   Icons.home_rounded,
-                                  color: _currentTabIndex == 0 ? Colors.red.shade600 : Colors.grey.shade400,
+                                  color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade400,
                                   size: 26,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'الرئيسية',
                                   style: TextStyle(
-                                    color: _currentTabIndex == 0 ? Colors.red.shade600 : Colors.grey.shade500,
+                                    color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade500,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -221,14 +222,14 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         ),
                       ),
 
-                      // Red floating plus button (طلب جديد)
+                      // Brand floating plus button (طلب جديد)
                       GestureDetector(
                         onTap: _navigateToCreateRequest,
                         child: Container(
                           width: 56,
                           height: 56,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFFF3B30), // bright red
+                            color: AppColors.primary, // brand blue
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
@@ -261,14 +262,14 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                               children: [
                                 Icon(
                                   Icons.history_rounded,
-                                  color: _currentTabIndex == 1 ? Colors.red.shade600 : Colors.grey.shade400,
+                                  color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade400,
                                   size: 26,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   'الأرشيف',
                                   style: TextStyle(
-                                    color: _currentTabIndex == 1 ? Colors.red.shade600 : Colors.grey.shade500,
+                                    color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade500,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -441,7 +442,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
                       ),

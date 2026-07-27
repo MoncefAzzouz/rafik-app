@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'parcel_vehicle_select_page.dart'; // import VehicleType
 import 'parcel_success_page.dart';
 import 'parcel_dashboard_page.dart'; // import ParcelDashboardPage and ParcelOrder
+import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class ParcelSummaryPage extends StatelessWidget {
@@ -107,7 +108,7 @@ class ParcelSummaryPage extends StatelessWidget {
                                   width: 8,
                                   height: 8,
                                   decoration: const BoxDecoration(
-                                    color: Colors.red,
+                                    color: AppColors.primary,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -213,7 +214,7 @@ class ParcelSummaryPage extends StatelessWidget {
                             _buildInfoRow(
                               'التاريخ والوقت',
                               timingText,
-                              valueColor: timingText == 'في القريب العاجل' ? Colors.red : Colors.black,
+                              valueColor: timingText == 'في القريب العاجل' ? AppColors.primary : Colors.black,
                             ),
                             const SizedBox(height: 16),
                             _buildInfoRow(
