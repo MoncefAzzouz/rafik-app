@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'parcel_vehicle_select_page.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class ParcelOrder {
@@ -79,18 +80,22 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl, // RTL support for Arabic layout
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: _isLoading
-              ? _buildShimmerLoading()
-              : Column(
-                  children: [
-                    // Custom Header
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+    return ValueListenableBuilder<AppLang>(
+      valueListenable: AppLanguage.instance,
+      builder: (context, lang, _) {
+        final s = AppStrings(lang);
+        return Directionality(
+          textDirection: AppLanguage.instance.textDirection,
+          child: Scaffold(
+            backgroundColor: Colors.white,
+            body: SafeArea(
+              child: _isLoading
+                  ? _buildShimmerLoading()
+                  : Column(
+                      children: [
+                        // Custom Header
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -135,9 +140,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                               ),
                               const SizedBox(width: 12),
                               // Title text
-                              const Text(
-                                'مرحباً، moncef!',
-                                style: TextStyle(
+                              Text(
+                                '${s.hello}, Moncef!',
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
@@ -165,181 +170,125 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     // Main Content depending on selected tab index
                     Expanded(
                       child: _currentTabIndex == 0
-                          ? _buildHomeTabContent()
-                          : _buildArchiveTabContent(),
+                          ? _buildHomeTabContent(s)
+                          : _buildArchiveTabContent(s),
                     ),
                   ],
                 ),
-        ),
-        // Custom Bottom bar with red floating action button
-        bottomNavigationBar: _isLoading
-            ? null
-            : SafeArea(
-                child: Container(
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.grey.shade100,
-                        width: 1,
+            ),
+            // Custom Bottom bar
+            bottomNavigationBar: _isLoading
+                ? null
+                : SafeArea(
+                    child: Container(
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border(top: BorderSide(color: Colors.grey.shade100, width: 1)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          // Home tab
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _currentTabIndex = 0),
+                              child: Container(
+                                color: Colors.transparent,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.home_rounded,
+                                        color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade400,
+                                        size: 26),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      s.parcelTabHome,
+                                      style: TextStyle(
+                                        color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade500,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // FAB
+                          GestureDetector(
+                            onTap: _navigateToCreateRequest,
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+                              ),
+                              child: const Icon(Icons.add, color: Colors.white, size: 28),
+                            ),
+                          ),
+
+                          // Archive tab
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _currentTabIndex = 1),
+                              child: Container(
+                                color: Colors.transparent,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.history_rounded,
+                                        color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade400,
+                                        size: 26),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      s.parcelTabArchive,
+                                      style: TextStyle(
+                                        color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade500,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // الرئيسية (Home)
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _currentTabIndex = 0;
-                            });
-                          },
-                          child: Container(
-                            color: Colors.transparent,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.home_rounded,
-                                  color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade400,
-                                  size: 26,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'الرئيسية',
-                                  style: TextStyle(
-                                    color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade500,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Brand floating plus button (طلب جديد)
-                      GestureDetector(
-                        onTap: _navigateToCreateRequest,
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary, // brand blue
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                      ),
-
-                      // الأرشيف (Archive)
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _currentTabIndex = 1;
-                            });
-                          },
-                          child: Container(
-                            color: Colors.transparent,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.history_rounded,
-                                  color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade400,
-                                  size: 26,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'الأرشيف',
-                                  style: TextStyle(
-                                    color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade500,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   // TAB 1: Home / Active Orders Content
-  Widget _buildHomeTabContent() {
+  Widget _buildHomeTabContent(AppStrings s) {
     if (ParcelDashboardPage.activeOrders.isEmpty) {
-      // Empty state layout
       return SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 60),
-            // Large Truck graphic
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 40),
-              height: 220,
-              child: Image.network(
-                'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=600&auto=format&fit=crop&q=60',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.local_shipping_rounded,
-                    size: 100,
-                    color: Colors.grey,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Info text
-            const Text(
-              'لا يوجد طلب!',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-              ),
+            const SizedBox(height: 230),
+            Text(
+              s.parcelEmpty,
+              style: const TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
-                'ليس لديك أي طلبات نشطة في الوقت الحالي. أنشئ طلباً جديداً الآن',
+                s.parcelEmptyHint,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                  height: 1.6,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.6, fontWeight: FontWeight.w500),
               ),
             ),
             const SizedBox(height: 40),
-
-            // Create Request Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SizedBox(
@@ -350,18 +299,10 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'إنشاء طلب',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Text(s.parcelCreateOrder, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -572,7 +513,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
   }
 
   // TAB 2: Archive Content
-  Widget _buildArchiveTabContent() {
+  Widget _buildArchiveTabContent(AppStrings s) {
     if (ParcelDashboardPage.archivedOrders.isEmpty) {
       return Center(
         child: Column(
@@ -580,34 +521,19 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.archive_outlined,
-                size: 64,
-                color: Colors.grey.shade400,
-              ),
+              decoration: BoxDecoration(color: Colors.grey.shade50, shape: BoxShape.circle),
+              child: Icon(Icons.archive_outlined, size: 64, color: Colors.grey.shade400),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'الأرشيف فارغ!',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
+            Text(
+              s.parcelArchiveEmpty,
+              style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             Text(
-              'ليس لديك أي طلبات سابقة في الأرشيف حالياً.',
+              s.parcelEmptyHint,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ],
         ),

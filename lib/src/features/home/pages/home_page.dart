@@ -21,10 +21,10 @@ class _HomePageState extends State<HomePage> {
   Timer? _bannerTimer;
 
   final List<String> _banners = [
-    'assets/imagesss/banner.PNG',
-    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg',
-    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg',
-    'assets/imagesss/IMG_0046.PNG',
+    'assets/imagesss/IMG_0046.PNG',            // 0 - Parcel (first)
+    'assets/imagesss/banner.PNG',              // 1
+    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg', // 2
+    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg', // 3
   ];
 
   @override
@@ -165,7 +165,22 @@ class _HomePageState extends State<HomePage> {
                           },
                           itemCount: _banners.length,
                           itemBuilder: (context, index) {
-                            return _buildBannerCard(index);
+                            return GestureDetector(
+                              onTap: () {
+                                if (index == 0) {
+                                  Navigator.push(
+                                    context,
+                                    SmoothPageRoute(
+                                      page: const ParcelDashboardPage(),
+                                      settings: const RouteSettings(
+                                        name: 'parcel_dashboard',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: _buildBannerCard(index),
+                            );
                           },
                         ),
                       ),
@@ -675,27 +690,27 @@ class _HomePageState extends State<HomePage> {
     switch (index) {
       case 0:
         return {
+          'title': 'توصيل السلع\nبين الولايات',
+          'subtitle': 'في كامل الجزائر',
+          'action': 'أرسل الآن',
+        };
+      case 1:
+        return {
           'title': 'كل خدماتك\nفي تطبيق واحد',
           'subtitle': 'توصيل، تاكسي، وتسوق',
           'action': 'اطلب الآن',
         };
-      case 1:
+      case 2:
         return {
           'title': 'وجبتك المفضلة\nتوصلك بسرعة',
           'subtitle': 'مطاعمك القريبة بين يديك',
           'action': 'اطلب الآن',
         };
-      case 2:
+      case 3:
         return {
           'title': 'مشوارك جاهز\nفي دقائق',
           'subtitle': 'تنقل بسهولة وأمان',
           'action': 'احجز الآن',
-        };
-      case 3:
-        return {
-          'title': 'توصيل السلع\nبين الولايات',
-          'subtitle': 'في كامل الجزائر',
-          'action': 'أرسل الآن',
         };
       default:
         return null;

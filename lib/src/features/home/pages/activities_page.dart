@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_strings.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../parcel_transport/pages/parcel_dashboard_page.dart';
@@ -272,143 +273,140 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFD),
-      body: Column(
-        children: [
-          // Activity Header Section
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: AppColors.headerGradient,
-            ),
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              bottom: 0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    'Activity',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
+    return ValueListenableBuilder<AppLang>(
+      valueListenable: AppLanguage.instance,
+      builder: (context, lang, _) {
+        final s = AppStrings(lang);
+        return Scaffold(
+          backgroundColor: const Color(0xFFFBFBFD),
+          body: Column(
+            children: [
+              // Activity Header Section
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.headerGradient,
                 ),
-                const SizedBox(height: 20),
-                // Tab Bar
-                TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  labelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                  ),
-                  tabs: [
-                    _buildTabHeader('Rides', 'Rides'),
-                    _buildTabHeader('Food', 'Food'),
-                    _buildTabHeader('Parcel', 'Parcel'),
-                    _buildTabHeader('Shop', 'Shop'),
-                    _buildTabHeader('Market', 'Market'),
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 16,
+                  bottom: 0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        s.activityTitle,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Tab Bar
+                    TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      indicatorColor: Colors.white,
+                      indicatorWeight: 3,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white70,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                      tabs: [
+                        _buildTabHeader(s.activityTabRides, 'Rides'),
+                        _buildTabHeader(s.activityTabFood, 'Food'),
+                        _buildTabHeader(s.activityTabParcel, 'Parcel'),
+                        _buildTabHeader(s.activityTabShop, 'Shop'),
+                        _buildTabHeader(s.activityTabMarket, 'Market'),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // Filters and Content List
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Horizontal Status Filters
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: _filters.map((filter) {
-                        final isSelected = _selectedFilter == filter;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedFilter = filter;
-                            });
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.royalBlue : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: isSelected ? AppColors.royalBlue : Colors.grey.shade200,
-                                width: 1,
+              // Filters and Content List
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Horizontal Status Filters
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            s.activityFilterAll,
+                            s.activityFilterCompleted,
+                            s.activityFilterScheduled,
+                            s.activityFilterCancelled,
+                          ].asMap().entries.map((entry) {
+                            final filterLabel = entry.value;
+                            // Map translated label back to internal filter key
+                            final filterKey = _filters[entry.key];
+                            final isSelected = _selectedFilter == filterKey;
+                            return GestureDetector(
+                              onTap: () => setState(() => _selectedFilter = filterKey),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.royalBlue : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.royalBlue : Colors.grey.shade200,
+                                  ),
+                                  boxShadow: isSelected
+                                      ? [BoxShadow(color: AppColors.royalBlue.withAlpha(50), blurRadius: 8, offset: const Offset(0, 3))]
+                                      : null,
+                                ),
+                                child: Text(
+                                  filterLabel,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.grey.shade600,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: AppColors.royalBlue.withAlpha(50),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Text(
-                              filter,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.grey.shade600,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                // Tab Content List
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildTabList('Rides'),
-                      _buildTabList('Food'),
-                      _buildTabList('Parcel'),
-                      _buildTabList('Shop'),
-                      _buildTabList('Market'),
-                    ],
-                  ),
+                    // Tab Content List
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildTabList('Rides', s),
+                          _buildTabList('Food', s),
+                          _buildTabList('Parcel', s),
+                          _buildTabList('Shop', s),
+                          _buildTabList('Market', s),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildTabList(String tabType) {
+  Widget _buildTabList(String tabType, AppStrings s) {
     final items = _getFilteredItems(tabType);
 
     if (items.isEmpty) {
@@ -416,19 +414,11 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 64,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
-              'No previous $tabType activities found',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              s.activityEmpty,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ],
         ),

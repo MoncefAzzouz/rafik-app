@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_strings.dart';
 import 'home_page.dart';
 import 'offers_page.dart';
 import 'activities_page.dart';
@@ -26,48 +27,52 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      extendBody: true, // Allows body to flow under the floating nav bar
-      body: _pages[_currentIndex],
-      bottomNavigationBar: SafeArea(
-        bottom: false,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(20), // 0.08 opacity approx
-                blurRadius: 24,
-                offset: const Offset(0, 10),
+    return ValueListenableBuilder<AppLang>(
+      valueListenable: AppLanguage.instance,
+      builder: (context, lang, _) {
+        final s = AppStrings(lang);
+        return Scaffold(
+          backgroundColor: AppColors.backgroundLight,
+          extendBody: true,
+          body: _pages[_currentIndex],
+          bottomNavigationBar: SafeArea(
+            bottom: false,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(20),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+                borderRadius: BorderRadius.circular(40),
               ),
-            ],
-            borderRadius: BorderRadius.circular(40),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(40),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                height: 72,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                color: Colors.white,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(child: _buildNavItem(label: 'Home', index: 0)),
-                    Expanded(child: _buildNavItem(label: 'Promos', index: 1)),
-                    Expanded(
-                      child: _buildNavItem(label: 'Activities', index: 2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(40),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    height: 72,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    color: Colors.white,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(child: _buildNavItem(label: s.navHome, index: 0)),
+                        Expanded(child: _buildNavItem(label: s.navPromos, index: 1)),
+                        Expanded(child: _buildNavItem(label: s.navActivities, index: 2)),
+                        Expanded(child: _buildNavItem(label: s.navProfile, index: 3)),
+                      ],
                     ),
-                    Expanded(child: _buildNavItem(label: 'Profile', index: 3)),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
