@@ -1,30 +1,61 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:rafik_app/main.dart';
+import 'package:rafik_driver/src/app.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const RafikApp());
+  testWidgets('driver home shows availability and parcel map', (tester) async {
+    await tester.pumpWidget(const RafikDriverApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Sétif, Algeria'), findsOneWidget);
+    expect(find.text('You’re currently offline'), findsOneWidget);
+    expect(find.text('Offline'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('home location opens the map picker', (tester) async {
+    await tester.pumpWidget(const RafikDriverApp());
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('Sétif, Algeria'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your work location'), findsOneWidget);
+    expect(find.text('Confirm location'), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation opens earnings', (tester) async {
+    await tester.pumpWidget(const RafikDriverApp());
+
+    await tester.tap(find.text('Earnings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('18,940 DA'), findsOneWidget);
+    expect(find.text('Recent payouts'), findsOneWidget);
+  });
+
+  testWidgets('activity separates current work from history', (tester) async {
+    await tester.pumpWidget(const RafikDriverApp());
+
+    await tester.tap(find.text('Activity'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current'), findsOneWidget);
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('No active delivery'), findsOneWidget);
+
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Today · July 28'), findsOneWidget);
+    expect(find.textContaining('RF-4768'), findsOneWidget);
+  });
+
+  testWidgets('profile opens driver information pages', (tester) async {
+    await tester.pumpWidget(const RafikDriverApp());
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Personal information'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Full name'), findsOneWidget);
+    expect(find.text('Save changes'), findsOneWidget);
   });
 }

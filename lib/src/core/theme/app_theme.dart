@@ -1,82 +1,50 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'app_colors.dart';
 
-class AppTheme {
-  static ThemeData get lightTheme {
+abstract final class AppTheme {
+  static ThemeData get light {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.blue,
+      primary: AppColors.blue,
+      surface: Colors.white,
+    );
     return ThemeData(
-      brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.backgroundWhite,
-      primaryColor: AppColors.primary,
-      fontFamily: GoogleFonts.poppins().fontFamily,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.primary,
-        secondary: AppColors.primaryLight,
-        surface: AppColors.backgroundWhite,
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: AppColors.canvas,
+      fontFamily: 'SF Pro Display',
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+          color: AppColors.ink,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.8,
+        ),
+        titleLarge: TextStyle(
+          color: AppColors.ink,
+          fontWeight: FontWeight.w800,
+        ),
+        titleMedium: TextStyle(
+          color: AppColors.ink,
+          fontWeight: FontWeight.w700,
+        ),
+        bodyMedium: TextStyle(color: AppColors.muted, height: 1.35),
       ),
-      textTheme: GoogleFonts.poppinsTextTheme().copyWith(
-        displayLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        displayMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        displaySmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        headlineMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        headlineSmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        titleLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        bodyLarge: GoogleFonts.poppins(color: AppColors.textPrimary),
-        bodyMedium: GoogleFonts.poppins(color: AppColors.textPrimary),
-        labelLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+      cardTheme: const CardThemeData(
+        color: Colors.white,
         elevation: 0,
-        centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        margin: EdgeInsets.zero,
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.backgroundWhite,
-          shadowColor: AppColors.primary.withAlpha(76), // 0.3 opacity
-          elevation: 5,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.navy,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.backgroundLight,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-        ),
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.backgroundWhite,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textSecondary,
-        type: BottomNavigationBarType.fixed,
-        elevation: 10,
       ),
     );
   }

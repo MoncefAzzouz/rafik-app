@@ -1,16 +1,44 @@
-# rafik_app
+# Rafik Driver
 
-A new Flutter project.
+Flutter application for Rafik parcel delivery partners. Drivers can manage
+availability, review nearby parcel offers, run the pickup/drop-off workflow,
+and track earnings and delivery history.
 
-## Getting Started
+## Architecture
 
-This project is a starting point for a Flutter application.
+The app follows the same feature-first structure as Rafik:
 
-A few resources to get you started if this is your first Flutter project:
+```text
+lib/src/
+├── core/
+│   ├── theme/
+│   └── widgets/
+└── features/
+    ├── activity/
+    ├── deliveries/
+    │   ├── data/
+    │   ├── domain/
+    │   └── presentation/
+    ├── earnings/
+    ├── home/
+    └── profile/
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+`DeliveryRepository` is the current in-memory source of truth. It is designed
+to be replaced by a remote repository implementation when the backend API and
+driver authentication are ready.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Run
+
+```sh
+flutter pub get
+flutter run
+```
+
+## Verify
+
+```sh
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+```
