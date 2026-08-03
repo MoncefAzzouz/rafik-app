@@ -58,14 +58,16 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
   final List<Electrician> _electricians = [
     Electrician(
       name: 'Sofiane Rahmani',
-      image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Real professional electrician image
+      image:
+          'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Real professional electrician image
       rating: 4.9,
       reviews: 142,
       experienceYears: 8,
       tags: ['Short Circuit', 'House Wiring', 'AC Installation'],
       startingPrice: 1500,
       location: 'Setif Center',
-      bio: 'Professional certified electrician with 8 years of experience. Specialist in domestic wiring, emergency short circuits, and smart home installations. Fast response time and quality guaranteed.',
+      bio:
+          'Professional certified electrician with 8 years of experience. Specialist in domestic wiring, emergency short circuits, and smart home installations. Fast response time and quality guaranteed.',
       workImages: [
         'https://images.unsplash.com/photo-1621905252507-b354bc25edac?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Electrical panel
         'https://images.unsplash.com/photo-1558211583-d26f610c1eb1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Wiring installation
@@ -75,14 +77,16 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
     ),
     Electrician(
       name: 'Mourad Belkacem',
-      image: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Professional headshot
+      image:
+          'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Professional headshot
       rating: 4.8,
       reviews: 98,
       experienceYears: 6,
       tags: ['Appliance Repair', 'Lighting Setup', 'Main Panels'],
       startingPrice: 1200,
       location: 'Beb Ezzouar, Setif',
-      bio: 'Expert electrician specializing in industrial and household systems. From fuse replacements to whole-house electrical renovations, I deliver clean, safe, and code-compliant work.',
+      bio:
+          'Expert electrician specializing in industrial and household systems. From fuse replacements to whole-house electrical renovations, I deliver clean, safe, and code-compliant work.',
       workImages: [
         'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Smart switches
         'https://images.unsplash.com/photo-1558211583-d26f610c1eb1?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Panel board
@@ -92,14 +96,16 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
     ),
     Electrician(
       name: 'Yacine Madani',
-      image: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Headshot
+      image:
+          'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Headshot
       rating: 4.7,
       reviews: 64,
       experienceYears: 5,
       tags: ['CCTV & Alarm', 'Smart Intercom', 'Network Cabling'],
       startingPrice: 1800,
       location: 'El Eulma, Setif',
-      bio: 'Tech-focused electrician specializing in smart home systems, home automation, security cameras, and electrical maintenance. Clean work and highly detail-oriented.',
+      bio:
+          'Tech-focused electrician specializing in smart home systems, home automation, security cameras, and electrical maintenance. Clean work and highly detail-oriented.',
       workImages: [
         'https://images.unsplash.com/photo-1524486361537-8ad156838585?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // Network switch
         'https://images.unsplash.com/photo-1516216621174-b127cc58e57b?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3', // CCTV camera
@@ -183,188 +189,197 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
             child: _isLoading
                 ? _buildShimmerLoading()
                 : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _electricians.length,
-              itemBuilder: (context, index) {
-                final electrician = _electricians[index];
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ElectricianDetailPage(electrician: electrician),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(6),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: Colors.grey.shade100,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Electrician Photo
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              electrician.image,
-                              width: 80,
-                              height: 90,
-                              fit: BoxFit.cover,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _electricians.length,
+                    itemBuilder: (context, index) {
+                      final electrician = _electricians[index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ElectricianDetailPage(
+                                electrician: electrician,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(6),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: Colors.grey.shade100,
+                              width: 1.5,
                             ),
                           ),
-                          const SizedBox(width: 16),
-
-                          // Electrician Info
-                          Expanded(
-                            child: Column(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        electrician.name,
-                                        style: const TextStyle(
-                                          color: AppColors.textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.star_rounded,
-                                          color: Colors.amber,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '${electrician.rating}',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
+                                // Electrician Photo
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Image.network(
+                                    electrician.image,
+                                    width: 80,
+                                    height: 90,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+
+                                // Electrician Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              electrician.name,
+                                              style: const TextStyle(
+                                                color: AppColors.textPrimary,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.work_history_outlined,
-                                      color: Colors.grey.shade500,
-                                      size: 13,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${electrician.experienceYears} Years Exp.',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.star_rounded,
+                                                color: Colors.amber,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                '${electrician.rating}',
+                                                style: const TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Icon(
-                                      Icons.location_on_outlined,
-                                      color: Colors.grey.shade500,
-                                      size: 13,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      electrician.location.split(',')[0],
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.work_history_outlined,
+                                            color: Colors.grey.shade500,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${electrician.experienceYears} Years Exp.',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Icon(
+                                            Icons.location_on_outlined,
+                                            color: Colors.grey.shade500,
+                                            size: 13,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            electrician.location.split(',')[0],
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
+                                      const SizedBox(height: 10),
 
-                                // Tags
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  children: electrician.tags.take(2).map((tag) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
+                                      // Tags
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: electrician.tags.take(2).map((
+                                          tag,
+                                        ) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.royalBlue
+                                                  .withAlpha(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              tag,
+                                              style: const TextStyle(
+                                                color: AppColors.royalBlue,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.royalBlue.withAlpha(10),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        tag,
-                                        style: const TextStyle(
-                                          color: AppColors.royalBlue,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                                const SizedBox(height: 8),
+                                      const SizedBox(height: 8),
 
-                                // Starting Price
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Starting from',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade500,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
+                                      // Starting Price
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Starting from',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade500,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${electrician.startingPrice} DA',
+                                            style: const TextStyle(
+                                              color: AppColors.royalBlue,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    Text(
-                                      '${electrician.startingPrice} DA',
-                                      style: const TextStyle(
-                                        color: AppColors.royalBlue,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

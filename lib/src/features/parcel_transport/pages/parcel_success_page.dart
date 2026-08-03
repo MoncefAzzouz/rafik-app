@@ -4,10 +4,7 @@ import 'package:flutter/services.dart';
 class ParcelSuccessPage extends StatelessWidget {
   final String orderId;
 
-  const ParcelSuccessPage({
-    super.key,
-    required this.orderId,
-  });
+  const ParcelSuccessPage({super.key, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +57,10 @@ class ParcelSuccessPage extends StatelessWidget {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(20),
@@ -115,7 +115,9 @@ class ParcelSuccessPage extends StatelessWidget {
                       // Navigate back to parcel dashboard
                       Navigator.popUntil(
                         context,
-                        (route) => route.settings.name == 'parcel_dashboard' || route.isFirst,
+                        (route) =>
+                            route.settings.name == 'parcel_dashboard' ||
+                            route.isFirst,
                       );
                     },
                     style: ElevatedButton.styleFrom(

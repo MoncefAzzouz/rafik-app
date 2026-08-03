@@ -5,10 +5,7 @@ import 'restaurant_details_page.dart';
 class CategoryDetailsPage extends StatelessWidget {
   final String categoryName;
 
-  const CategoryDetailsPage({
-    super.key,
-    required this.categoryName,
-  });
+  const CategoryDetailsPage({super.key, required this.categoryName});
 
   // Predefined mock data for category stores
   List<Map<String, dynamic>> _getStoresForCategory() {
@@ -16,7 +13,8 @@ class CategoryDetailsPage extends StatelessWidget {
       return [
         {
           'name': 'Fruits & Légumes - BBZ',
-          'image': 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300',
           'rating': '4.8',
           'reviews': '8',
           'type': 'Courses',
@@ -25,7 +23,8 @@ class CategoryDetailsPage extends StatelessWidget {
         },
         {
           'name': 'Boucherie - BBZ',
-          'image': 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=300',
           'rating': '4.8',
           'reviews': '17',
           'type': 'Courses',
@@ -37,7 +36,8 @@ class CategoryDetailsPage extends StatelessWidget {
       return [
         {
           'name': 'Pizzeria Apollino',
-          'image': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300',
           'rating': '4.8',
           'reviews': '120',
           'type': 'Pizzas & Tacos',
@@ -49,7 +49,8 @@ class CategoryDetailsPage extends StatelessWidget {
       return [
         {
           'name': 'Burger House',
-          'image': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300',
           'rating': '4.9',
           'reviews': '450',
           'type': 'Burgers & Fries',
@@ -58,7 +59,8 @@ class CategoryDetailsPage extends StatelessWidget {
         },
         {
           'name': 'Naan - BBZ',
-          'image': 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=300',
           'rating': '4.6',
           'reviews': '856',
           'type': 'Burgers',
@@ -70,7 +72,8 @@ class CategoryDetailsPage extends StatelessWidget {
       return [
         {
           'name': 'Quick Bites',
-          'image': 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300',
+          'image':
+              'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300',
           'rating': '4.5',
           'reviews': '99',
           'type': categoryName,
@@ -216,7 +219,9 @@ class CategoryDetailsPage extends StatelessWidget {
                             // Right Details
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisAlignment: MainAxisAlignment.center,

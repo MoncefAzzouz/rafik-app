@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
@@ -6,7 +5,7 @@ import 'home_page.dart';
 import 'offers_page.dart';
 import 'activities_page.dart';
 import '../../profile/pages/profile_page.dart';
-import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../parcel_transport/data/parcel_order_repository.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -17,6 +16,7 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
+  final _parcelOrders = ParcelOrderRepository.instance;
 
   final List<Widget> _pages = [
     const HomePage(),
@@ -24,6 +24,22 @@ class _MainPageState extends State<MainPage> {
     const ActivitiesPage(),
     const ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _parcelOrders.addListener(_onOrdersChanged);
+  }
+
+  void _onOrdersChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _parcelOrders.removeListener(_onOrdersChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +50,7 @@ class _MainPageState extends State<MainPage> {
         return Scaffold(
           backgroundColor: AppColors.backgroundLight,
           extendBody: true,
-          body: _pages[_currentIndex],
+          body: IndexedStack(index: _currentIndex, children: _pages),
           bottomNavigationBar: SafeArea(
             bottom: false,
             child: Container(
@@ -51,21 +67,26 @@ class _MainPageState extends State<MainPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(40),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: Container(
-                    height: 72,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    color: Colors.white,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(child: _buildNavItem(label: s.navHome, index: 0)),
-                        Expanded(child: _buildNavItem(label: s.navPromos, index: 1)),
-                        Expanded(child: _buildNavItem(label: s.navActivities, index: 2)),
-                        Expanded(child: _buildNavItem(label: s.navProfile, index: 3)),
-                      ],
-                    ),
+                child: Container(
+                  height: 72,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  color: Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(
+                        child: _buildNavItem(label: s.navHome, index: 0),
+                      ),
+                      Expanded(
+                        child: _buildNavItem(label: s.navPromos, index: 1),
+                      ),
+                      Expanded(
+                        child: _buildNavItem(label: s.navActivities, index: 2),
+                      ),
+                      Expanded(
+                        child: _buildNavItem(label: s.navProfile, index: 3),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -78,7 +99,7 @@ class _MainPageState extends State<MainPage> {
 
   int _getActivityCount() {
     // Scheduled items from activities data + active parcel orders
-    return ActivitiesPage.scheduledCount + ParcelDashboardPage.activeOrders.length;
+    return ActivitiesPage.scheduledCount + _parcelOrders.activeCount;
   }
 
   Widget _buildNavItem({required String label, required int index}) {

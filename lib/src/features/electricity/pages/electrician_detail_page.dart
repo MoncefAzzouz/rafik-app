@@ -5,10 +5,7 @@ import 'electrician_list_page.dart'; // import Electrician model
 class ElectricianDetailPage extends StatefulWidget {
   final Electrician electrician;
 
-  const ElectricianDetailPage({
-    super.key,
-    required this.electrician,
-  });
+  const ElectricianDetailPage({super.key, required this.electrician});
 
   @override
   State<ElectricianDetailPage> createState() => _ElectricianDetailPageState();
@@ -206,7 +203,10 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
 
                 // Stats Row
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -282,12 +282,13 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
                         physics: const NeverScrollableScrollPhysics(),
                         shrinkWrap: true,
                         itemCount: e.workImages.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.2,
-                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.2,
+                            ),
                         itemBuilder: (context, index) {
                           return GestureDetector(
                             onTap: () {
@@ -350,11 +351,7 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
                     offset: const Offset(0, -6),
                   ),
                 ],
-                border: Border(
-                  top: BorderSide(
-                    color: Colors.grey.shade100,
-                  ),
-                ),
+                border: Border(top: BorderSide(color: Colors.grey.shade100)),
               ),
               child: SafeArea(
                 top: false,
@@ -377,7 +374,9 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -409,9 +408,7 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
       decoration: BoxDecoration(
         color: const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade100,
-        ),
+        border: Border.all(color: Colors.grey.shade100),
       ),
       child: Column(
         children: [

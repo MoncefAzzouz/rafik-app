@@ -15,22 +15,47 @@ class AppTheme {
         surface: AppColors.backgroundWhite,
       ),
       textTheme: GoogleFonts.poppinsTextTheme().copyWith(
-        displayLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        displayMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        displaySmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        headlineMedium: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        headlineSmall: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        titleLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        displayLarge: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.bold,
+        ),
+        displayMedium: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.bold,
+        ),
+        displaySmall: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        headlineSmall: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        titleLarge: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
         bodyLarge: GoogleFonts.poppins(color: AppColors.textPrimary),
         bodyMedium: GoogleFonts.poppins(color: AppColors.textPrimary),
-        labelLarge: GoogleFonts.poppins(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+        labelLarge: GoogleFonts.poppins(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+        titleTextStyle: TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

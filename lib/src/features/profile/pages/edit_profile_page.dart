@@ -31,7 +31,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       builder: (context, lang, _) {
         final s = AppStrings(lang);
         return Directionality(
-          textDirection: lang == AppLang.ar ? TextDirection.rtl : TextDirection.ltr,
+          textDirection: lang == AppLang.ar
+              ? TextDirection.rtl
+              : TextDirection.ltr,
           child: Scaffold(
             backgroundColor: const Color(0xFFF6F8FD),
             body: Column(
@@ -65,7 +67,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 color: Colors.white.withAlpha(30),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                              child: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -232,7 +238,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
           labelText: label,
           labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
         validator: (v) => v == null || v.isEmpty ? '⚠️' : null,
       ),

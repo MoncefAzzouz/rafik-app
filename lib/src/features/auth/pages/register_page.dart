@@ -134,7 +134,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 decoration: _outlineDecoration('Password').copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: AppColors.textSecondary,
                     ),
                     onPressed: () {
@@ -155,13 +157,17 @@ class _RegisterPageState extends State<RegisterPage> {
                 decoration: InputDecoration(
                   labelText: 'Confirm Password',
                   labelStyle: TextStyle(
-                    color: _passwordsMatch ? Colors.green : AppColors.textSecondary,
+                    color: _passwordsMatch
+                        ? Colors.green
+                        : AppColors.textSecondary,
                   ),
                   filled: false,
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: _passwordsMatch ? Colors.green : Colors.grey.shade300,
+                      color: _passwordsMatch
+                          ? Colors.green
+                          : Colors.grey.shade300,
                       width: _passwordsMatch ? 2 : 1,
                     ),
                   ),
@@ -183,7 +189,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
@@ -247,7 +254,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.backgroundWhite,
                     disabledBackgroundColor: AppColors.primary.withAlpha(102),
-                    disabledForegroundColor: AppColors.backgroundWhite.withAlpha(180),
+                    disabledForegroundColor: AppColors.backgroundWhite
+                        .withAlpha(180),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -255,10 +263,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   child: const Text(
                     'Continue',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -276,7 +281,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     onTap: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
                       );
                     },
                     child: const Text(

@@ -93,10 +93,7 @@ class _CartPageState extends State<CartPage>
             },
             child: const Text(
               'Confirmer',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -229,10 +226,7 @@ class _CartPageState extends State<CartPage>
                   const Divider(height: 1, color: Color(0xFFF2F2F2)),
 
                   // Add your comment
-                  _buildActionRow(
-                    title: 'Add your comment here',
-                    onTap: () {},
-                  ),
+                  _buildActionRow(title: 'Add your comment here', onTap: () {}),
 
                   const Divider(height: 1, color: Color(0xFFF2F2F2)),
 
@@ -329,16 +323,10 @@ class _CartPageState extends State<CartPage>
                     ),
                   ),
 
-                  const Divider(
-                    height: 32,
-                    color: Color(0xFFF2F2F2),
-                  ),
+                  const Divider(height: 32, color: Color(0xFFF2F2F2)),
 
                   // Add Promocode
-                  _buildActionRow(
-                    title: 'Add promocode',
-                    onTap: () {},
-                  ),
+                  _buildActionRow(title: 'Add promocode', onTap: () {}),
 
                   const Divider(height: 1, color: Color(0xFFF2F2F2)),
 
@@ -669,10 +657,7 @@ class _CartPageState extends State<CartPage>
   }
 
   // ── Simple Action Row ──
-  Widget _buildActionRow({
-    required String title,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildActionRow({required String title, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -723,14 +708,10 @@ class _CartPageState extends State<CartPage>
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.deepNavy.withAlpha(8)
-                : Colors.white,
+            color: isSelected ? AppColors.deepNavy.withAlpha(8) : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isSelected
-                  ? AppColors.deepNavy
-                  : Colors.grey.shade200,
+              color: isSelected ? AppColors.deepNavy : Colors.grey.shade200,
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -758,9 +739,7 @@ class _CartPageState extends State<CartPage>
                   Text(
                     label,
                     style: TextStyle(
-                      color: isDisabled
-                          ? Colors.grey.shade400
-                          : Colors.black,
+                      color: isDisabled ? Colors.grey.shade400 : Colors.black,
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),
@@ -836,9 +815,7 @@ class _CartPageState extends State<CartPage>
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade100),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
       ),
       child: SafeArea(
         top: false,
@@ -851,13 +828,14 @@ class _CartPageState extends State<CartPage>
             return GestureDetector(
               onHorizontalDragUpdate: (details) {
                 setState(() {
-                  _swipeProgress =
-                      (_swipeProgress + details.delta.dx / maxDrag)
-                          .clamp(0.0, 1.0);
+                  _swipeProgress = (_swipeProgress + details.delta.dx / maxDrag)
+                      .clamp(0.0, 1.0);
                 });
               },
               onHorizontalDragEnd: (details) {
                 if (_swipeProgress > 0.85) {
+                  final navigator = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
                   setState(() {
                     _isValidating = true;
                     _swipeProgress = 1.0;
@@ -865,8 +843,8 @@ class _CartPageState extends State<CartPage>
                   // Simulate order placement
                   Future.delayed(const Duration(seconds: 2), () {
                     if (mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      navigator.pop();
+                      messenger.showSnackBar(
                         SnackBar(
                           content: const Text(
                             'Commande confirmée ! 🎉',
@@ -948,8 +926,9 @@ class _CartPageState extends State<CartPage>
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 3,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -1001,14 +980,8 @@ class _CartPageState extends State<CartPage>
                 ),
                 const SizedBox(height: 16),
                 _buildPaymentOption('CASH', Icons.payments_outlined),
-                _buildPaymentOption(
-                  'CIB / DAHABIA',
-                  Icons.credit_card_rounded,
-                ),
-                _buildPaymentOption(
-                  'BARIDI MOB',
-                  Icons.phone_android_rounded,
-                ),
+                _buildPaymentOption('CIB / DAHABIA', Icons.credit_card_rounded),
+                _buildPaymentOption('BARIDI MOB', Icons.phone_android_rounded),
               ],
             ),
           ),
@@ -1028,9 +1001,7 @@ class _CartPageState extends State<CartPage>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: Color(0xFFF5F5F5)),
-          ),
+          border: Border(bottom: BorderSide(color: Color(0xFFF5F5F5))),
         ),
         child: Row(
           children: [

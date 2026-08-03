@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'parcel_vehicle_select_page.dart'; // import VehicleType
 import 'parcel_success_page.dart';
-import 'parcel_dashboard_page.dart'; // import ParcelDashboardPage and ParcelOrder
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../data/parcel_order_repository.dart';
+import '../domain/parcel_order.dart';
 
 class ParcelSummaryPage extends StatelessWidget {
   final VehicleType selectedVehicle;
@@ -37,7 +38,10 @@ class ParcelSummaryPage extends StatelessWidget {
             children: [
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -88,7 +92,10 @@ class ParcelSummaryPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Section 1: مسار الرحلة (Route Path)
-                      _buildSummarySectionHeader('مسار الرحلة', onEdit: () => Navigator.pop(context)),
+                      _buildSummarySectionHeader(
+                        'مسار الرحلة',
+                        onEdit: () => Navigator.pop(context),
+                      ),
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -159,7 +166,10 @@ class ParcelSummaryPage extends StatelessWidget {
                       const SizedBox(height: 24),
 
                       // Section 2: معلومات المركبة (Vehicle Info)
-                      _buildSummarySectionHeader('معلومات المركبة', onEdit: () => Navigator.pop(context)),
+                      _buildSummarySectionHeader(
+                        'معلومات المركبة',
+                        onEdit: () => Navigator.pop(context),
+                      ),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
@@ -196,7 +206,10 @@ class ParcelSummaryPage extends StatelessWidget {
                       const SizedBox(height: 24),
 
                       // Section 3: نوع البضاعة والموعد (Goods & Timing)
-                      _buildSummarySectionHeader('نوع البضاعة والموعد', onEdit: () => Navigator.pop(context)),
+                      _buildSummarySectionHeader(
+                        'نوع البضاعة والموعد',
+                        onEdit: () => Navigator.pop(context),
+                      ),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
@@ -209,12 +222,19 @@ class ParcelSummaryPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildInfoRow('سلعة', description.isNotEmpty ? description : 'شحنة طرود'),
+                            _buildInfoRow(
+                              'سلعة',
+                              description.isNotEmpty
+                                  ? description
+                                  : 'شحنة طرود',
+                            ),
                             const SizedBox(height: 16),
                             _buildInfoRow(
                               'التاريخ والوقت',
                               timingText,
-                              valueColor: timingText == 'في القريب العاجل' ? AppColors.primary : Colors.black,
+                              valueColor: timingText == 'في القريب العاجل'
+                                  ? AppColors.primary
+                                  : Colors.black,
                             ),
                             const SizedBox(height: 16),
                             _buildInfoRow(
@@ -245,7 +265,10 @@ class ParcelSummaryPage extends StatelessWidget {
                         onPressed: () {},
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black87,
-                          side: BorderSide(color: Colors.grey.shade200, width: 1.5),
+                          side: BorderSide(
+                            color: Colors.grey.shade200,
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(26),
                           ),
@@ -269,8 +292,9 @@ class ParcelSummaryPage extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           // Build order ID and go to Success screen
-                          final orderId = 'DZA${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 13)}';
-                          
+                          final orderId =
+                              'DZA${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 13)}';
+
                           // Create new order and add it to active list
                           final newOrder = ParcelOrder(
                             id: orderId,
@@ -283,7 +307,7 @@ class ParcelSummaryPage extends StatelessWidget {
                             invoice: invoiceOption,
                             dateCreated: DateTime.now(),
                           );
-                          ParcelDashboardPage.activeOrders.add(newOrder);
+                          ParcelOrderRepository.instance.add(newOrder);
 
                           Navigator.push(
                             context,
@@ -319,7 +343,10 @@ class ParcelSummaryPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSummarySectionHeader(String title, {required VoidCallback onEdit}) {
+  Widget _buildSummarySectionHeader(
+    String title, {
+    required VoidCallback onEdit,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

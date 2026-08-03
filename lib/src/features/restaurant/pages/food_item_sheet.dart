@@ -222,9 +222,7 @@ class _FoodItemSheetState extends State<FoodItemSheet> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Colors.grey.shade200),
-              ),
+              border: Border(top: BorderSide(color: Colors.grey.shade200)),
             ),
             child: SafeArea(
               top: false,

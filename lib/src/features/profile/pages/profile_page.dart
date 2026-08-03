@@ -19,7 +19,9 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (context, lang, _) {
         final s = AppStrings(lang);
         return Directionality(
-          textDirection: lang == AppLang.ar ? TextDirection.rtl : TextDirection.ltr,
+          textDirection: lang == AppLang.ar
+              ? TextDirection.rtl
+              : TextDirection.ltr,
           child: Scaffold(
             backgroundColor: const Color(0xFFF6F8FD),
             body: SingleChildScrollView(
@@ -69,11 +71,17 @@ class _ProfilePageState extends State<ProfilePage> {
                             Positioned(
                               bottom: -4,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.royalBlue,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
                                 ),
                                 child: const Text(
                                   '60%',
@@ -152,7 +160,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             offset: const Offset(0, 4),
                           ),
                         ],
-                        border: Border.all(color: Colors.grey.shade100, width: 1.5),
+                        border: Border.all(
+                          color: Colors.grey.shade100,
+                          width: 1.5,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,11 +211,26 @@ class _ProfilePageState extends State<ProfilePage> {
                           // Language buttons
                           Row(
                             children: [
-                              _buildLangButton(lang: lang, target: AppLang.ar, flag: '🇩🇿', label: s.langArabic),
+                              _buildLangButton(
+                                lang: lang,
+                                target: AppLang.ar,
+                                flag: '🇩🇿',
+                                label: s.langArabic,
+                              ),
                               const SizedBox(width: 8),
-                              _buildLangButton(lang: lang, target: AppLang.fr, flag: '🇫🇷', label: s.langFrench),
+                              _buildLangButton(
+                                lang: lang,
+                                target: AppLang.fr,
+                                flag: '🇫🇷',
+                                label: s.langFrench,
+                              ),
                               const SizedBox(width: 8),
-                              _buildLangButton(lang: lang, target: AppLang.en, flag: '🇬🇧', label: s.langEnglish),
+                              _buildLangButton(
+                                lang: lang,
+                                target: AppLang.en,
+                                flag: '🇬🇧',
+                                label: s.langEnglish,
+                              ),
                             ],
                           ),
                         ],
@@ -225,7 +251,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           offset: const Offset(0, 4),
                         ),
                       ],
-                      border: Border.all(color: Colors.grey.shade100, width: 1.5),
+                      border: Border.all(
+                        color: Colors.grey.shade100,
+                        width: 1.5,
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -236,20 +265,23 @@ class _ProfilePageState extends State<ProfilePage> {
                             context,
                             SmoothPageRoute(page: const EditProfilePage()),
                           ),
-                          badgeText: lang == AppLang.ar ? 'معلومات ناقصة' : lang == AppLang.fr ? 'Infos manquantes' : 'Missing details',
+                          badgeText: lang == AppLang.ar
+                              ? 'معلومات ناقصة'
+                              : lang == AppLang.fr
+                              ? 'Infos manquantes'
+                              : 'Missing details',
                           badgeColor: const Color(0xFFFFECE0),
                           badgeTextColor: const Color(0xFFE65100),
                         ),
-                        _buildMenuDivider(),
-                        _buildMenuTile(
-                          icon: Icons.credit_card_rounded,
-                          label: s.profilePayment,
-                          showArrow: true,
-                        ),
+
                         _buildMenuDivider(),
                         _buildMenuTile(
                           icon: Icons.star_border_rounded,
-                          label: lang == AppLang.ar ? 'المفضلة' : lang == AppLang.fr ? 'Favoris' : 'Favorites',
+                          label: lang == AppLang.ar
+                              ? 'المفضلة'
+                              : lang == AppLang.fr
+                              ? 'Favoris'
+                              : 'Favorites',
                           showArrow: true,
                         ),
                         _buildMenuDivider(),
@@ -257,7 +289,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           icon: Icons.add_circle_outline_rounded,
                           label: 'Rafik Plus',
                           iconColor: Colors.pink,
-                          badgeText: lang == AppLang.ar ? 'اشترك ووفّر' : lang == AppLang.fr ? 'Abonnez & économisez' : 'Subscribe & save',
+                          badgeText: lang == AppLang.ar
+                              ? 'اشترك ووفّر'
+                              : lang == AppLang.fr
+                              ? 'Abonnez & économisez'
+                              : 'Subscribe & save',
                           badgeColor: const Color(0xFFFFECEF),
                           badgeTextColor: Colors.pink,
                         ),
@@ -308,7 +344,13 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 1.5,
             ),
             boxShadow: isSelected
-                ? [BoxShadow(color: AppColors.primary.withAlpha(40), blurRadius: 8, offset: const Offset(0, 3))]
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withAlpha(40),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
                 : null,
           ),
           child: Column(
@@ -366,16 +408,28 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               child: Text(
                 badgeText,
-                style: TextStyle(color: badgeTextColor, fontSize: 11, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: badgeTextColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           if (showArrow)
-            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 22),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.grey.shade400,
+              size: 22,
+            ),
         ],
       ),
     );
     if (onTap != null) {
-      return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(24), child: tile);
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: tile,
+      );
     }
     return tile;
   }

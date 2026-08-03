@@ -39,16 +39,16 @@ class ActivitiesPage extends StatefulWidget {
   static final List<ActivityItem> allActivities = [];
 
   // Public static count of scheduled/active items
-  static int get scheduledCount =>
-      _ActivitiesPageState._allItemsInternal
-          .where((a) => a.status == 'Scheduled')
-          .length;
+  static int get scheduledCount => _ActivitiesPageState._allItemsInternal
+      .where((a) => a.status == 'Scheduled')
+      .length;
 
   @override
   State<ActivitiesPage> createState() => _ActivitiesPageState();
 }
 
-class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProviderStateMixin {
+class _ActivitiesPageState extends State<ActivitiesPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedFilter = 'All';
 
@@ -190,7 +190,8 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
   List<ActivityItem> _getFilteredItems(String tabType) {
     return _activities.where((item) {
       final matchesTab = item.type == tabType;
-      final matchesFilter = _selectedFilter == 'All' || item.status == _selectedFilter;
+      final matchesFilter =
+          _selectedFilter == 'All' || item.status == _selectedFilter;
       return matchesTab && matchesFilter;
     }).toList();
   }
@@ -198,7 +199,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
   void _handleRequestAgain(ActivityItem item) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Re-ordering: ${item.storeName ?? "Ride to ${item.destinationAddress.split(',')[0]}"}'),
+        content: Text(
+          'Re-ordering: ${item.storeName ?? "Ride to ${item.destinationAddress.split(',')[0]}"}',
+        ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.royalBlue,
@@ -209,7 +212,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
             if (item.type == 'Rides') {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const TaxiBookingPage()),
+                MaterialPageRoute(
+                  builder: (context) => const TaxiBookingPage(),
+                ),
               );
             } else if (item.type == 'Food') {
               Navigator.push(
@@ -232,7 +237,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
   }
 
   int _getNewCount(String tabType) {
-    return _activities.where((item) => item.type == tabType && item.status == 'Scheduled').length;
+    return _activities
+        .where((item) => item.type == tabType && item.status == 'Scheduled')
+        .length;
   }
 
   Widget _buildTabHeader(String title, String type) {
@@ -317,8 +324,14 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                       labelColor: Colors.white,
                       unselectedLabelColor: Colors.white70,
                       labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                      ),
                       tabs: [
                         _buildTabHeader(s.activityTabRides, 'Rides'),
                         _buildTabHeader(s.activityTabFood, 'Food'),
@@ -343,42 +356,61 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
-                          children: [
-                            s.activityFilterAll,
-                            s.activityFilterCompleted,
-                            s.activityFilterScheduled,
-                            s.activityFilterCancelled,
-                          ].asMap().entries.map((entry) {
-                            final filterLabel = entry.value;
-                            // Map translated label back to internal filter key
-                            final filterKey = _filters[entry.key];
-                            final isSelected = _selectedFilter == filterKey;
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedFilter = filterKey),
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? AppColors.royalBlue : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isSelected ? AppColors.royalBlue : Colors.grey.shade200,
+                          children:
+                              [
+                                s.activityFilterAll,
+                                s.activityFilterCompleted,
+                                s.activityFilterScheduled,
+                                s.activityFilterCancelled,
+                              ].asMap().entries.map((entry) {
+                                final filterLabel = entry.value;
+                                // Map translated label back to internal filter key
+                                final filterKey = _filters[entry.key];
+                                final isSelected = _selectedFilter == filterKey;
+                                return GestureDetector(
+                                  onTap: () => setState(
+                                    () => _selectedFilter = filterKey,
                                   ),
-                                  boxShadow: isSelected
-                                      ? [BoxShadow(color: AppColors.royalBlue.withAlpha(50), blurRadius: 8, offset: const Offset(0, 3))]
-                                      : null,
-                                ),
-                                child: Text(
-                                  filterLabel,
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.grey.shade600,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? AppColors.royalBlue
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? AppColors.royalBlue
+                                            : Colors.grey.shade200,
+                                      ),
+                                      boxShadow: isSelected
+                                          ? [
+                                              BoxShadow(
+                                                color: AppColors.royalBlue
+                                                    .withAlpha(50),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Text(
+                                      filterLabel,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.grey.shade600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                                );
+                              }).toList(),
                         ),
                       ),
                     ),
@@ -414,11 +446,19 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: Colors.grey.shade300,
+            ),
             const SizedBox(height: 16),
             Text(
               s.activityEmpty,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -426,7 +466,12 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 110), // Bottom padding for floating navigation bar spacing
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        0,
+        16,
+        110,
+      ), // Bottom padding for floating navigation bar spacing
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
@@ -445,10 +490,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                 offset: const Offset(0, 4),
               ),
             ],
-            border: Border.all(
-              color: Colors.grey.shade100,
-              width: 1,
-            ),
+            border: Border.all(color: Colors.grey.shade100, width: 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,21 +507,21 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                         color: isCompleted
                             ? Colors.green.shade50
                             : isCancelled
-                                ? Colors.red.shade50
-                                : Colors.blue.shade50,
+                            ? Colors.red.shade50
+                            : Colors.blue.shade50,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         isCompleted
                             ? Icons.check_rounded
                             : isCancelled
-                                ? Icons.close_rounded
-                                : Icons.calendar_month_rounded,
+                            ? Icons.close_rounded
+                            : Icons.calendar_month_rounded,
                         color: isCompleted
                             ? Colors.green.shade700
                             : isCancelled
-                                ? Colors.red.shade700
-                                : Colors.blue.shade700,
+                            ? Colors.red.shade700
+                            : Colors.blue.shade700,
                         size: 16,
                       ),
                     ),
@@ -522,10 +564,14 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                     Text(
                       item.price,
                       style: TextStyle(
-                        color: isCancelled ? Colors.grey.shade400 : AppColors.textPrimary,
+                        color: isCancelled
+                            ? Colors.grey.shade400
+                            : AppColors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
-                        decoration: isCancelled ? TextDecoration.lineThrough : null,
+                        decoration: isCancelled
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                   ],
@@ -580,7 +626,10 @@ class _ActivitiesPageState extends State<ActivitiesPage> with SingleTickerProvid
                           height: 10,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.royalBlue, width: 2),
+                            border: Border.all(
+                              color: AppColors.royalBlue,
+                              width: 2,
+                            ),
                             color: Colors.white,
                           ),
                         ),

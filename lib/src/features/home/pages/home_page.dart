@@ -21,8 +21,8 @@ class _HomePageState extends State<HomePage> {
   Timer? _bannerTimer;
 
   final List<String> _banners = [
-    'assets/imagesss/IMG_0046.PNG',            // 0 - Parcel (first)
-    'assets/imagesss/banner.PNG',              // 1
+    'assets/imagesss/IMG_0046.PNG', // 0 - Parcel (first)
+    'assets/imagesss/banner.PNG', // 1
     'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg', // 2
     'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg', // 3
   ];
@@ -309,7 +309,9 @@ class _HomePageState extends State<HomePage> {
                                   context,
                                   SmoothPageRoute(
                                     page: const ParcelDashboardPage(),
-                                    settings: const RouteSettings(name: 'parcel_dashboard'),
+                                    settings: const RouteSettings(
+                                      name: 'parcel_dashboard',
+                                    ),
                                   ),
                                 );
                               },

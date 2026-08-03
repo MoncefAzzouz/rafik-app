@@ -29,50 +29,58 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
   final List<CartItem> _cartItems = [];
 
   int get _cartCount => _cartItems.fold(0, (sum, item) => sum + item.quantity);
-  int get _cartTotal => _cartItems.fold(0, (sum, item) => sum + item.totalPrice);
+  int get _cartTotal =>
+      _cartItems.fold(0, (sum, item) => sum + item.totalPrice);
 
-  final List<String> _tabs = [
-    'Nos Naans 🌮',
-    'Nos Burgers 🍔',
-    'Nos Tacos 🌯',
-  ];
+  final List<String> _tabs = ['Nos Naans 🌮', 'Nos Burgers 🍔', 'Nos Tacos 🌯'];
 
   final List<Map<String, dynamic>> _menuItems = [
     {
       'name': 'Composez votre Naan 🌮',
       'description': 'Pain au choix, viande au choix, sauce, crudités.',
       'price': 500,
-      'image': 'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=200',
     },
     {
       'name': 'Naan Chef',
-      'description': 'Escalope de poulet champignons et crème fraîche, crudités au choix.',
+      'description':
+          'Escalope de poulet champignons et crème fraîche, crudités au choix.',
       'price': 550,
-      'image': 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=200',
     },
     {
       'name': 'Naan Boursin',
-      'description': 'Escalope de poulet fromage ail et fines herbes, crudités au choix.',
+      'description':
+          'Escalope de poulet fromage ail et fines herbes, crudités au choix.',
       'price': 600,
-      'image': 'https://images.unsplash.com/photo-1509722747041-616f39b57569?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1509722747041-616f39b57569?w=200',
     },
     {
       'name': 'Naan Delice',
-      'description': 'Viande hachée, jambon de dinde et œuf, crudités au choix.',
+      'description':
+          'Viande hachée, jambon de dinde et œuf, crudités au choix.',
       'price': 700,
-      'image': 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=200',
     },
     {
       'name': 'Naan Suisse',
-      'description': 'Escalope de poulet sauce fromagère et jambon de dinde, crudités au choix.',
+      'description':
+          'Escalope de poulet sauce fromagère et jambon de dinde, crudités au choix.',
       'price': 650,
-      'image': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200',
     },
     {
       'name': 'Naan 3 Fromages',
-      'description': 'Escalope de poulet, sauce fromagère, camembert, slice, crudit...',
+      'description':
+          'Escalope de poulet, sauce fromagère, camembert, slice, crudit...',
       'price': 700,
-      'image': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200',
+      'image':
+          'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200',
     },
   ];
 
@@ -92,8 +100,6 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
       'tag': '+2 products',
     },
   ];
-
-
 
   @override
   void dispose() {
@@ -167,7 +173,10 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
 
                 // Delivery info block
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Row(
                     children: [
                       // Delivery charges
@@ -268,7 +277,10 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8F5E9), // Light green background
                       borderRadius: BorderRadius.circular(12),
@@ -337,7 +349,10 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey.shade200),
                           borderRadius: BorderRadius.circular(20),
@@ -569,7 +584,9 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                               },
                               child: Container(
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
                                 decoration: BoxDecoration(
                                   border: Border(
                                     bottom: BorderSide(
@@ -708,13 +725,17 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                                         image: item['image'],
                                         onAddToCart: (totalPrice, quantity) {
                                           setState(() {
-                                            _cartItems.add(CartItem(
-                                              name: item['name'],
-                                              description: item['description'],
-                                              unitPrice: totalPrice ~/ quantity,
-                                              image: item['image'],
-                                              quantity: quantity,
-                                            ));
+                                            _cartItems.add(
+                                              CartItem(
+                                                name: item['name'],
+                                                description:
+                                                    item['description'],
+                                                unitPrice:
+                                                    totalPrice ~/ quantity,
+                                                image: item['image'],
+                                                quantity: quantity,
+                                              ),
+                                            );
                                           });
                                         },
                                       );
@@ -854,7 +875,10 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white.withAlpha(40),
                               borderRadius: BorderRadius.circular(12),

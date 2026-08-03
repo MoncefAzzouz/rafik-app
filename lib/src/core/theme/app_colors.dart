@@ -6,7 +6,7 @@ class AppColors {
   static const Color royalBlue = Color(0xFF0A5BFF);
   static const Color electricBlue = Color(0xFF2196FF);
   static const Color cyan = Color(0xFF35D7FF);
-  
+
   // Mapping to theme colors
   static const Color primary = royalBlue;
   static const Color primaryLight = electricBlue;
@@ -16,7 +16,9 @@ class AppColors {
   static const Color backgroundLight = Color(0xFFF9FAFB);
 
   // Text Colors
-  static const Color textPrimary = Color(0xFF111827); // Very dark gray for headings
+  static const Color textPrimary = Color(
+    0xFF111827,
+  ); // Very dark gray for headings
   static const Color textSecondary = Color(0xFF6B7280); // Gray for descriptions
 
   // Gradients
@@ -29,10 +31,7 @@ class AppColors {
   static const LinearGradient headerGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [
-      Color(0xFF063B8F),
-      royalBlue,
-    ],
+    colors: [Color(0xFF063B8F), royalBlue],
   );
 
   static const LinearGradient qrButtonGradient = LinearGradient(

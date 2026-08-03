@@ -21,10 +21,11 @@ class ParcelDetailsPage extends StatefulWidget {
 
 class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
   final TextEditingController _descController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController(text: '2026/07/28');
+  final TextEditingController _dateController = TextEditingController(
+    text: '2026/07/28',
+  );
   int _selectedInvoiceOption = 2; // Default: 'هذه الخدمة لا تحتاج إلى فاتورة.'
   bool _isLater = true; // Default: 'لاحقاً'
-  bool _isSubmitting = false;
 
   final List<String> _invoiceOptions = [
     'نعم عندي.',
@@ -89,7 +90,10 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -107,7 +111,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                     const SizedBox(height: 16),
 
                     // Illustration of loading van
-                    Container(
+                    SizedBox(
                       height: 160,
                       child: Image.network(
                         'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400', // cargo loading mockup van
@@ -153,10 +157,16 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                     // Counter Widget (Blue border box)
                     Container(
                       width: 150,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: Colors.blue.shade600, width: 1.5),
+                        border: Border.all(
+                          color: Colors.blue.shade600,
+                          width: 1.5,
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -269,7 +279,10 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black87,
-                          side: BorderSide(color: Colors.grey.shade200, width: 1.5),
+                          side: BorderSide(
+                            color: Colors.grey.shade200,
+                            width: 1.5,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(26),
                           ),
@@ -295,7 +308,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
   }
 
   void _navigateToSummary(int helperCount) {
-    final timing = _isLater ? 'لاحقاً (${_dateController.text})' : 'في القريب العاجل';
+    final timing = _isLater
+        ? 'لاحقاً (${_dateController.text})'
+        : 'في القريب العاجل';
     Navigator.push(
       context,
       SmoothPageRoute(
@@ -326,7 +341,10 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                 children: [
                   // Header
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -353,7 +371,10 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.popUntil(context, (route) => route.isFirst);
+                            Navigator.popUntil(
+                              context,
+                              (route) => route.isFirst,
+                            );
                           },
                           child: Text(
                             'إلغاء',
@@ -429,7 +450,10 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                         children: [
                           // Shipment description input
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(16),
@@ -470,8 +494,11 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
 
                           // Radio options list
                           Column(
-                            children: List.generate(_invoiceOptions.length, (index) {
-                              final isSelected = _selectedInvoiceOption == index;
+                            children: List.generate(_invoiceOptions.length, (
+                              index,
+                            ) {
+                              final isSelected =
+                                  _selectedInvoiceOption == index;
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -480,12 +507,17 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                 },
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 10),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF9FAFB),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: isSelected ? Colors.blue.shade600 : Colors.grey.shade200,
+                                      color: isSelected
+                                          ? Colors.blue.shade600
+                                          : Colors.grey.shade200,
                                       width: isSelected ? 1.5 : 1,
                                     ),
                                   ),
@@ -497,7 +529,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: isSelected ? Colors.blue.shade600 : Colors.grey.shade400,
+                                            color: isSelected
+                                                ? Colors.blue.shade600
+                                                : Colors.grey.shade400,
                                             width: isSelected ? 6 : 2,
                                           ),
                                           color: Colors.white,
@@ -507,7 +541,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                       Text(
                                         _invoiceOptions[index],
                                         style: TextStyle(
-                                          color: isSelected ? Colors.black : Colors.grey.shade700,
+                                          color: isSelected
+                                              ? Colors.black
+                                              : Colors.grey.shade700,
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -550,9 +586,13 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: !_isLater ? Colors.white : Colors.transparent,
+                                        color: !_isLater
+                                            ? Colors.white
+                                            : Colors.transparent,
                                         borderRadius: BorderRadius.circular(12),
                                         boxShadow: !_isLater
                                             ? [
@@ -560,7 +600,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                                   color: Colors.black12,
                                                   blurRadius: 4,
                                                   offset: Offset(0, 2),
-                                                )
+                                                ),
                                               ]
                                             : null,
                                       ),
@@ -568,7 +608,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                         child: Text(
                                           'الآن',
                                           style: TextStyle(
-                                            color: !_isLater ? Colors.black : Colors.grey.shade600,
+                                            color: !_isLater
+                                                ? Colors.black
+                                                : Colors.grey.shade600,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -586,9 +628,13 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: _isLater ? Colors.blue.shade600 : Colors.transparent,
+                                        color: _isLater
+                                            ? Colors.blue.shade600
+                                            : Colors.transparent,
                                         borderRadius: BorderRadius.circular(12),
                                         boxShadow: _isLater
                                             ? [
@@ -596,7 +642,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                                   color: Colors.black12,
                                                   blurRadius: 4,
                                                   offset: Offset(0, 2),
-                                                )
+                                                ),
                                               ]
                                             : null,
                                       ),
@@ -604,7 +650,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                         child: Text(
                                           'لاحقاً',
                                           style: TextStyle(
-                                            color: _isLater ? Colors.white : Colors.grey.shade600,
+                                            color: _isLater
+                                                ? Colors.white
+                                                : Colors.grey.shade600,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -624,11 +672,16 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                             GestureDetector(
                               onTap: _selectDate,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF9FAFB),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.shade200),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -698,27 +751,6 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                   ),
                 ],
               ),
-
-              // Loading Spinner Screen during submission
-              if (_isSubmitting)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black54,
-                    child: const Center(
-                      child: Card(
-                        color: Colors.white,
-                        shape: CircleBorder(),
-                        elevation: 4,
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: CircularProgressIndicator(
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),

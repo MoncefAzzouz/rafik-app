@@ -1,57 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import 'parcel_category_select_page.dart';
 import 'parcel_vehicle_select_page.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
-
-class ParcelOrder {
-  final String id;
-  final String vehicleName;
-  final String pickup;
-  final String delivery;
-  final String description;
-  final String timing;
-  final int helpers;
-  final String invoice;
-  final DateTime dateCreated;
-  bool isCompleted;
-  bool isCancelled;
-
-  ParcelOrder({
-    required this.id,
-    required this.vehicleName,
-    required this.pickup,
-    required this.delivery,
-    required this.description,
-    required this.timing,
-    required this.helpers,
-    required this.invoice,
-    required this.dateCreated,
-    this.isCompleted = false,
-    this.isCancelled = false,
-  });
-}
+import '../data/parcel_order_repository.dart';
+import '../domain/parcel_order.dart';
 
 class ParcelDashboardPage extends StatefulWidget {
   const ParcelDashboardPage({super.key});
-
-  // Static lists for persistent mock database
-  static final List<ParcelOrder> activeOrders = [];
-  static final List<ParcelOrder> archivedOrders = [];
 
   @override
   State<ParcelDashboardPage> createState() => _ParcelDashboardPageState();
 }
 
 class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
+  final _orders = ParcelOrderRepository.instance;
   bool _isLoading = true;
   int _currentTabIndex = 0; // 0 for الرئيسية, 1 for الأرشيف
 
   @override
   void initState() {
     super.initState();
+    _orders.addListener(_onOrdersChanged);
     _simulateLoading();
+  }
+
+  void _onOrdersChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _orders.removeListener(_onOrdersChanged);
+    super.dispose();
   }
 
   void _simulateLoading() {
@@ -67,9 +50,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
   void _navigateToCreateRequest() {
     Navigator.push(
       context,
-      SmoothPageRoute(
-        page: const ParcelVehicleSelectPage(),
-      ),
+      SmoothPageRoute(page: const ParcelCategorySelectPage()),
     ).then((_) {
       // Rebuild when returning to dashboard to reflect new orders
       if (mounted) {
@@ -95,86 +76,92 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                       children: [
                         // Custom Header
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              GestureDetector(
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.grey.shade100,
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_back,
-                                    color: Colors.black87,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Profile picture (MA brand gradient)
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: LinearGradient(
-                                    colors: [AppColors.royalBlue, AppColors.electricBlue],
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    'MA',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => Navigator.pop(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.grey.shade100,
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_back,
+                                        color: Colors.black87,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  // Profile picture (MA brand gradient)
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.royalBlue,
+                                          AppColors.electricBlue,
+                                        ],
+                                      ),
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        'MA',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Title text
+                                  Text(
+                                    '${s.hello}, Moncef!',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              // Title text
-                              Text(
-                                '${s.hello}, Moncef!',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
+                              // Notification bell icon
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.grey.shade100,
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_none_rounded,
+                                  color: Colors.black87,
+                                  size: 22,
                                 ),
                               ),
                             ],
                           ),
-                          // Notification bell icon
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey.shade100,
-                            ),
-                            child: const Icon(
-                              Icons.notifications_none_rounded,
-                              color: Colors.black87,
-                              size: 22,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    // Main Content depending on selected tab index
-                    Expanded(
-                      child: _currentTabIndex == 0
-                          ? _buildHomeTabContent(s)
-                          : _buildArchiveTabContent(s),
+                        // Main Content depending on selected tab index
+                        Expanded(
+                          child: _currentTabIndex == 0
+                              ? _buildHomeTabContent(s)
+                              : _buildArchiveTabContent(s),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
             ),
             // Custom Bottom bar
             bottomNavigationBar: _isLoading
@@ -184,7 +171,12 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                       height: 80,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border(top: BorderSide(color: Colors.grey.shade100, width: 1)),
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.grey.shade100,
+                            width: 1,
+                          ),
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -198,14 +190,20 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.home_rounded,
-                                        color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade400,
-                                        size: 26),
+                                    Icon(
+                                      Icons.home_rounded,
+                                      color: _currentTabIndex == 0
+                                          ? AppColors.primary
+                                          : Colors.grey.shade400,
+                                      size: 26,
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
                                       s.parcelTabHome,
                                       style: TextStyle(
-                                        color: _currentTabIndex == 0 ? AppColors.primary : Colors.grey.shade500,
+                                        color: _currentTabIndex == 0
+                                            ? AppColors.primary
+                                            : Colors.grey.shade500,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -225,9 +223,19 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                               decoration: const BoxDecoration(
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
-                                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4))],
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                              child: const Icon(Icons.add, color: Colors.white, size: 28),
+                              child: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
                           ),
 
@@ -240,14 +248,20 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.history_rounded,
-                                        color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade400,
-                                        size: 26),
+                                    Icon(
+                                      Icons.history_rounded,
+                                      color: _currentTabIndex == 1
+                                          ? AppColors.primary
+                                          : Colors.grey.shade400,
+                                      size: 26,
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
                                       s.parcelTabArchive,
                                       style: TextStyle(
-                                        color: _currentTabIndex == 1 ? AppColors.primary : Colors.grey.shade500,
+                                        color: _currentTabIndex == 1
+                                            ? AppColors.primary
+                                            : Colors.grey.shade500,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -269,7 +283,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
 
   // TAB 1: Home / Active Orders Content
   Widget _buildHomeTabContent(AppStrings s) {
-    if (ParcelDashboardPage.activeOrders.isEmpty) {
+    if (_orders.activeOrders.isEmpty) {
       return SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -277,7 +291,11 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
             const SizedBox(height: 230),
             Text(
               s.parcelEmpty,
-              style: const TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -285,7 +303,12 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
               child: Text(
                 s.parcelEmptyHint,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.6, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(height: 40),
@@ -299,10 +322,18 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(28),
+                    ),
                     elevation: 0,
                   ),
-                  child: Text(s.parcelCreateOrder, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    s.parcelCreateOrder,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -314,9 +345,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
     // Active orders list view
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      itemCount: ParcelDashboardPage.activeOrders.length,
+      itemCount: _orders.activeOrders.length,
       itemBuilder: (context, index) {
-        final order = ParcelDashboardPage.activeOrders[index];
+        final order = _orders.activeOrders[index];
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           padding: const EdgeInsets.all(18),
@@ -341,7 +372,11 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.inventory_2_outlined, color: Colors.blue, size: 20),
+                      const Icon(
+                        Icons.inventory_2_outlined,
+                        color: Colors.blue,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         order.id,
@@ -354,7 +389,10 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(10),
@@ -440,7 +478,10 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildDetailBadge('المركبة', order.vehicleName),
-                  _buildDetailBadge('العمال', order.helpers > 0 ? '${order.helpers} أشخاص' : 'لا يوجد'),
+                  _buildDetailBadge(
+                    'العمال',
+                    order.helpers > 0 ? '${order.helpers} أشخاص' : 'لا يوجد',
+                  ),
                   _buildDetailBadge('الوقت', order.timing.split(' ').first),
                 ],
               ),
@@ -453,18 +494,17 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        setState(() {
-                          order.isCancelled = true;
-                          ParcelDashboardPage.activeOrders.remove(order);
-                          ParcelDashboardPage.archivedOrders.add(order);
-                        });
+                        _orders.cancel(order);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('تم إلغاء الطلب بنجاح')),
                         );
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red.shade600,
-                        side: BorderSide(color: Colors.red.shade100, width: 1.5),
+                        side: BorderSide(
+                          color: Colors.red.shade100,
+                          width: 1.5,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -480,13 +520,11 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        setState(() {
-                          order.isCompleted = true;
-                          ParcelDashboardPage.activeOrders.remove(order);
-                          ParcelDashboardPage.archivedOrders.add(order);
-                        });
+                        _orders.complete(order);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('تم إكمال شحن الطرد وتوصيله بنجاح!')),
+                          const SnackBar(
+                            content: Text('تم إكمال شحن الطرد وتوصيله بنجاح!'),
+                          ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -514,26 +552,41 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
 
   // TAB 2: Archive Content
   Widget _buildArchiveTabContent(AppStrings s) {
-    if (ParcelDashboardPage.archivedOrders.isEmpty) {
+    if (_orders.archivedOrders.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.grey.shade50, shape: BoxShape.circle),
-              child: Icon(Icons.archive_outlined, size: 64, color: Colors.grey.shade400),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.archive_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               s.parcelArchiveEmpty,
-              style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               s.parcelEmptyHint,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -542,9 +595,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      itemCount: ParcelDashboardPage.archivedOrders.length,
+      itemCount: _orders.archivedOrders.length,
       itemBuilder: (context, index) {
-        final order = ParcelDashboardPage.archivedOrders[index];
+        final order = _orders.archivedOrders[index];
         final isCompleted = order.isCompleted;
 
         return Container(
@@ -571,15 +624,22 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isCompleted ? Colors.green.shade50 : Colors.red.shade50,
+                      color: isCompleted
+                          ? Colors.green.shade50
+                          : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       isCompleted ? 'مكتمل' : 'ملغي',
                       style: TextStyle(
-                        color: isCompleted ? Colors.green.shade700 : Colors.red.shade700,
+                        color: isCompleted
+                            ? Colors.green.shade700
+                            : Colors.red.shade700,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -596,9 +656,27 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                   Column(
                     children: [
                       const SizedBox(height: 4),
-                      Container(width: 5, height: 5, decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle)),
-                      Container(width: 1, height: 18, color: Colors.grey.shade200),
-                      Container(width: 5, height: 5, decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle)),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 18,
+                        color: Colors.grey.shade200,
+                      ),
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(width: 12),
@@ -606,9 +684,23 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(order.pickup, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
+                        Text(
+                          order.pickup,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 10),
-                        Text(order.delivery, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
+                        Text(
+                          order.delivery,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -635,11 +727,15 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         invoice: order.invoice,
                         dateCreated: DateTime.now(),
                       );
-                      ParcelDashboardPage.activeOrders.add(reordered);
+                      _orders.add(reordered);
                       _currentTabIndex = 0;
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تمت إعادة إرسال الطلب وإضافته للطلبات النشطة')),
+                      const SnackBar(
+                        content: Text(
+                          'تمت إعادة إرسال الطلب وإضافته للطلبات النشطة',
+                        ),
+                      ),
                     );
                   },
                   style: OutlinedButton.styleFrom(
@@ -656,7 +752,10 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                       SizedBox(width: 6),
                       Text(
                         'إعادة الطلب',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),

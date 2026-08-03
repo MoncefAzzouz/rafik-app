@@ -140,7 +140,9 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
                 : _sourceAddress);
       _destinationFocus.unfocus();
     });
-    final target = isSource ? _sourceCoord : (_destinationCoord ?? _sourceCoord);
+    final target = isSource
+        ? _sourceCoord
+        : (_destinationCoord ?? _sourceCoord);
     _mapController.move(target, 16);
   }
 

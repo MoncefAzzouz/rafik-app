@@ -16,6 +16,13 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   void _login() {
     Navigator.pushReplacement(
       context,
@@ -57,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                
+
                 const Text(
                   'Welcome Back',
                   textAlign: TextAlign.center,
@@ -77,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 40),
-                
+
                 // Email Field
                 TextField(
                   controller: _emailController,
@@ -85,11 +92,14 @@ class _LoginPageState extends State<LoginPage> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
                     hintText: 'Email Address',
-                    prefixIcon: Icon(Icons.email_outlined, color: AppColors.textSecondary),
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Password Field
                 TextField(
                   controller: _passwordController,
@@ -97,10 +107,15 @@ class _LoginPageState extends State<LoginPage> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     hintText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondary),
+                    prefixIcon: const Icon(
+                      Icons.lock_outline,
+                      color: AppColors.textSecondary,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: AppColors.textSecondary,
                       ),
                       onPressed: () {
@@ -112,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                
+
                 // Forgot password
                 Align(
                   alignment: Alignment.centerRight,
@@ -120,12 +135,15 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: () {},
                     child: const Text(
                       'Forgot Password?',
-                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Login Button
                 SizedBox(
                   height: 55,
@@ -142,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Sign up
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -155,12 +173,17 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterPage()),
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterPage(),
+                          ),
                         );
                       },
                       child: const Text(
                         'Sign Up',
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],

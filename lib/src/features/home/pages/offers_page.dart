@@ -139,17 +139,14 @@ class OffersPage extends StatelessWidget {
             offset: const Offset(0, 5),
           ),
         ],
-        image: !isSvg 
-          ? DecorationImage(image: AssetImage(assetPath), fit: BoxFit.contain)
-          : null,
+        image: !isSvg
+            ? DecorationImage(image: AssetImage(assetPath), fit: BoxFit.contain)
+            : null,
       ),
       child: isSvg
           ? ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: SvgPicture.asset(
-                assetPath,
-                fit: BoxFit.contain,
-              ),
+              child: SvgPicture.asset(assetPath, fit: BoxFit.contain),
             )
           : null,
     );
