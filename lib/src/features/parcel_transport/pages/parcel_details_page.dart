@@ -73,6 +73,8 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
     }
   }
 
+  // Kept temporarily for reference; the order flow now skips helper selection.
+  // ignore: unused_element
   void _showHelperSelectionSheet() {
     int localHelperCount = 1;
 
@@ -730,7 +732,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _showHelperSelectionSheet,
+                        onPressed: () => _navigateToSummary(0),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,

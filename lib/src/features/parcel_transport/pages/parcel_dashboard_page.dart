@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import 'parcel_category_select_page.dart';
 import 'parcel_vehicle_select_page.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
@@ -50,7 +49,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
   void _navigateToCreateRequest() {
     Navigator.push(
       context,
-      SmoothPageRoute(page: const ParcelCategorySelectPage()),
+      SmoothPageRoute(page: const ParcelVehicleSelectPage()),
     ).then((_) {
       // Rebuild when returning to dashboard to reflect new orders
       if (mounted) {
