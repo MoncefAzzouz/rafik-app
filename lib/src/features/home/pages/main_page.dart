@@ -52,9 +52,8 @@ class _MainPageState extends State<MainPage> {
           extendBody: true,
           body: IndexedStack(index: _currentIndex, children: _pages),
           bottomNavigationBar: SafeArea(
-            bottom: false,
             child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(

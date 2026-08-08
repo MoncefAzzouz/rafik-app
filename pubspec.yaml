@@ -60,9 +60,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/logoApp.PNG"
+  image_path: "assets/rafik_app_icon.png"
   adaptive_icon_background: "#031C2D"
-  adaptive_icon_foreground: "assets/logoApp.PNG"
+  adaptive_icon_foreground: "assets/rafik_app_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -95,6 +95,9 @@ flutter:
     - assets/imagesss/IMG_0045.PNG
     - assets/imagesss/IMG_0046.PNG
     - assets/imagesss/banner.PNG
+    - assets/imagesss/rafik-port-delivery-banner.png
+    - assets/imagesss/rafik-nationwide-delivery-banner.png
+    - assets/imagesss/rafik-secure-tracking-banner.png
     - assets/imagesss/food icon.PNG
     - assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg
     - assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg

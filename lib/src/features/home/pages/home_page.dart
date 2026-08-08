@@ -22,9 +22,9 @@ class _HomePageState extends State<HomePage> {
 
   final List<String> _banners = [
     'assets/imagesss/IMG_0046.PNG', // 0 - Parcel (first)
-    'assets/imagesss/banner.PNG', // 1
-    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674090-y.jpg', // 2
-    'assets/imagesss/telegram-cloud-photo-size-4-5866005413520674091-y.jpg', // 3
+    'assets/imagesss/rafik-port-delivery-banner.png',
+    'assets/imagesss/rafik-nationwide-delivery-banner.png',
+    'assets/imagesss/rafik-secure-tracking-banner.png',
   ];
 
   @override
@@ -167,7 +167,7 @@ class _HomePageState extends State<HomePage> {
                           itemBuilder: (context, index) {
                             return GestureDetector(
                               onTap: () {
-                                if (index == 0) {
+                                if (index <= 3) {
                                   Navigator.push(
                                     context,
                                     SmoothPageRoute(
@@ -232,6 +232,22 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildServiceItem(
+                              'assets/imagesss/IMG_0043.PNG',
+                              'Parcel\nTransport',
+                              isLocked: false,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  SmoothPageRoute(
+                                    page: const ParcelDashboardPage(),
+                                    settings: const RouteSettings(
+                                      name: 'parcel_dashboard',
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            _buildServiceItem(
                               'assets/imagesss/food icon.PNG',
                               'Food',
                               onTap: () {
@@ -260,16 +276,16 @@ class _HomePageState extends State<HomePage> {
                               'assets/imagesss/IMG_0039.PNG',
                               'Supermarket',
                             ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0040.PNG',
-                              'Home Service',
-                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0040.PNG',
+                              'Home Service',
+                            ),
                             _buildServiceItem(
                               'assets/imagesss/IMG_0044.PNG',
                               'Parcel\nDelivery',
@@ -291,10 +307,6 @@ class _HomePageState extends State<HomePage> {
                               'assets/imagesss/IMG_0042.PNG',
                               'Bricolage\n(DIY)',
                             ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0045.PNG',
-                              'Plumbing',
-                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -302,19 +314,8 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildServiceItem(
-                              'assets/imagesss/IMG_0043.PNG',
-                              'Parcel\nTransport',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  SmoothPageRoute(
-                                    page: const ParcelDashboardPage(),
-                                    settings: const RouteSettings(
-                                      name: 'parcel_dashboard',
-                                    ),
-                                  ),
-                                );
-                              },
+                              'assets/imagesss/IMG_0045.PNG',
+                              'Plumbing',
                             ),
                             _buildServiceItem('', 'More', isCustomMore: true),
                             const Expanded(child: SizedBox()),
@@ -696,24 +697,6 @@ class _HomePageState extends State<HomePage> {
           'subtitle': 'في كامل الجزائر',
           'action': 'أرسل الآن',
         };
-      case 1:
-        return {
-          'title': 'كل خدماتك\nفي تطبيق واحد',
-          'subtitle': 'توصيل، تاكسي، وتسوق',
-          'action': 'اطلب الآن',
-        };
-      case 2:
-        return {
-          'title': 'وجبتك المفضلة\nتوصلك بسرعة',
-          'subtitle': 'مطاعمك القريبة بين يديك',
-          'action': 'اطلب الآن',
-        };
-      case 3:
-        return {
-          'title': 'مشوارك جاهز\nفي دقائق',
-          'subtitle': 'تنقل بسهولة وأمان',
-          'action': 'احجز الآن',
-        };
       default:
         return null;
     }
@@ -724,41 +707,79 @@ class _HomePageState extends State<HomePage> {
     String assetPath,
     String title, {
     bool isCustomMore = false,
+    bool isLocked = true,
     VoidCallback? onTap,
   }) {
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: isLocked ? null : onTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: const BoxDecoration(shape: BoxShape.circle),
-              child: ClipOval(
-                child: isCustomMore
-                    ? const Center(
-                        child: Icon(
-                          Icons.more_horiz_rounded,
-                          color: AppColors.royalBlue,
-                          size: 32,
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(
-                          4.0,
-                        ), // Padding to keep premium borders
-                        child: Image.asset(assetPath, fit: BoxFit.contain),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Opacity(
+                  opacity: isLocked ? 0.45 : 1,
+                  child: Container(
+                    width: 68,
+                    height: 68,
+                    decoration: const BoxDecoration(shape: BoxShape.circle),
+                    child: ClipOval(
+                      child: isCustomMore
+                          ? const Center(
+                              child: Icon(
+                                Icons.more_horiz_rounded,
+                                color: AppColors.royalBlue,
+                                size: 32,
+                              ),
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Image.asset(
+                                assetPath,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                if (isLocked)
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 25,
+                      height: 25,
+                      decoration: BoxDecoration(
+                        color: AppColors.royalBlue,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(35),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-              ),
+                      child: const Icon(
+                        Icons.lock_rounded,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: isLocked
+                    ? AppColors.textPrimary.withAlpha(120)
+                    : AppColors.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 height: 1.2,
