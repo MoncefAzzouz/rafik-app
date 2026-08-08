@@ -242,14 +242,18 @@ class _ActivitiesPageState extends State<ActivitiesPage>
         .length;
   }
 
-  Widget _buildTabHeader(String title, String type) {
+  Widget _buildTabHeader(String title, String type, {bool isLocked = false}) {
     final count = _getNewCount(type);
     return Tab(
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(title),
-          if (count > 0) ...[
+          if (isLocked) ...[
+            const SizedBox(width: 5),
+            const Icon(Icons.lock_rounded, size: 13),
+          ],
+          if (!isLocked && count > 0) ...[
             const SizedBox(width: 6),
             SizedBox(
               height: 16,
@@ -295,7 +299,7 @@ class _ActivitiesPageState extends State<ActivitiesPage>
                   gradient: AppColors.headerGradient,
                 ),
                 padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top + 16,
+                  top: MediaQuery.of(context).padding.top + 10,
                   bottom: 0,
                 ),
                 child: Column(
@@ -307,16 +311,19 @@ class _ActivitiesPageState extends State<ActivitiesPage>
                         s.activityTitle,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 26,
+                          fontSize: 23,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.5,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     // Tab Bar
                     TabBar(
                       controller: _tabController,
+                      onTap: (index) {
+                        if (index != 0) _tabController.index = 0;
+                      },
                       isScrollable: true,
                       tabAlignment: TabAlignment.start,
                       indicatorColor: Colors.white,
@@ -333,11 +340,27 @@ class _ActivitiesPageState extends State<ActivitiesPage>
                         fontWeight: FontWeight.normal,
                       ),
                       tabs: [
-                        _buildTabHeader(s.activityTabRides, 'Rides'),
-                        _buildTabHeader(s.activityTabFood, 'Food'),
                         _buildTabHeader(s.activityTabParcel, 'Parcel'),
-                        _buildTabHeader(s.activityTabShop, 'Shop'),
-                        _buildTabHeader(s.activityTabMarket, 'Market'),
+                        _buildTabHeader(
+                          s.activityTabRides,
+                          'Rides',
+                          isLocked: true,
+                        ),
+                        _buildTabHeader(
+                          s.activityTabFood,
+                          'Food',
+                          isLocked: true,
+                        ),
+                        _buildTabHeader(
+                          s.activityTabShop,
+                          'Shop',
+                          isLocked: true,
+                        ),
+                        _buildTabHeader(
+                          s.activityTabMarket,
+                          'Market',
+                          isLocked: true,
+                        ),
                       ],
                     ),
                   ],
@@ -419,12 +442,13 @@ class _ActivitiesPageState extends State<ActivitiesPage>
                     Expanded(
                       child: TabBarView(
                         controller: _tabController,
+                        physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _buildTabList('Rides', s),
-                          _buildTabList('Food', s),
                           _buildTabList('Parcel', s),
-                          _buildTabList('Shop', s),
-                          _buildTabList('Market', s),
+                          const SizedBox.shrink(),
+                          const SizedBox.shrink(),
+                          const SizedBox.shrink(),
+                          const SizedBox.shrink(),
                         ],
                       ),
                     ),

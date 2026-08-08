@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
@@ -52,12 +54,15 @@ class _MainPageState extends State<MainPage> {
           extendBody: true,
           body: IndexedStack(index: _currentIndex, children: _pages),
           bottomNavigationBar: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 12),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              height: 72,
+              margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(20),
+                    color: AppColors.primary.withAlpha(22),
                     blurRadius: 24,
                     offset: const Offset(0, 10),
                   ),
@@ -66,26 +71,34 @@ class _MainPageState extends State<MainPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(40),
-                child: Container(
-                  height: 72,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  color: Colors.white,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(
-                        child: _buildNavItem(label: s.navHome, index: 0),
-                      ),
-                      Expanded(
-                        child: _buildNavItem(label: s.navPromos, index: 1),
-                      ),
-                      Expanded(
-                        child: _buildNavItem(label: s.navActivities, index: 2),
-                      ),
-                      Expanded(
-                        child: _buildNavItem(label: s.navProfile, index: 3),
-                      ),
-                    ],
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(178),
+                      border: Border.all(color: Colors.white.withAlpha(180)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(
+                          child: _buildNavItem(label: s.navHome, index: 0),
+                        ),
+                        Expanded(
+                          child: _buildNavItem(label: s.navPromos, index: 1),
+                        ),
+                        Expanded(
+                          child: _buildNavItem(
+                            label: s.navActivities,
+                            index: 2,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildNavItem(label: s.navProfile, index: 3),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -114,7 +127,7 @@ class _MainPageState extends State<MainPage> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         margin: EdgeInsets.symmetric(
-          vertical: isActive ? 8 : 12,
+          vertical: isActive ? 7 : 10,
           horizontal: 4,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -156,7 +169,7 @@ class _MainPageState extends State<MainPage> {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
@@ -199,6 +212,10 @@ class _MainPageState extends State<MainPage> {
           ],
         ),
       );
+    }
+
+    if (index == 1) {
+      return Icon(Icons.new_releases_outlined, color: color, size: 30);
     }
 
     final icons = [

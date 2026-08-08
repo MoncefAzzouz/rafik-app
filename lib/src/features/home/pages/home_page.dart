@@ -6,6 +6,7 @@ import '../../restaurant/pages/food_page.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../electricity/pages/electrician_list_page.dart';
 import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../parcel_transport/data/parcel_order_repository.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class HomePage extends StatefulWidget {
@@ -17,6 +18,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController();
+  final ParcelOrderRepository _parcelOrders = ParcelOrderRepository.instance;
   int _currentBannerIndex = 0;
   Timer? _bannerTimer;
 
@@ -30,7 +32,12 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _parcelOrders.addListener(_onParcelOrdersChanged);
     _startBannerTimer();
+  }
+
+  void _onParcelOrdersChanged() {
+    if (mounted) setState(() {});
   }
 
   void _startBannerTimer() {
@@ -51,6 +58,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _parcelOrders.removeListener(_onParcelOrdersChanged);
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
@@ -235,6 +243,7 @@ class _HomePageState extends State<HomePage> {
                               'assets/imagesss/IMG_0043.PNG',
                               'Parcel\nTransport',
                               isLocked: false,
+                              badgeCount: _parcelOrders.activeCount,
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -325,6 +334,85 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
+                  if (_parcelOrders.activeCount > 0) ...[
+                    const SizedBox(height: 14),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            SmoothPageRoute(
+                              page: const ParcelDashboardPage(),
+                              settings: const RouteSettings(
+                                name: 'parcel_dashboard',
+                              ),
+                            ),
+                          );
+                        },
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.royalBlue.withAlpha(18),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: AppColors.royalBlue.withAlpha(45),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.royalBlue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.local_shipping_rounded,
+                                  color: Colors.white,
+                                  size: 21,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${_parcelOrders.activeCount} active parcel ${_parcelOrders.activeCount == 1 ? 'order' : 'orders'}',
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Tap to view and manage your delivery',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.royalBlue,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   // Reorder Section
                   const SizedBox(height: 16),
                   Row(
@@ -708,6 +796,7 @@ class _HomePageState extends State<HomePage> {
     String title, {
     bool isCustomMore = false,
     bool isLocked = true,
+    int badgeCount = 0,
     VoidCallback? onTap,
   }) {
     return Expanded(
@@ -767,6 +856,32 @@ class _HomePageState extends State<HomePage> {
                         Icons.lock_rounded,
                         color: Colors.white,
                         size: 14,
+                      ),
+                    ),
+                  ),
+                if (!isLocked && badgeCount > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),
