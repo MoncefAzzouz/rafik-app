@@ -23,10 +23,10 @@ class _HomePageState extends State<HomePage> {
   Timer? _bannerTimer;
 
   final List<String> _banners = [
-    'assets/imagesss/IMG_0046.PNG', // 0 - Parcel (first)
+    'assets/imagesss/rafik-secure-tracking-banner.png',
+    'assets/imagesss/IMG_0046.PNG',
     'assets/imagesss/rafik-port-delivery-banner.png',
     'assets/imagesss/rafik-nationwide-delivery-banner.png',
-    'assets/imagesss/rafik-secure-tracking-banner.png',
   ];
 
   @override
@@ -257,6 +257,14 @@ class _HomePageState extends State<HomePage> {
                               },
                             ),
                             _buildServiceItem(
+                              'assets/imagesss/IMG_0080.PNG',
+                              'Fourgon',
+                            ),
+                            _buildServiceItem(
+                              'assets/imagesss/IMG_0044.PNG',
+                              'Colis',
+                            ),
+                            _buildServiceItem(
                               'assets/imagesss/food icon.PNG',
                               'Food',
                               onTap: () {
@@ -268,6 +276,12 @@ class _HomePageState extends State<HomePage> {
                                 );
                               },
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             _buildServiceItem(
                               'assets/imagesss/IMG_0038.PNG',
                               'Taxi',
@@ -285,19 +299,9 @@ class _HomePageState extends State<HomePage> {
                               'assets/imagesss/IMG_0039.PNG',
                               'Supermarket',
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
                             _buildServiceItem(
                               'assets/imagesss/IMG_0040.PNG',
                               'Home Service',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0044.PNG',
-                              'Parcel\nDelivery',
                             ),
                             _buildServiceItem(
                               'assets/imagesss/IMG_0041.PNG',
@@ -312,10 +316,6 @@ class _HomePageState extends State<HomePage> {
                                 );
                               },
                             ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0042.PNG',
-                              'Bricolage\n(DIY)',
-                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -323,11 +323,14 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildServiceItem(
+                              'assets/imagesss/IMG_0042.PNG',
+                              'Bricolage\n(DIY)',
+                            ),
+                            _buildServiceItem(
                               'assets/imagesss/IMG_0045.PNG',
                               'Plumbing',
                             ),
                             _buildServiceItem('', 'More', isCustomMore: true),
-                            const Expanded(child: SizedBox()),
                             const Expanded(child: SizedBox()),
                           ],
                         ),
@@ -779,7 +782,7 @@ class _HomePageState extends State<HomePage> {
 
   Map<String, String>? _bannerText(int index) {
     switch (index) {
-      case 0:
+      case 1:
         return {
           'title': 'توصيل السلع\nبين الولايات',
           'subtitle': 'في كامل الجزائر',
