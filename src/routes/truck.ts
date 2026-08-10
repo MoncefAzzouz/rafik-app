@@ -7,12 +7,49 @@ import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 import { deleteUpload } from '../lib/r2';
 import {
   canTruckTransition, nextTruckOrderNumber, nextTruckCode, haversineKm,
-  estimateTruckPrice, computeTruckCommission, TRUCK_STATUSES, TRUCK_CANCELLED,
+  estimateTruckPrice, computeTruckCommission, wilayaPriceByName, TRUCK_STATUSES, TRUCK_CANCELLED,
 } from '../lib/truck';
 
 const router = Router();
 const INVOICE_STATUSES = ['HAS_INVOICE', 'NO_INVOICE', 'NOT_REQUIRED'];
 const TRUCK_DUTY = ['available', 'busy', 'offline', 'suspended'];
+const COMMISSION_MODES = ['PERCENTAGE', 'SUBSCRIPTION'];
+
+// ══════════════════ WILAYA PRICES (58 wilayas) ══════════════════
+
+// Public list — the mobile app + admin need it to price rides
+router.get('/wilayas', async (_req: Request, res: Response) => {
+  try {
+    const wilayas = await prisma.truckWilaya.findMany({ orderBy: { code: 'asc' } });
+    res.json(wilayas);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Update one wilaya's price (admin)
+router.put('/wilayas/:code', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  const code = parseInt(req.params.code as string);
+  const { price } = req.body;
+  if (price === undefined || isNaN(parseInt(price))) { res.status(400).json({ error: 'price (DZD) is required' }); return; }
+  try {
+    const wilaya = await prisma.truckWilaya.update({ where: { code }, data: { price: parseInt(price) } });
+    res.json(wilaya);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Bulk update prices (admin) — body: { prices: { "16": 5000, "19": 500, ... } }
+router.put('/wilayas', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  const { prices } = req.body;
+  if (!prices || typeof prices !== 'object') { res.status(400).json({ error: 'prices object is required' }); return; }
+  try {
+    await prisma.$transaction(
+      Object.entries(prices).map(([code, price]) =>
+        prisma.truckWilaya.update({ where: { code: parseInt(code) }, data: { price: parseInt(price as string) || 0 } })
+      )
+    );
+    const wilayas = await prisma.truckWilaya.findMany({ orderBy: { code: 'asc' } });
+    res.json(wilayas);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
 
 function getUser(req: Request) {
   return (req as AuthenticatedRequest).user!;
@@ -367,16 +404,18 @@ router.post('/register', async (req: Request, res: Response) => {
 
 // ══════════════════ PRICE QUOTE (public — mobile app calls before ordering) ══════════════════
 router.post('/quote', async (req: Request, res: Response) => {
-  const { categoryId, truckTypeId, distanceKm, pickupLat, pickupLng, destinationLat, destinationLng } = req.body;
+  const { truckTypeId, destinationWilaya, distanceKm, pickupLat, pickupLng, destinationLat, destinationLng } = req.body;
   try {
     let km: number | null = distanceKm != null && `${distanceKm}` !== '' ? parseFloat(distanceKm) : null;
     if (km === null && pickupLat != null && pickupLng != null && destinationLat != null && destinationLng != null) {
       km = Math.round(haversineKm(parseFloat(pickupLat), parseFloat(pickupLng), parseFloat(destinationLat), parseFloat(destinationLng)) * 10) / 10;
     }
     const truckType = truckTypeId ? await prisma.truckType.findUnique({ where: { id: truckTypeId as string } }) : null;
+    const wilayaPrice = await wilayaPriceByName(destinationWilaya as string);
     const quote = await estimateTruckPrice({
       distanceKm: km,
       typeMultiplier: truckType?.priceMultiplier ?? null,
+      wilayaPrice,
     });
     res.json({ ...quote, distanceKm: km, estimatedPrice: quote.estimatedPrice });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -441,7 +480,7 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
   const {
     clientName, clientPhone, categoryId, truckTypeId,
     pickupAddress, pickupWilaya, pickupCommune, pickupLat, pickupLng,
-    destinationAddress, destinationLat, destinationLng, distanceKm,
+    destinationAddress, destinationWilaya, destinationLat, destinationLng, distanceKm,
     description, invoiceStatus, scheduledType, scheduledDate, promoCode,
   } = req.body;
   const user = getUser(req);
@@ -472,8 +511,9 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
       km = Math.round(haversineKm(parseFloat(pickupLat), parseFloat(pickupLng), parseFloat(destinationLat), parseFloat(destinationLng)) * 10) / 10;
     }
 
+    const wilayaPrice = await wilayaPriceByName(destinationWilaya as string);
     const { estimatedPrice } = await estimateTruckPrice({
-      distanceKm: km, typeMultiplier: truckType?.priceMultiplier ?? null,
+      distanceKm: km, typeMultiplier: truckType?.priceMultiplier ?? null, wilayaPrice,
     });
 
     // Optional promo
@@ -494,7 +534,7 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
         categoryId: categoryId as string, truckTypeId: (truckTypeId as string) || null,
         pickupAddress: pickupAddress as string, pickupWilaya: (pickupWilaya as string) || null, pickupCommune: (pickupCommune as string) || null,
         pickupLat: pickupLat != null ? parseFloat(pickupLat) : null, pickupLng: pickupLng != null ? parseFloat(pickupLng) : null,
-        destinationAddress: destinationAddress as string,
+        destinationAddress: destinationAddress as string, destinationWilaya: (destinationWilaya as string) || null,
         destinationLat: destinationLat != null ? parseFloat(destinationLat) : null, destinationLng: destinationLng != null ? parseFloat(destinationLng) : null,
         distanceKm: km, description: description as string,
         invoiceStatus: (invoiceStatus as any) || 'NOT_REQUIRED',
@@ -640,15 +680,26 @@ router.get('/stats', authenticateToken, requireRole('ADMIN'), async (_req: Reque
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+function configShape(s: any) {
+  return {
+    truckBaseFare: s.truckBaseFare, truckPerKm: s.truckPerKm, truckMinFare: s.truckMinFare,
+    truckCommissionMode: s.truckCommissionMode, truckCommissionPercent: s.truckCommissionPercent,
+    truckSubscriptionFee: s.truckSubscriptionFee,
+  };
+}
+
 router.get('/config', authenticateToken, async (_req: Request, res: Response) => {
   try {
-    const s = await getPlatformSettings();
-    res.json({ truckBaseFare: s.truckBaseFare, truckPerKm: s.truckPerKm, truckMinFare: s.truckMinFare, truckCommissionPercent: s.truckCommissionPercent });
+    res.json(configShape(await getPlatformSettings()));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.put('/config', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { truckBaseFare, truckPerKm, truckMinFare, truckCommissionPercent } = req.body;
+  const { truckBaseFare, truckPerKm, truckMinFare, truckCommissionMode, truckCommissionPercent, truckSubscriptionFee } = req.body;
+  if (truckCommissionMode !== undefined && !COMMISSION_MODES.includes(truckCommissionMode)) {
+    res.status(400).json({ error: 'truckCommissionMode must be PERCENTAGE or SUBSCRIPTION' });
+    return;
+  }
   try {
     await getPlatformSettings();
     const s = await prisma.platformSettings.update({
@@ -657,10 +708,12 @@ router.put('/config', authenticateToken, requireRole('ADMIN'), async (req: Reque
         ...(truckBaseFare !== undefined && { truckBaseFare: parseInt(truckBaseFare) }),
         ...(truckPerKm !== undefined && { truckPerKm: parseFloat(truckPerKm) }),
         ...(truckMinFare !== undefined && { truckMinFare: parseInt(truckMinFare) }),
+        ...(truckCommissionMode !== undefined && { truckCommissionMode }),
         ...(truckCommissionPercent !== undefined && { truckCommissionPercent: parseFloat(truckCommissionPercent) }),
+        ...(truckSubscriptionFee !== undefined && { truckSubscriptionFee: parseInt(truckSubscriptionFee) }),
       },
     });
-    res.json({ truckBaseFare: s.truckBaseFare, truckPerKm: s.truckPerKm, truckMinFare: s.truckMinFare, truckCommissionPercent: s.truckCommissionPercent });
+    res.json(configShape(s));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

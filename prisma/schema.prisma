@@ -49,11 +49,13 @@ model PlatformSettings {
   taxiMinFare           Int   @default(150) // DZD floor
   taxiCommissionPercent Float @default(10)  // platform % of each completed ride
   // Truck freight config (editable pricing formula)
-  // price = max(min, round((base + km*perKm) * truckType.priceMultiplier + category.surcharge))
-  truckBaseFare          Int   @default(500)  // DZD base for a freight job
-  truckPerKm             Float @default(60)   // DZD per km
-  truckMinFare           Int   @default(800)  // DZD floor
-  truckCommissionPercent Float @default(12)   // platform % of each completed freight job
+  // price = max(min, round((destinationWilayaPrice + km*perKm) * truckType.priceMultiplier))
+  truckBaseFare          Int            @default(0)   // optional flat add-on (DZD), usually 0
+  truckPerKm             Float          @default(10)  // DZD per km
+  truckMinFare           Int            @default(0)   // DZD floor
+  truckCommissionMode    CommissionMode @default(PERCENTAGE) // % per job OR monthly subscription
+  truckCommissionPercent Float          @default(10)  // platform % of each completed freight job
+  truckSubscriptionFee   Int            @default(0)   // DZD / month when mode = SUBSCRIPTION
   updatedAt         DateTime       @updatedAt
 }
 
@@ -633,6 +635,14 @@ model SubscriptionPayment {
 
 // ─── TRUCK FREIGHT (house moving, towing, construction materials, refrigerated, fuels…) ───
 
+// The 58 Algerian wilayas, each with an admin-editable freight price (DZD).
+// A ride's base price = the destination wilaya's price.
+model TruckWilaya {
+  code  Int    @id     // 1..58
+  name  String
+  price Int    @default(0)
+}
+
 // A kind of truck the admin defines (Flatbed, Refrigerated 10T, Tow truck…)
 model TruckType {
   id              String              @id @default(cuid())
@@ -719,6 +729,7 @@ model TruckOrder {
   pickupLat          Float?
   pickupLng          Float?
   destinationAddress String
+  destinationWilaya  String?    // drives the base price
   destinationLat     Float?
   destinationLng     Float?
   distanceKm         Float?

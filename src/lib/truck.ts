@@ -46,27 +46,44 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 }
 
 // ─── Editable pricing formula ───
-// price = max( truckMinFare, round( (truckBaseFare + km × truckPerKm) × typeMultiplier ) )
-// Levers are admin-editable: base/perKm/min (truck config) and typeMultiplier (per TruckType).
+// price = max( truckMinFare, round( (destinationWilayaPrice + truckBaseFare + km × truckPerKm) × typeMultiplier ) )
+// Example: Alger price 5000, 300 km, 10 DZD/km, base 0, multiplier 1 -> 5000 + 3000 = 8000 DZD.
+// Levers: per-wilaya price (TruckWilaya), perKm/min/base (truck config), typeMultiplier (per TruckType).
 export async function estimateTruckPrice(opts: {
   distanceKm: number | null;
   typeMultiplier?: number | null;
-}): Promise<{ estimatedPrice: number; base: number; perKm: number; minFare: number }> {
+  wilayaPrice?: number | null;
+}): Promise<{ estimatedPrice: number; base: number; perKm: number; minFare: number; wilayaPrice: number }> {
   const s = await getPlatformSettings();
   const base = s.truckBaseFare;
   const perKm = s.truckPerKm;
   const minFare = s.truckMinFare;
+  const wilayaPrice = opts.wilayaPrice ?? 0;
   const multiplier = opts.typeMultiplier ?? 1;
-  const raw = (base + (opts.distanceKm ?? 0) * perKm) * multiplier;
+  const raw = (wilayaPrice + base + (opts.distanceKm ?? 0) * perKm) * multiplier;
   const estimatedPrice = Math.max(minFare, Math.round(raw / 10) * 10);
-  return { estimatedPrice, base, perKm, minFare };
+  return { estimatedPrice, base, perKm, minFare, wilayaPrice };
 }
 
-export async function computeTruckCommission(price: number): Promise<{ percent: number; commissionAmount: number; driverEarnings: number }> {
+// Look up a wilaya's configured freight price by its name (used at order time).
+export async function wilayaPriceByName(name: string | null | undefined): Promise<number> {
+  if (!name) return 0;
+  const w = await prisma.truckWilaya.findFirst({ where: { name } });
+  return w?.price ?? 0;
+}
+
+// Commission at completion: PERCENTAGE takes a cut per job; SUBSCRIPTION means the
+// driver keeps 100% (they pay a fixed monthly fee to the platform instead).
+export async function computeTruckCommission(price: number): Promise<{
+  mode: string; percent: number; commissionAmount: number; driverEarnings: number;
+}> {
   const s = await getPlatformSettings();
+  if (s.truckCommissionMode === 'SUBSCRIPTION') {
+    return { mode: 'SUBSCRIPTION', percent: 0, commissionAmount: 0, driverEarnings: price };
+  }
   const percent = s.truckCommissionPercent;
   const commissionAmount = Math.round((price * percent) / 100);
-  return { percent, commissionAmount, driverEarnings: price - commissionAmount };
+  return { mode: 'PERCENTAGE', percent, commissionAmount, driverEarnings: price - commissionAmount };
 }
 
 // Next TRK-#### truck code

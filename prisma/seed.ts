@@ -1,6 +1,7 @@
 import prisma from '../src/lib/prisma';
 import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { ALGERIA_WILAYAS } from '../src/lib/wilayas';
 
 async function main() {
   console.log('Clearing database...');
@@ -10,6 +11,7 @@ async function main() {
   await prisma.truck.deleteMany();
   await prisma.truckCategory.deleteMany();
   await prisma.truckType.deleteMany();
+  await prisma.truckWilaya.deleteMany();
   // Promo codes
   await prisma.promoRedemption.deleteMany();
   await prisma.promoCode.deleteMany();
@@ -888,6 +890,16 @@ async function main() {
   // ────────────────────────────────────────────
   console.log('Seeding truck types, categories, trucks, orders...');
 
+  // 58 wilayas, each with an editable freight price. Demo defaults (admin edits later).
+  await prisma.truckWilaya.createMany({
+    data: ALGERIA_WILAYAS.map(w => ({
+      code: w.code,
+      name: w.name,
+      // Sétif (home) cheap, Alger 5000 to match the example, others a modest default
+      price: w.code === 19 ? 500 : w.code === 16 ? 5000 : 2000,
+    })),
+  });
+
   // Truck types (with price multipliers — heavier/specialized = pricier)
   const truckTypesData = [
     { name: 'Small Van', capacityLabel: 'up to 1 ton', priceMultiplier: 1.0, description: 'Light parcels and small moves' },
@@ -962,13 +974,17 @@ async function main() {
     desc: string; invoice: 'HAS_INVOICE' | 'NO_INVOICE' | 'NOT_REQUIRED'; status: string; truckIdx?: number; scheduled?: string;
   }) => {
     const mult = truckTypesData.find(t => t.name === o.type)!.priceMultiplier;
-    const price = Math.max(800, Math.round(((500 + o.km * 60) * mult) / 10) * 10);
+    // New formula: (destination wilaya price + km × per-km) × type multiplier. Demo destinations are Sétif (500).
+    const wilayaPrice = 500;
+    const perKm = 10;
+    const price = Math.max(0, Math.round(((wilayaPrice + o.km * perKm) * mult) / 10) * 10);
     const done = o.status === 'delivered';
     return prisma.truckOrder.create({
       data: {
         orderNumber: tNum(), clientName: o.client, clientPhone: o.phone,
         categoryId: truckCategoryIds[o.category], truckTypeId: truckTypeIds[o.type],
-        pickupAddress: o.from, pickupWilaya: 'Sétif', pickupCommune: 'Sétif', destinationAddress: o.to, distanceKm: o.km,
+        pickupAddress: o.from, pickupWilaya: 'Sétif', pickupCommune: 'Sétif',
+        destinationAddress: o.to, destinationWilaya: 'Sétif', distanceKm: o.km,
         description: o.desc, invoiceStatus: o.invoice,
         scheduledType: o.scheduled ? 'scheduled' : 'now', scheduledDate: o.scheduled ?? null,
         estimatedPrice: price, agreedPrice: price, status: o.status,
@@ -976,7 +992,7 @@ async function main() {
         ...(o.truckIdx != null && { acceptedAt: new Date(Date.now() - 3600e3) }),
         ...(done && {
           deliveredAt: new Date(Date.now() - 1800e3),
-          commissionPercentSnapshot: 12, commissionAmount: Math.round(price * 0.12), driverEarnings: price - Math.round(price * 0.12),
+          commissionPercentSnapshot: 10, commissionAmount: Math.round(price * 0.10), driverEarnings: price - Math.round(price * 0.10),
         }),
       },
     });
