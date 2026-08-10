@@ -71,7 +71,7 @@ interface TruckOrder {
   category?: { id: string; name: string } | null;
   truckType?: { id: string; name: string; priceMultiplier: number; capacityLabel?: string | null } | null;
   pickupAddress: string; pickupWilaya?: string | null; pickupCommune?: string | null;
-  destinationAddress: string; distanceKm?: number | null;
+  destinationAddress: string; destinationWilaya?: string | null; distanceKm?: number | null;
   description: string; invoiceStatus: string; scheduledType: string; scheduledDate?: string | null;
   estimatedPrice?: number | null; promoDiscount?: number | null; agreedPrice?: number | null;
   commissionPercentSnapshot?: number | null; commissionAmount?: number | null; driverEarnings?: number | null;
@@ -86,7 +86,11 @@ interface TruckStats {
   grossRevenue: number; commissionRevenue: number; driverPayouts: number;
   trucksTotal: number; trucksAvailable: number; trucksBusy: number; categories: number; types: number;
 }
-interface TruckConfig { truckBaseFare: number; truckPerKm: number; truckMinFare: number; truckCommissionPercent: number; }
+interface TruckConfig {
+  truckBaseFare: number; truckPerKm: number; truckMinFare: number;
+  truckCommissionMode: "PERCENTAGE" | "SUBSCRIPTION"; truckCommissionPercent: number; truckSubscriptionFee: number;
+}
+interface TruckWilaya { code: number; name: string; price: number; }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   requested: { label: "Requested", cls: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -119,6 +123,7 @@ export default function TruckDashboard({ activePage }: { activePage: string }) {
   const [types, setTypes] = useState<TruckType[]>([]);
   const [trucks, setTrucks] = useState<TruckVehicle[]>([]);
   const [config, setConfig] = useState<TruckConfig | null>(null);
+  const [wilayas, setWilayas] = useState<TruckWilaya[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 4000); };
@@ -126,13 +131,14 @@ export default function TruckDashboard({ activePage }: { activePage: string }) {
   const fetchAll = useCallback(async () => {
     try {
       const h = { headers: auth() };
-      const [rS, rO, rC, rT, rTr, rCfg] = await Promise.all([
+      const [rS, rO, rC, rT, rTr, rCfg, rW] = await Promise.all([
         fetch(`${API_URL}/api/truck/stats`, h),
         fetch(`${API_URL}/api/truck/orders`, h),
         fetch(`${API_URL}/api/truck/categories`, h),
         fetch(`${API_URL}/api/truck/types`, h),
         fetch(`${API_URL}/api/truck/trucks`, h),
         fetch(`${API_URL}/api/truck/config`, h),
+        fetch(`${API_URL}/api/truck/wilayas`, h),
       ]);
       if (rS.ok) setStats(await rS.json());
       if (rO.ok) setOrders(await rO.json());
@@ -140,6 +146,7 @@ export default function TruckDashboard({ activePage }: { activePage: string }) {
       if (rT.ok) setTypes(await rT.json());
       if (rTr.ok) setTrucks(await rTr.json());
       if (rCfg.ok) setConfig(await rCfg.json());
+      if (rW.ok) setWilayas(await rW.json());
     } catch (err) { console.error("Truck fetch error:", err); }
   }, [auth]);
 
@@ -163,11 +170,13 @@ export default function TruckDashboard({ activePage }: { activePage: string }) {
   };
 
   const view = () => {
-    if (activePage === "orders") return <OrdersPage orders={orders} categories={categories} types={types} trucks={trucks} config={config} post={post} showToast={showToast} />;
+    if (activePage === "orders") return <OrdersPage orders={orders} categories={categories} types={types} trucks={trucks} config={config} wilayas={wilayas} post={post} showToast={showToast} />;
     if (activePage === "categories") return <CategoriesPage categories={categories} types={types} onSave={(f, id) => (id ? put(`/api/truck/categories/${id}`, f) : post(`/api/truck/categories`, f))} onDelete={(id) => del(`/api/truck/categories/${id}`)} showToast={showToast} />;
     if (activePage === "types") return <TypesPage types={types} onSave={(f, id) => (id ? put(`/api/truck/types/${id}`, f) : post(`/api/truck/types`, f))} onDelete={(id) => del(`/api/truck/types/${id}`)} />;
     if (activePage === "trucks") return <TrucksPage trucks={trucks} types={types} onCreate={(f) => post(`/api/truck/trucks`, f)} onUpdate={(id, f) => put(`/api/truck/trucks/${id}`, f)} onSetStatus={async (id, status) => { const r = await fetch(`${API_URL}/api/truck/trucks/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ status }) }); if (r.ok) { fetchAll(); showToast(`Truck ${status} ✓`); } }} onDelete={(id) => del(`/api/truck/trucks/${id}`)} />;
-    if (activePage === "pricing") return <PricingPage stats={stats} trucks={trucks} orders={orders} config={config} onSave={async (c) => { const r = await put(`/api/truck/config`, c); if (r) showToast("Pricing saved ✓"); }} />;
+    if (activePage === "pricing") return <PricingPage stats={stats} trucks={trucks} orders={orders} config={config} wilayas={wilayas}
+      onSave={async (c) => { const r = await put(`/api/truck/config`, c); if (r) showToast("Pricing saved ✓"); }}
+      onSaveWilayas={async (prices) => { const r = await put(`/api/truck/wilayas`, { prices }); if (r) { setWilayas(r); showToast("Wilaya prices saved ✓"); } }} />;
     return <OverviewPage stats={stats} orders={orders} />;
   };
 
@@ -237,8 +246,9 @@ function OverviewPage({ stats, orders }: { stats: TruckStats | null; orders: Tru
 
 // ══════════════════ ORDERS ══════════════════
 
-function OrdersPage({ orders, categories, types, trucks, config, post, showToast }: {
+function OrdersPage({ orders, categories, types, trucks, config, wilayas, post, showToast }: {
   orders: TruckOrder[]; categories: TruckCategory[]; types: TruckType[]; trucks: TruckVehicle[]; config: TruckConfig | null;
+  wilayas: TruckWilaya[];
   post: (path: string, body?: object) => Promise<any>; showToast: (m: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState("all");
@@ -304,7 +314,7 @@ function OrdersPage({ orders, categories, types, trucks, config, post, showToast
       </div>
 
       {selected && <OrderDrawer order={selected} trucks={trucks} onClose={() => setSelected(null)} onAction={async (id, action, body, label) => { const r = await post(`/api/truck/orders/${id}/${action}`, body); if (r) showToast(label || "Done ✓"); }} />}
-      {showNew && <NewOrderModal categories={categories} types={types} config={config} onClose={() => setShowNew(false)} onSubmit={async (fields) => { const r = await post(`/api/truck/orders`, fields); if (r) { setShowNew(false); showToast("🚚 Freight order created!"); } }} />}
+      {showNew && <NewOrderModal categories={categories} types={types} config={config} wilayas={wilayas} onClose={() => setShowNew(false)} onSubmit={async (fields) => { const r = await post(`/api/truck/orders`, fields); if (r) { setShowNew(false); showToast("🚚 Freight order created!"); } }} />}
     </div>
   );
 }
@@ -349,7 +359,7 @@ function OrderDrawer({ order, trucks, onClose, onAction }: {
         {/* Route */}
         <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-2">
           <p className="text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5"><MapPin size={12} className="text-emerald-500 mt-0.5 shrink-0" /> {order.pickupAddress}{order.pickupCommune && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-slate-500 rounded-lg border border-slate-100 ml-1">{order.pickupCommune}</span>}</p>
-          <p className="text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5"><Navigation size={12} className="text-rose-500 mt-0.5 shrink-0" /> {order.destinationAddress}</p>
+          <p className="text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5"><Navigation size={12} className="text-rose-500 mt-0.5 shrink-0" /> {order.destinationAddress}{order.destinationWilaya && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-rose-600 rounded-lg border border-slate-100 ml-1">{order.destinationWilaya}</span>}</p>
           {order.distanceKm != null && <p className="text-[10px] font-black text-slate-400 uppercase">Distance: {order.distanceKm} km</p>}
         </div>
 
@@ -451,8 +461,8 @@ function OrderDrawer({ order, trucks, onClose, onAction }: {
 }
 
 // New freight order modal — the full client flow
-function NewOrderModal({ categories, types, config, onClose, onSubmit }: {
-  categories: TruckCategory[]; types: TruckType[]; config: TruckConfig | null;
+function NewOrderModal({ categories, types, config, wilayas, onClose, onSubmit }: {
+  categories: TruckCategory[]; types: TruckType[]; config: TruckConfig | null; wilayas: TruckWilaya[];
   onClose: () => void; onSubmit: (fields: object) => void;
 }) {
   const [clientName, setClientName] = useState("");
@@ -461,8 +471,8 @@ function NewOrderModal({ categories, types, config, onClose, onSubmit }: {
   const [truckTypeId, setTruckTypeId] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [pickupWilaya, setPickupWilaya] = useState(DEFAULT_WILAYA);
-  const [pickupCommune, setPickupCommune] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [destinationWilaya, setDestinationWilaya] = useState("");
   const [km, setKm] = useState("");
   const [description, setDescription] = useState("");
   const [invoiceStatus, setInvoiceStatus] = useState("NOT_REQUIRED");
@@ -474,21 +484,22 @@ function NewOrderModal({ categories, types, config, onClose, onSubmit }: {
   // Truck types allowed in the chosen category
   const selectedCat = categories.find(c => c.id === categoryId);
   const allowedTypes = selectedCat?.truckTypes ?? [];
+  const destPrice = wilayas.find(w => w.name === destinationWilaya)?.price ?? null;
 
   // Live price quote whenever inputs change
   useEffect(() => {
-    if (!categoryId) { setQuote(null); return; }
+    if (!categoryId || !destinationWilaya) { setQuote(null); return; }
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`${API_URL}/api/truck/quote`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ categoryId, truckTypeId: truckTypeId || undefined, distanceKm: km ? parseFloat(km) : undefined }),
+          body: JSON.stringify({ truckTypeId: truckTypeId || undefined, destinationWilaya, distanceKm: km ? parseFloat(km) : undefined }),
         });
         if (res.ok) { const d = await res.json(); setQuote(d.estimatedPrice); }
       } catch { /* ignore */ }
     }, 300);
     return () => clearTimeout(t);
-  }, [categoryId, truckTypeId, km]);
+  }, [categoryId, truckTypeId, km, destinationWilaya]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
@@ -518,21 +529,25 @@ function NewOrderModal({ categories, types, config, onClose, onSubmit }: {
             </select></div>
         </div>
 
-        {/* Positions */}
-        <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1"><MapPin size={10} className="text-emerald-500" /> Pickup (your position) *</label>
-          <input value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} placeholder="e.g. Cité El Hidhab, Sétif" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
+        {/* Pickup */}
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Wilaya</label>
-            <select value={pickupWilaya} onChange={e => { setPickupWilaya(e.target.value); setPickupCommune(""); }} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
-              {Object.keys(WILAYAS).map(w => <option key={w} value={w}>{w}</option>)}</select></div>
-          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Commune</label>
-            <select value={pickupCommune} onChange={e => setPickupCommune(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
-              <option value="">— Select —</option>{(WILAYAS[pickupWilaya] || []).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1"><MapPin size={10} className="text-emerald-500" /> Pickup Wilaya *</label>
+            <select value={pickupWilaya} onChange={e => setPickupWilaya(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
+              {wilayas.map(w => <option key={w.code} value={w.name}>{w.code}. {w.name}</option>)}</select></div>
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Pickup Address</label>
+            <input value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} placeholder="e.g. Cité El Hidhab" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         </div>
-        <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1"><Navigation size={10} className="text-rose-500" /> Destination (next move) *</label>
-          <input value={destinationAddress} onChange={e => setDestinationAddress(e.target.value)} placeholder="e.g. Zone industrielle, El Eulma" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
+        {/* Destination — its wilaya drives the base price */}
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2 flex items-center gap-1"><Navigation size={10} className="text-rose-500" /> Destination Wilaya *</label>
+            <select value={destinationWilaya} onChange={e => setDestinationWilaya(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
+              <option value="">Choose…</option>
+              {wilayas.map(w => <option key={w.code} value={w.name}>{w.code}. {w.name} — {w.price.toLocaleString()} DZD</option>)}</select></div>
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Destination Address</label>
+            <input value={destinationAddress} onChange={e => setDestinationAddress(e.target.value)} placeholder="e.g. Zone industrielle" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
+        </div>
         <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Distance (km)</label>
-          <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="e.g. 27" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
+          <input type="number" value={km} onChange={e => setKm(e.target.value)} placeholder="e.g. 300" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
 
         {/* Description */}
         <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Cargo Description *</label>
@@ -570,17 +585,17 @@ function NewOrderModal({ categories, types, config, onClose, onSubmit }: {
 
         {quote !== null && (
           <p className="text-[11px] font-bold text-slate-600 font-inter bg-teal-50 border border-teal-100 rounded-xl px-4 py-3">
-            📐 Calculated price: <strong className="text-teal-700">{quote.toLocaleString()} DZD</strong>
-            {promoCode && <span className="text-emerald-700"> — promo discount applied automatically</span>}
+            📐 {destinationWilaya} price <strong>{(destPrice ?? 0).toLocaleString()}</strong> + {km || 0} km × {config?.truckPerKm ?? 10} = calculated price: <strong className="text-teal-700">{quote.toLocaleString()} DZD</strong>
+            {promoCode && <span className="text-emerald-700"> — promo applied automatically</span>}
           </p>
         )}
 
         <button
           onClick={() => {
-            if (!clientName || !clientPhone || !categoryId || !pickupAddress || !destinationAddress || !description) { alert("Please fill all required fields."); return; }
+            if (!clientName || !clientPhone || !categoryId || !destinationWilaya || !destinationAddress || !description) { alert("Please fill all required fields (including destination wilaya)."); return; }
             onSubmit({
               clientName, clientPhone, categoryId, ...(truckTypeId && { truckTypeId }),
-              pickupAddress, pickupWilaya, pickupCommune, destinationAddress,
+              pickupAddress, pickupWilaya, destinationAddress, destinationWilaya,
               ...(km && { distanceKm: parseFloat(km) }),
               description, invoiceStatus, scheduledType, ...(scheduledType === "scheduled" && { scheduledDate }),
               ...(promoCode && { promoCode }),
@@ -845,20 +860,33 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
 
 // ══════════════════ PRICING & EARNINGS ══════════════════
 
-function PricingPage({ stats, trucks, orders, config, onSave }: {
-  stats: TruckStats | null; trucks: TruckVehicle[]; orders: TruckOrder[]; config: TruckConfig | null;
+function PricingPage({ stats, trucks, orders, config, wilayas, onSave, onSaveWilayas }: {
+  stats: TruckStats | null; trucks: TruckVehicle[]; orders: TruckOrder[]; config: TruckConfig | null; wilayas: TruckWilaya[];
   onSave: (c: TruckConfig) => void;
+  onSaveWilayas: (prices: Record<number, number>) => void;
 }) {
-  const [base, setBase] = useState("");
   const [perKm, setPerKm] = useState("");
   const [minFare, setMinFare] = useState("");
+  const [commissionMode, setCommissionMode] = useState<"PERCENTAGE" | "SUBSCRIPTION">("PERCENTAGE");
   const [commission, setCommission] = useState("");
-  useEffect(() => { if (config) { setBase(String(config.truckBaseFare)); setPerKm(String(config.truckPerKm)); setMinFare(String(config.truckMinFare)); setCommission(String(config.truckCommissionPercent)); } }, [config]);
+  const [subscriptionFee, setSubscriptionFee] = useState("");
+  const [wPrices, setWPrices] = useState<Record<number, string>>({});
+  const [wSearch, setWSearch] = useState("");
 
-  // example: 20 km, ×1.6 flatbed
-  const exKm = 20, exMult = 1.6;
-  const exPrice = Math.max(parseInt(minFare || "0") || 0, Math.round((((parseInt(base || "0") || 0) + exKm * (parseFloat(perKm || "0") || 0)) * exMult) / 10) * 10);
-  const exCom = Math.round((exPrice * (parseFloat(commission || "0") || 0)) / 100);
+  useEffect(() => {
+    if (config) {
+      setPerKm(String(config.truckPerKm)); setMinFare(String(config.truckMinFare));
+      setCommissionMode(config.truckCommissionMode); setCommission(String(config.truckCommissionPercent));
+      setSubscriptionFee(String(config.truckSubscriptionFee));
+    }
+  }, [config]);
+  useEffect(() => {
+    if (wilayas.length) setWPrices(Object.fromEntries(wilayas.map(w => [w.code, String(w.price)])));
+  }, [wilayas]);
+
+  // Live example: to Alger (5000) over 300 km
+  const exWilaya = 5000, exKm = 300;
+  const exPrice = Math.max(parseInt(minFare || "0") || 0, Math.round(((exWilaya + exKm * (parseFloat(perKm || "0") || 0))) / 10) * 10);
 
   // per-truck payouts from completed orders
   const payoutByTruck = new Map<string, { name: string; code: string; jobs: number; gross: number; commission: number; net: number }>();
@@ -869,16 +897,17 @@ function PricingPage({ stats, trucks, orders, config, onSave }: {
     payoutByTruck.set(key, cur);
   }
   const payouts = [...payoutByTruck.values()].sort((a, b) => b.gross - a.gross);
+  const filteredWilayas = wilayas.filter(w => !wSearch || w.name.toLowerCase().includes(wSearch.toLowerCase()) || String(w.code) === wSearch);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto animate-fadeIn pb-16 text-left">
       <div className="space-y-2"><h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Truck Pricing & Earnings</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">The editable freight pricing formula and what each truck earns</p></div>
+        <p className="text-sm text-slate-400 font-medium font-inter">Set the per-km rate, the price of each wilaya, and how the platform earns</p></div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           { label: "Gross Revenue", value: dzd(stats?.grossRevenue), sub: `${stats?.completedOrders ?? 0} delivered`, cls: "text-slate-800" },
-          { label: `Commission (${config?.truckCommissionPercent ?? 12}%)`, value: dzd(stats?.commissionRevenue), sub: "Platform earnings", cls: "text-emerald-600" },
+          { label: "Commission Revenue", value: dzd(stats?.commissionRevenue), sub: "Platform earnings", cls: "text-emerald-600" },
           { label: "Driver Payouts", value: dzd(stats?.driverPayouts), sub: "What drivers kept", cls: "text-blue-600" },
           { label: "Cancelled", value: String(stats?.cancelledOrders ?? 0), sub: "Lost jobs", cls: "text-rose-600" },
         ].map(t => (
@@ -890,22 +919,76 @@ function PricingPage({ stats, trucks, orders, config, onSave }: {
         ))}
       </div>
 
+      {/* Formula + commission */}
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center"><Percent size={20} /></div>
           <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Freight Pricing Formula</h3>
-            <p className="text-xs text-slate-400 font-bold font-inter">price = max(min, (base + km × per-km) × truck-type multiplier)</p></div>
+            <p className="text-xs text-slate-400 font-bold font-inter">price = (destination wilaya price + km × per-km) × truck-type multiplier</p></div>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[{ label: "Base Fare (DZD)", value: base, set: setBase }, { label: "Per Km (DZD)", value: perKm, set: setPerKm }, { label: "Minimum (DZD)", value: minFare, set: setMinFare }, { label: "Commission (%)", value: commission, set: setCommission }].map(f => (
-            <div key={f.label}><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">{f.label}</label>
-              <input type="number" value={f.value} onChange={e => f.set(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-teal-500/10" /></div>
-          ))}
+
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Price per 1 km (DZD)</label>
+            <input type="number" value={perKm} onChange={e => setPerKm(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-teal-500/10" /></div>
+          <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Minimum price (DZD)</label>
+            <input type="number" value={minFare} onChange={e => setMinFare(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:ring-4 focus:ring-teal-500/10" /></div>
         </div>
+
+        {/* Commission: % or monthly subscription */}
+        <div className="space-y-3">
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">How does the platform earn?</label>
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            <button onClick={() => setCommissionMode("PERCENTAGE")} className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${commissionMode === "PERCENTAGE" ? "border-emerald-500 bg-emerald-50/50" : "border-slate-100 bg-slate-50/50"}`}>
+              <p className="text-xs font-black uppercase text-slate-800">Percentage</p><p className="text-[10px] font-bold text-slate-400 font-inter">a % of each job</p></button>
+            <button onClick={() => setCommissionMode("SUBSCRIPTION")} className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${commissionMode === "SUBSCRIPTION" ? "border-violet-500 bg-violet-50/50" : "border-slate-100 bg-slate-50/50"}`}>
+              <p className="text-xs font-black uppercase text-slate-800">Subscription</p><p className="text-[10px] font-bold text-slate-400 font-inter">fixed monthly fee</p></button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 max-w-md">
+            <div className={commissionMode === "PERCENTAGE" ? "" : "opacity-40"}>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Commission %</label>
+              <input type="number" value={commission} onChange={e => setCommission(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white" /></div>
+            <div className={commissionMode === "SUBSCRIPTION" ? "" : "opacity-40"}>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Monthly fee (DZD)</label>
+              <input type="number" value={subscriptionFee} onChange={e => setSubscriptionFee(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white" /></div>
+          </div>
+        </div>
+
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-teal-50/60 border border-teal-100 rounded-2xl p-4">
-          <p className="text-[11px] font-bold text-slate-600 font-inter">📐 Example — 20 km with a Flatbed 5T (×1.6): client pays <strong className="text-teal-700">{exPrice.toLocaleString()} DZD</strong>, platform takes <strong className="text-emerald-700">{exCom.toLocaleString()} DZD</strong>, driver keeps <strong className="text-blue-700">{(exPrice - exCom).toLocaleString()} DZD</strong></p>
-          <button onClick={() => onSave({ truckBaseFare: parseInt(base) || 0, truckPerKm: parseFloat(perKm) || 0, truckMinFare: parseInt(minFare) || 0, truckCommissionPercent: parseFloat(commission) || 0 })}
-            className="px-8 py-3.5 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-600/20 cursor-pointer flex items-center gap-2 shrink-0"><Check size={14} /> Save Formula</button>
+          <p className="text-[11px] font-bold text-slate-600 font-inter">📐 Example — to <strong>Alger</strong> (5,000 DZD) over 300 km at {perKm || 0} DZD/km: client pays <strong className="text-teal-700">{exPrice.toLocaleString()} DZD</strong> {commissionMode === "PERCENTAGE" ? <>— platform takes {commission || 0}% = <strong className="text-emerald-700">{Math.round((exPrice * (parseFloat(commission || "0") || 0)) / 100).toLocaleString()} DZD</strong></> : <>— driver keeps 100%, pays <strong className="text-violet-700">{(parseInt(subscriptionFee || "0") || 0).toLocaleString()} DZD/month</strong></>}</p>
+          <button onClick={() => onSave({
+              truckBaseFare: config?.truckBaseFare ?? 0, truckPerKm: parseFloat(perKm) || 0, truckMinFare: parseInt(minFare) || 0,
+              truckCommissionMode: commissionMode, truckCommissionPercent: parseFloat(commission) || 0, truckSubscriptionFee: parseInt(subscriptionFee) || 0,
+            })}
+            className="px-8 py-3.5 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-600/20 cursor-pointer flex items-center gap-2 shrink-0"><Check size={14} /> Save</button>
+        </div>
+      </div>
+
+      {/* 58 wilaya prices */}
+      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div><h3 className="text-sm font-black uppercase tracking-tight text-slate-800">Wilaya Prices ({wilayas.length})</h3>
+            <p className="text-xs text-slate-400 font-bold font-inter">The base price for a freight going to each wilaya</p></div>
+          <div className="flex gap-2">
+            <input value={wSearch} onChange={e => setWSearch(e.target.value)} placeholder="Search wilaya…" className="px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none w-44 font-inter" />
+            <button onClick={() => {
+                const prices: Record<number, number> = {};
+                for (const [code, v] of Object.entries(wPrices)) prices[parseInt(code)] = parseInt(v) || 0;
+                onSaveWilayas(prices);
+              }}
+              className="px-6 py-2.5 bg-teal-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-600/20 cursor-pointer flex items-center gap-2"><Check size={13} /> Save Prices</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {filteredWilayas.map(w => (
+            <div key={w.code} className="bg-slate-50/70 border border-slate-100 rounded-2xl p-3">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-wide block mb-1.5 truncate">{w.code}. {w.name}</label>
+              <div className="flex items-center gap-1.5">
+                <input type="number" value={wPrices[w.code] ?? ""} onChange={e => setWPrices(p => ({ ...p, [w.code]: e.target.value }))}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black outline-none focus:ring-2 focus:ring-teal-500/20" />
+                <span className="text-[9px] font-black text-slate-400">DZD</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
