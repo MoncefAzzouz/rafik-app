@@ -1030,7 +1030,7 @@ function AddTaxiDriverModal({ onClose, onSubmit }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full space-y-5 relative m-4 text-left">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-5 relative m-4 text-left">
         <button onClick={onClose} className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"><X size={18} /></button>
         <div className="space-y-1">
           <h2 className="text-xl font-black text-slate-800 uppercase">Add Taxi Driver</h2>

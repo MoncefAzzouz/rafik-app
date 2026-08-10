@@ -2274,7 +2274,7 @@ function EarningsPage() {
       {/* Record Subscription Payment modal */}
       {payWorker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-sm w-full space-y-5 relative m-4">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto space-y-5 relative m-4">
             <button
               onClick={() => setPayWorker(null)}
               className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
@@ -2858,7 +2858,7 @@ function AddCategoryModal({ onClose, onSubmit }: AddCategoryModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full relative m-4">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto relative m-4">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"
@@ -2996,7 +2996,7 @@ function EditCategoryModal({ category, categories, onClose, onSubmit }: EditCate
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full relative m-4">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto relative m-4">
         <button
           onClick={onClose}
           className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 hover:text-slate-800 cursor-pointer"

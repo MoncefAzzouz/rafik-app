@@ -166,7 +166,19 @@ export default function TruckDashboard({ activePage }: { activePage: string }) {
   };
   const del = async (path: string) => {
     const res = await fetch(`${API_URL}${path}`, { method: "DELETE", headers: auth() });
-    if (res.ok) { fetchAll(); showToast("Deleted ✓"); } else { const d = await res.json().catch(() => ({})); showToast(`⚠ ${d.error || "Failed"}`); }
+    if (res.ok) { fetchAll(); showToast("Deleted ✓"); return; }
+    const d = await res.json().catch(() => ({}));
+    // Category still has freight orders — ask before wiping those too.
+    if (res.status === 409 && d.error === "category_has_orders") {
+      const n = d.orderCount ?? 0;
+      const ok = window.confirm(`This category has ${n} freight order${n === 1 ? "" : "s"}. Deleting it will permanently remove ${n === 1 ? "that order" : "those orders"} too. Continue?`);
+      if (!ok) return;
+      const sep = path.includes("?") ? "&" : "?";
+      const res2 = await fetch(`${API_URL}${path}${sep}force=true`, { method: "DELETE", headers: auth() });
+      if (res2.ok) { fetchAll(); showToast("Deleted ✓"); } else { const d2 = await res2.json().catch(() => ({})); showToast(`⚠ ${d2.error || "Failed"}`); }
+      return;
+    }
+    showToast(`⚠ ${d.error || "Failed"}`);
   };
 
   const view = () => {
@@ -739,7 +751,7 @@ function TypeModal({ type, onClose, onSave }: { type: TruckType | null; onClose:
   const [isActive, setIsActive] = useState(type?.isActive ?? true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full space-y-5 relative text-left">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-5 relative text-left">
         <button onClick={onClose} className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 cursor-pointer"><X size={18} /></button>
         <h2 className="text-xl font-black text-slate-800 uppercase">{type ? "Edit Truck Type" : "New Truck Type"}</h2>
         <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Name *</label>
@@ -827,7 +839,7 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
   const [isVerified, setIsVerified] = useState(truck?.isVerified ?? true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full space-y-5 relative text-left">
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-5 relative text-left">
         <button onClick={onClose} className="absolute top-6 right-6 w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 cursor-pointer"><X size={18} /></button>
         <h2 className="text-xl font-black text-slate-800 uppercase">{editMode ? `Edit ${truck!.truckCode}` : "Add Truck"}</h2>
         <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Driver Name *</label>
