@@ -7,8 +7,46 @@ import { useAuth } from "@/context/AuthContext";
 import {
   Truck, Package, DollarSign, CheckCircle2, XCircle, Plus, X, MapPin, Navigation, Check,
   RefreshCw, ClipboardList, FolderKanban, Percent, FileText, Calendar, HandCoins, Ban,
-  Shield, Trash2, Edit2, Layers, Loader2,
+  Shield, Trash2, Edit2, Layers, Loader2, ImagePlus,
 } from "lucide-react";
+
+// Reusable image picker: uploads to the backend (which stores it in R2) and returns the URL.
+function ImageUploadField({ label, value, onChange }: { label: string; value: string; onChange: (url: string) => void }) {
+  const { token } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const preview = value ? (value.startsWith("/uploads") ? `${API_URL}${value}` : value) : "";
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API_URL}/api/upload?type=categories`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form,
+      });
+      if (res.ok) { const d = await res.json(); onChange(d.url); }
+      else alert("Upload failed (images only, max 5MB)");
+    } catch (e) { console.error(e); alert("Upload failed"); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div>
+      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">{label}</label>
+      <div className="flex items-center gap-3">
+        <label className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 hover:border-teal-300 bg-slate-50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0 transition-colors">
+          {preview
+            ? <img src={preview} alt="preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            : <ImagePlus size={22} className="text-slate-300" />}
+          <input type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+        </label>
+        <div className="text-[10px] font-bold text-slate-400 font-inter">
+          {uploading ? <span className="text-teal-600 animate-pulse">Uploading…</span> : (preview ? "Click the image to change it" : "Click to upload a picture")}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ══════════════════ TYPES ══════════════════
 
@@ -18,12 +56,12 @@ interface TruckType {
   _count?: { trucks: number };
 }
 interface TruckCategory {
-  id: string; name: string; description?: string | null; isActive: boolean;
+  id: string; name: string; description?: string | null; isActive: boolean; image?: string | null;
   truckTypes?: TruckType[]; _count?: { orders: number };
 }
 interface TruckVehicle {
   id: string; truckCode: string; driverName: string; phone: string; plate?: string | null;
-  truckTypeId?: string | null; truckType?: { name: string } | null;
+  truckTypeId?: string | null; truckType?: { name: string } | null; profileImage?: string | null;
   status: string; isVerified: boolean; isActive: boolean; rating: number; totalTrips: number;
   wilaya?: string | null; commune?: string | null;
 }
@@ -575,7 +613,9 @@ function CategoriesPage({ categories, types, onSave, onDelete, showToast }: {
           <div key={c.id} className={`bg-white border rounded-[2rem] p-6 shadow-sm ${c.isActive ? "border-slate-100" : "border-slate-100 opacity-60"}`}>
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center"><FolderKanban size={18} /></div>
+                {c.image
+                  ? <img src={c.image.startsWith("/uploads") ? `${API_URL}${c.image}` : c.image} alt={c.name} className="w-11 h-11 rounded-2xl object-cover border border-slate-100" />
+                  : <div className="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center"><FolderKanban size={18} /></div>}
                 <div><p className="text-sm font-black text-slate-800 uppercase tracking-tight">{c.name}</p><p className="text-[10px] font-bold text-slate-400 font-inter">{c.description || "—"}</p></div>
               </div>
               <div className="flex gap-1.5">
@@ -600,6 +640,7 @@ function CategoryModal({ category, types, onClose, onSave }: {
 }) {
   const [name, setName] = useState(category?.name ?? "");
   const [description, setDescription] = useState(category?.description ?? "");
+  const [image, setImage] = useState(category?.image ?? "");
   const [isActive, setIsActive] = useState(category?.isActive ?? true);
   const [selectedTypes, setSelectedTypes] = useState<string[]>((category?.truckTypes ?? []).map(t => t.id));
   const toggle = (id: string) => setSelectedTypes(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
@@ -613,6 +654,7 @@ function CategoryModal({ category, types, onClose, onSave }: {
           <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. House Moving" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Description</label>
           <input value={description ?? ""} onChange={e => setDescription(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
+        <ImageUploadField label="Category Picture" value={image} onChange={setImage} />
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-[10px] font-black text-slate-600 uppercase">Active</span></label>
         <div>
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Allowed Truck Types (select which can serve this category)</label>
@@ -624,7 +666,7 @@ function CategoryModal({ category, types, onClose, onSave }: {
             ))}
           </div>
         </div>
-        <button onClick={() => { if (!name) { alert("Name required"); return; } onSave({ name, description, isActive, truckTypeIds: selectedTypes }); }}
+        <button onClick={() => { if (!name) { alert("Name required"); return; } onSave({ name, description, image, isActive, truckTypeIds: selectedTypes }); }}
           className="w-full py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-2"><Check size={14} /> {category ? "Save" : "Create"}</button>
       </div>
     </div>
@@ -649,7 +691,9 @@ function TypesPage({ types, onSave, onDelete }: {
         {types.map(t => (
           <div key={t.id} className={`bg-white border rounded-[2rem] p-6 shadow-sm ${t.isActive ? "border-slate-100" : "border-slate-100 opacity-60"}`}>
             <div className="flex justify-between items-start">
-              <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center"><Truck size={18} /></div>
+              {t.image
+                ? <img src={t.image.startsWith("/uploads") ? `${API_URL}${t.image}` : t.image} alt={t.name} className="w-11 h-11 rounded-2xl object-cover border border-slate-100" />
+                : <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center"><Truck size={18} /></div>}
               <div className="flex gap-1.5">
                 <button onClick={() => setEditing(t)} className="w-8 h-8 rounded-lg hover:bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-500 cursor-pointer"><Edit2 size={13} /></button>
                 <button onClick={() => { if (confirm(`Delete ${t.name}?`)) onDelete(t.id); }} className="w-8 h-8 rounded-lg hover:bg-rose-50 flex items-center justify-center border border-slate-100 text-rose-500 cursor-pointer"><Trash2 size={13} /></button>
@@ -675,6 +719,7 @@ function TypeModal({ type, onClose, onSave }: { type: TruckType | null; onClose:
   const [description, setDescription] = useState(type?.description ?? "");
   const [capacityLabel, setCapacityLabel] = useState(type?.capacityLabel ?? "");
   const [priceMultiplier, setPriceMultiplier] = useState(String(type?.priceMultiplier ?? 1));
+  const [image, setImage] = useState(type?.image ?? "");
   const [isActive, setIsActive] = useState(type?.isActive ?? true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
@@ -691,8 +736,9 @@ function TypeModal({ type, onClose, onSave }: { type: TruckType | null; onClose:
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Price multiplier</label>
             <input type="number" step="0.1" value={priceMultiplier} onChange={e => setPriceMultiplier(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white" /></div>
         </div>
+        <ImageUploadField label="Truck Type Picture" value={image} onChange={setImage} />
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-[10px] font-black text-slate-600 uppercase">Active</span></label>
-        <button onClick={() => { if (!name) { alert("Name required"); return; } onSave({ name, description, capacityLabel, priceMultiplier: parseFloat(priceMultiplier) || 1, isActive }); }}
+        <button onClick={() => { if (!name) { alert("Name required"); return; } onSave({ name, description, capacityLabel, priceMultiplier: parseFloat(priceMultiplier) || 1, image, isActive }); }}
           className="w-full py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-2"><Check size={14} /> {type ? "Save" : "Create"}</button>
       </div>
     </div>
@@ -719,7 +765,9 @@ function TrucksPage({ trucks, types, onCreate, onUpdate, onSetStatus, onDelete }
         {trucks.map(t => (
           <div key={t.id} className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm uppercase">{t.driverName.split(" ").map(n => n[0]).join("")}</div>
+              {t.profileImage
+                ? <img src={t.profileImage.startsWith("/uploads") ? `${API_URL}${t.profileImage}` : t.profileImage} alt={t.driverName} className="w-12 h-12 rounded-2xl object-cover border border-slate-100" />
+                : <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm uppercase">{t.driverName.split(" ").map(n => n[0]).join("")}</div>}
               <div>
                 <p className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">{t.driverName}{t.isVerified && <Shield size={12} className="text-emerald-500 fill-emerald-500" />}</p>
                 <p className="text-[10px] font-bold text-slate-400 font-inter">{t.truckCode} · {t.truckType?.name || "No type"} · {t.plate || "no plate"} · ⭐ {t.rating}</p>
@@ -753,6 +801,7 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
   const [phone, setPhone] = useState(truck?.phone ?? "");
   const [plate, setPlate] = useState(truck?.plate ?? "");
   const [truckTypeId, setTruckTypeId] = useState(truck?.truckTypeId ?? "");
+  const [profileImage, setProfileImage] = useState(truck?.profileImage ?? "");
   const [isVerified, setIsVerified] = useState(truck?.isVerified ?? true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
@@ -770,10 +819,11 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Plate</label>
             <input value={plate ?? ""} onChange={e => setPlate(e.target.value)} placeholder="00111-119-19" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         </div>
+        <ImageUploadField label="Truck / Driver Photo" value={profileImage} onChange={setProfileImage} />
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isVerified} onChange={e => setIsVerified(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-xs font-bold text-slate-600 font-inter">Documents checked — verified</span></label>
         <button onClick={() => {
             if (!driverName || !phone) { alert("Name and phone required"); return; }
-            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, isVerified };
+            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, profileImage: profileImage || null, isVerified };
             if (!editMode) { fields.wilaya = "Sétif"; fields.commune = "Sétif"; }
             onSave(fields);
           }}
