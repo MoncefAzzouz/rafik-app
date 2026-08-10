@@ -1,21 +1,9 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { authenticateToken, requireRole } from '../middlewares/auth';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { memoryUpload, storeUpload, deleteUpload } from '../lib/r2';
 
-const CATEGORIES_DIR = path.join(__dirname, '../../uploads/categories');
-if (!fs.existsSync(CATEGORIES_DIR)) fs.mkdirSync(CATEGORIES_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, CATEGORIES_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `category-${Date.now()}${ext}`);
-  },
-});
-const upload = multer({ storage });
+const upload = memoryUpload();
 
 const router = Router();
 
@@ -38,7 +26,7 @@ router.post('/', authenticateToken, requireRole('ADMIN'), upload.single('image')
     res.status(400).json({ error: 'Category name is required' });
     return;
   }
-  const imagePath = file ? `/uploads/categories/${file.filename}` : (req.body.image || '/uploads/categories/default.png');
+  const imagePath = file ? await storeUpload(file, 'categories') : (req.body.image || '/uploads/categories/default.png');
   try {
     const category = await prisma.category.create({
       data: { name, image: imagePath },
@@ -69,14 +57,11 @@ router.put('/:id', authenticateToken, requireRole('ADMIN'), upload.single('image
 
     const oldName = existing.name;
     const newName = name || existing.name;
-    const newImage = file ? `/uploads/categories/${file.filename}` : (req.body.image || existing.image);
+    const newImage = file ? await storeUpload(file, 'categories') : (req.body.image || existing.image);
 
     // Delete old image if a new image is set and it's not the default image
     if (newImage !== existing.image && existing.image && !existing.image.endsWith('default.png')) {
-      const oldPath = path.join(__dirname, '../../', existing.image);
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
+      await deleteUpload(existing.image);
     }
 
     const updated = await prisma.category.update({
@@ -117,12 +102,9 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
       return;
     }
 
-    // Delete category image file if it is not default
+    // Delete category image if it is not the default
     if (existing.image && !existing.image.endsWith('default.png')) {
-      const fullPath = path.join(__dirname, '../../', existing.image);
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-      }
+      await deleteUpload(existing.image);
     }
 
     await prisma.category.delete({ where: { id } });

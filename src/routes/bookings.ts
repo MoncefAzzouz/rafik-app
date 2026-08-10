@@ -5,27 +5,9 @@ import { getEffectiveModes } from '../lib/settings';
 import { isValidLocation } from '../lib/locations';
 import { canTransition, isKnownStatus, newBookingId } from '../lib/bookingStatus';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { memoryUpload, storeUpload, deleteUpload } from '../lib/r2';
 
-const BOOKINGS_DIR = path.join(__dirname, '../../uploads/bookings');
-if (!fs.existsSync(BOOKINGS_DIR)) fs.mkdirSync(BOOKINGS_DIR, { recursive: true });
-
-const IMAGE_TYPES = /image\/(jpeg|png|gif|webp)/;
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, BOOKINGS_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `booking-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => cb(null, IMAGE_TYPES.test(file.mimetype)),
-});
+const upload = memoryUpload();
 
 const router = Router();
 
@@ -143,7 +125,9 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT'), upload.array
   }
 
   const files = req.files as Express.Multer.File[];
-  const photoPaths = files ? files.map(f => `/uploads/bookings/${f.filename}`) : [];
+  const photoPaths = files && files.length > 0
+    ? await Promise.all(files.map(f => storeUpload(f, 'bookings')))
+    : [];
   const user = getUser(req);
 
   try {
@@ -474,13 +458,10 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
       return;
     }
 
-    // Delete booking photos from filesystem
+    // Delete booking photos (R2 or local)
     if (booking.clientPhotos && booking.clientPhotos.length > 0) {
       for (const imgPath of booking.clientPhotos) {
-        const fullPath = path.join(__dirname, '../../', imgPath);
-        if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
+        await deleteUpload(imgPath);
       }
     }
 

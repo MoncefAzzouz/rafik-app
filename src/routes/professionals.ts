@@ -4,43 +4,10 @@ import bcrypt from 'bcryptjs';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middlewares/auth';
 import { getEffectiveModes } from '../lib/settings';
 import { isValidLocation } from '../lib/locations';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import { memoryUpload, storeUpload, deleteUpload } from '../lib/r2';
 
-const PORTFOLIO_DIR = path.join(__dirname, '../../uploads/professionals');
-if (!fs.existsSync(PORTFOLIO_DIR)) fs.mkdirSync(PORTFOLIO_DIR, { recursive: true });
-
-const IMAGE_TYPES = /image\/(jpeg|png|gif|webp)/;
-
-const PROFILES_DIR = path.join(__dirname, '../../uploads/profiles');
-if (!fs.existsSync(PROFILES_DIR)) fs.mkdirSync(PROFILES_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, PORTFOLIO_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `portfolio-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => cb(null, IMAGE_TYPES.test(file.mimetype)),
-});
-
-const profileStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, PROFILES_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
-  },
-});
-const uploadProfile = multer({
-  storage: profileStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => cb(null, IMAGE_TYPES.test(file.mimetype)),
-});
+const upload = memoryUpload();
+const uploadProfile = memoryUpload();
 
 const router = Router();
 
@@ -365,15 +332,10 @@ router.post('/:id/profile-image', authenticateToken, uploadProfile.single('image
       return;
     }
 
-    const newImage = `/uploads/profiles/${req.file.filename}`;
+    const newImage = await storeUpload(req.file, 'profiles');
 
-    // Remove the previous local avatar file
-    if (existing.profileImage && existing.profileImage.startsWith('/uploads/')) {
-      const oldPath = path.join(__dirname, '../../', existing.profileImage);
-      if (oldPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
-    }
+    // Remove the previous avatar (R2 or local)
+    await deleteUpload(existing.profileImage);
 
     const professional = await prisma.professional.update({
       where: { id },
@@ -410,12 +372,9 @@ router.post('/:id/portfolio', authenticateToken, upload.array('images', 10), asy
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
     }
+    const images = await Promise.all(files.map(f => storeUpload(f, 'professionals')));
     await prisma.portfolioPost.createMany({
-      data: files.map(f => ({
-        professionalId: id,
-        image: `/uploads/professionals/${f.filename}`,
-        caption,
-      })),
+      data: images.map(image => ({ professionalId: id, image, caption })),
     });
     const professional = await prisma.professional.findUnique({
       where: { id },
@@ -448,12 +407,7 @@ router.delete('/:id/portfolio/:postId', authenticateToken, async (req: Request, 
       res.status(404).json({ error: 'Post not found' });
       return;
     }
-    if (post.image.startsWith('/uploads/')) {
-      const fullPath = path.join(__dirname, '../../', post.image);
-      if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-      }
-    }
+    await deleteUpload(post.image);
     await prisma.portfolioPost.delete({ where: { id: postId } });
     res.json({ success: true });
   } catch (err) {
@@ -475,24 +429,16 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
     // Delete related reviews first
     await prisma.review.deleteMany({ where: { professionalId: id } });
 
-    // Delete portfolio post image files (rows cascade with the professional)
+    // Delete portfolio post images (rows cascade with the professional)
     const posts = await prisma.portfolioPost.findMany({ where: { professionalId: id } });
     for (const post of posts) {
-      if (post.image.startsWith('/uploads/')) {
-        const fullPath = path.join(__dirname, '../../', post.image);
-        if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
-      }
+      await deleteUpload(post.image);
     }
 
-    // Delete professional portfolio images from filesystem
+    // Delete legacy flat portfolio images
     if (pro.portfolio && pro.portfolio.length > 0) {
       for (const imgPath of pro.portfolio) {
-        const fullPath = path.join(__dirname, '../../', imgPath);
-        if (fullPath.startsWith(path.join(__dirname, '../../uploads')) && fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
+        await deleteUpload(imgPath);
       }
     }
 
@@ -508,10 +454,7 @@ router.delete('/:id', authenticateToken, requireRole('ADMIN'), async (req: Reque
     if (pro.userId) {
       const user = await prisma.user.findUnique({ where: { id: pro.userId } });
       if (user && user.profileImage && !user.profileImage.endsWith('default.png')) {
-        const fullPath = path.join(__dirname, '../../', user.profileImage);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
+        await deleteUpload(user.profileImage);
       }
       await prisma.user.delete({ where: { id: pro.userId } }).catch(() => {});
     }
