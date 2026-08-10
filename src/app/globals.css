@@ -73,9 +73,13 @@ body {
 }
 
 /* ===== ANIMATIONS ===== */
+/* NOTE: fadeIn is opacity-only ON PURPOSE. It wraps almost every page, and a
+   lingering `transform` (from `both` fill-mode) turns the wrapper into the
+   containing block for any `position: fixed` child — which pushed modal dialogs
+   off-screen (their top/title got cut off). Keep this transform-free. */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideUp {
