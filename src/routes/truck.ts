@@ -136,8 +136,15 @@ router.delete('/types/:id', authenticateToken, requireRole('ADMIN'), async (req:
   const id = req.params.id as string;
   try {
     const existing = await prisma.truckType.findUnique({ where: { id } });
-    await prisma.truckType.delete({ where: { id } });
-    if (existing?.image) await deleteUpload(existing.image);
+    if (!existing) { res.status(404).json({ error: 'Type not found' }); return; }
+    // Trucks and orders may reference this type (nullable FK). Detach them so the
+    // records survive, then delete the type. Join rows cascade automatically.
+    await prisma.$transaction(async (tx) => {
+      await tx.truck.updateMany({ where: { truckTypeId: id }, data: { truckTypeId: null } });
+      await tx.truckOrder.updateMany({ where: { truckTypeId: id }, data: { truckTypeId: null } });
+      await tx.truckType.delete({ where: { id } });
+    });
+    if (existing.image) await deleteUpload(existing.image);
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -223,11 +230,27 @@ router.put('/categories/:id', authenticateToken, requireRole('ADMIN'), async (re
 
 router.delete('/categories/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
+  const force = req.query.force === 'true';
   try {
-    const existing = await prisma.truckCategory.findUnique({ where: { id } });
-    await prisma.truckCategory.delete({ where: { id } });
-    if (existing?.image) await deleteUpload(existing.image);
-    res.json({ success: true });
+    const existing = await prisma.truckCategory.findUnique({
+      where: { id },
+      include: { _count: { select: { orders: true } } },
+    });
+    if (!existing) { res.status(404).json({ error: 'Category not found' }); return; }
+    const orderCount = existing._count.orders;
+    // A freight category can't just be dropped while orders still point at it (FK).
+    // Warn first; only wipe the orders too if the admin explicitly forces it.
+    if (orderCount > 0 && !force) {
+      res.status(409).json({ error: 'category_has_orders', orderCount });
+      return;
+    }
+    await prisma.$transaction(async (tx) => {
+      if (orderCount > 0) await tx.truckOrder.deleteMany({ where: { categoryId: id } });
+      // TruckCategoryType join rows cascade automatically on category delete.
+      await tx.truckCategory.delete({ where: { id } });
+    });
+    if (existing.image) await deleteUpload(existing.image);
+    res.json({ success: true, deletedOrders: orderCount });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -352,7 +375,11 @@ router.delete('/trucks/:id', authenticateToken, requireRole('ADMIN'), async (req
   try {
     const truck = await prisma.truck.findUnique({ where: { id } });
     if (!truck) { res.status(404).json({ error: 'Truck not found' }); return; }
-    await prisma.truck.delete({ where: { id } });
+    // Orders may reference this truck (nullable FK) — detach so history survives.
+    await prisma.$transaction(async (tx) => {
+      await tx.truckOrder.updateMany({ where: { truckId: id }, data: { truckId: null } });
+      await tx.truck.delete({ where: { id } });
+    });
     if (truck.userId) await prisma.user.delete({ where: { id: truck.userId } }).catch(() => {});
     // Remove the driver + truck photos from R2
     await deleteUpload(truck.profileImage);
