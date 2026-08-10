@@ -89,13 +89,12 @@ export async function deleteUpload(storedUrl: string | null | undefined): Promis
 }
 
 // Shared multer config: keep files in memory (so we can push the buffer to R2),
-// images only, 5 MB max.
+// images only, no size limit.
 export const IMAGE_MIME = /image\/(jpeg|png|gif|webp)/;
 
 export function memoryUpload() {
   return multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => cb(null, IMAGE_MIME.test(file.mimetype)),
   });
 }
