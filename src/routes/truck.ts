@@ -204,7 +204,7 @@ router.get('/trucks/me', authenticateToken, requireRole('TRUCKER'), async (req: 
 });
 
 router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified } = req.body;
+  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified, profileImage } = req.body;
   if (!driverName || !phone) { res.status(400).json({ error: 'driverName and phone are required' }); return; }
   try {
     const truckCode = await nextTruckCode();
@@ -218,6 +218,7 @@ router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Requ
         userId: usr.id, truckCode, driverName: driverName as string, phone: phone as string, email: truckEmail,
         plate: (plate as string) || null, truckTypeId: (truckTypeId as string) || null,
         wilaya: (wilaya as string) || null, commune: (commune as string) || null, isVerified: !!isVerified,
+        profileImage: (profileImage as string) || null,
       },
       include: { truckType: { select: { name: true } } },
     });
