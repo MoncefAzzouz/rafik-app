@@ -61,7 +61,8 @@ interface TruckCategory {
 }
 interface TruckVehicle {
   id: string; truckCode: string; driverName: string; phone: string; plate?: string | null;
-  truckTypeId?: string | null; truckType?: { name: string } | null; profileImage?: string | null;
+  truckTypeId?: string | null; truckType?: { name: string } | null;
+  profileImage?: string | null; truckImage?: string | null;
   status: string; isVerified: boolean; isActive: boolean; rating: number; totalTrips: number;
   wilaya?: string | null; commune?: string | null;
 }
@@ -765,12 +766,17 @@ function TrucksPage({ trucks, types, onCreate, onUpdate, onSetStatus, onDelete }
         {trucks.map(t => (
           <div key={t.id} className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
+              {/* Driver photo (round) */}
               {t.profileImage
-                ? <img src={t.profileImage.startsWith("/uploads") ? `${API_URL}${t.profileImage}` : t.profileImage} alt={t.driverName} className="w-12 h-12 rounded-2xl object-cover border border-slate-100" />
-                : <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm uppercase">{t.driverName.split(" ").map(n => n[0]).join("")}</div>}
+                ? <img src={t.profileImage.startsWith("/uploads") ? `${API_URL}${t.profileImage}` : t.profileImage} alt={t.driverName} className="w-12 h-12 rounded-full object-cover border border-slate-100 shrink-0" />
+                : <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm uppercase shrink-0">{t.driverName.split(" ").map(n => n[0]).join("")}</div>}
+              {/* Truck photo (rounded rectangle) */}
+              {t.truckImage
+                ? <img src={t.truckImage.startsWith("/uploads") ? `${API_URL}${t.truckImage}` : t.truckImage} alt="truck" className="w-16 h-12 rounded-xl object-cover border border-slate-100 shrink-0" />
+                : <div className="w-16 h-12 rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center shrink-0"><Truck size={18} /></div>}
               <div>
                 <p className="text-sm font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">{t.driverName}{t.isVerified && <Shield size={12} className="text-emerald-500 fill-emerald-500" />}</p>
-                <p className="text-[10px] font-bold text-slate-400 font-inter">{t.truckCode} · {t.truckType?.name || "No type"} · {t.plate || "no plate"} · ⭐ {t.rating}</p>
+                <p className="text-[10px] font-bold text-slate-400 font-inter">{t.truckCode} · <span className="text-teal-600">{t.truckType?.name || "No type"}</span> · {t.plate || "no plate"} · ⭐ {t.rating}</p>
                 <span className={`inline-block mt-1 text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider border ${t.status === "available" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : t.status === "busy" ? "bg-amber-50 text-amber-700 border-amber-200" : t.status === "suspended" ? "bg-rose-50 text-rose-700 border-rose-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>{t.status}</span>
               </div>
             </div>
@@ -802,6 +808,7 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
   const [plate, setPlate] = useState(truck?.plate ?? "");
   const [truckTypeId, setTruckTypeId] = useState(truck?.truckTypeId ?? "");
   const [profileImage, setProfileImage] = useState(truck?.profileImage ?? "");
+  const [truckImage, setTruckImage] = useState(truck?.truckImage ?? "");
   const [isVerified, setIsVerified] = useState(truck?.isVerified ?? true);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
@@ -819,11 +826,14 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Plate</label>
             <input value={plate ?? ""} onChange={e => setPlate(e.target.value)} placeholder="00111-119-19" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         </div>
-        <ImageUploadField label="Truck / Driver Photo" value={profileImage} onChange={setProfileImage} />
+        <div className="grid grid-cols-2 gap-4">
+          <ImageUploadField label="Driver Photo" value={profileImage} onChange={setProfileImage} />
+          <ImageUploadField label="Truck Photo" value={truckImage} onChange={setTruckImage} />
+        </div>
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isVerified} onChange={e => setIsVerified(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-xs font-bold text-slate-600 font-inter">Documents checked — verified</span></label>
         <button onClick={() => {
             if (!driverName || !phone) { alert("Name and phone required"); return; }
-            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, profileImage: profileImage || null, isVerified };
+            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, profileImage: profileImage || null, truckImage: truckImage || null, isVerified };
             if (!editMode) { fields.wilaya = "Sétif"; fields.commune = "Sétif"; }
             onSave(fields);
           }}
