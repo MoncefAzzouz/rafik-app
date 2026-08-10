@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { authenticateToken, requireRole, AuthenticatedRequest } from '../middlewares/auth';
 import { getPlatformSettings } from '../lib/settings';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
+import { deleteUpload } from '../lib/r2';
 import {
   canTruckTransition, nextTruckOrderNumber, nextTruckCode, haversineKm,
   estimateTruckPrice, computeTruckCommission, TRUCK_STATUSES, TRUCK_CANCELLED,
@@ -73,6 +74,8 @@ router.put('/types/:id', authenticateToken, requireRole('ADMIN'), async (req: Re
   const id = req.params.id as string;
   const d = req.body;
   try {
+    const existing = await prisma.truckType.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: 'Truck type not found' }); return; }
     const type = await prisma.truckType.update({
       where: { id },
       data: {
@@ -84,13 +87,22 @@ router.put('/types/:id', authenticateToken, requireRole('ADMIN'), async (req: Re
         ...(d.isActive !== undefined && { isActive: !!d.isActive }),
       },
     });
+    // Remove the old picture from R2 if it was replaced
+    if (d.image !== undefined && existing.image && existing.image !== (d.image || null)) {
+      await deleteUpload(existing.image);
+    }
     res.json(type);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.delete('/types/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  try { await prisma.truckType.delete({ where: { id: req.params.id as string } }); res.json({ success: true }); }
-  catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  const id = req.params.id as string;
+  try {
+    const existing = await prisma.truckType.findUnique({ where: { id } });
+    await prisma.truckType.delete({ where: { id } });
+    if (existing?.image) await deleteUpload(existing.image);
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ══════════════════ TRUCK CATEGORIES ══════════════════
@@ -142,6 +154,8 @@ router.put('/categories/:id', authenticateToken, requireRole('ADMIN'), async (re
   const id = req.params.id as string;
   const d = req.body;
   try {
+    const existing = await prisma.truckCategory.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: 'Category not found' }); return; }
     // Replace the allowed-types set when provided
     if (Array.isArray(d.truckTypeIds)) {
       await prisma.truckCategoryType.deleteMany({ where: { categoryId: id } });
@@ -162,13 +176,22 @@ router.put('/categories/:id', authenticateToken, requireRole('ADMIN'), async (re
       },
       include: { allowedTypes: { include: { truckType: true } } },
     });
+    // Remove the old picture from R2 if it was replaced
+    if (d.image !== undefined && existing.image && existing.image !== (d.image || null)) {
+      await deleteUpload(existing.image);
+    }
     res.json(category);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 router.delete('/categories/:id', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  try { await prisma.truckCategory.delete({ where: { id: req.params.id as string } }); res.json({ success: true }); }
-  catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  const id = req.params.id as string;
+  try {
+    const existing = await prisma.truckCategory.findUnique({ where: { id } });
+    await prisma.truckCategory.delete({ where: { id } });
+    if (existing?.image) await deleteUpload(existing.image);
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ══════════════════ TRUCKS (vehicle + driver) ══════════════════
@@ -204,7 +227,7 @@ router.get('/trucks/me', authenticateToken, requireRole('TRUCKER'), async (req: 
 });
 
 router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified, profileImage } = req.body;
+  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified, profileImage, truckImage } = req.body;
   if (!driverName || !phone) { res.status(400).json({ error: 'driverName and phone are required' }); return; }
   try {
     const truckCode = await nextTruckCode();
@@ -219,6 +242,7 @@ router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Requ
         plate: (plate as string) || null, truckTypeId: (truckTypeId as string) || null,
         wilaya: (wilaya as string) || null, commune: (commune as string) || null, isVerified: !!isVerified,
         profileImage: (profileImage as string) || null,
+        truckImage: (truckImage as string) || null,
       },
       include: { truckType: { select: { name: true } } },
     });
@@ -249,7 +273,8 @@ router.put('/trucks/:id', authenticateToken, async (req: Request, res: Response)
         ...(d.commune !== undefined && { commune: d.commune }),
         ...(d.lat !== undefined && { lat: d.lat === null ? null : parseFloat(d.lat) }),
         ...(d.lng !== undefined && { lng: d.lng === null ? null : parseFloat(d.lng) }),
-        ...(d.profileImage !== undefined && { profileImage: d.profileImage }),
+        ...(d.profileImage !== undefined && { profileImage: d.profileImage || null }),
+        ...(d.truckImage !== undefined && { truckImage: d.truckImage || null }),
         ...(d.notes !== undefined && { notes: d.notes }),
         ...(isAdmin && d.isVerified !== undefined && { isVerified: !!d.isVerified }),
         ...(isAdmin && d.isActive !== undefined && { isActive: !!d.isActive }),
@@ -257,6 +282,13 @@ router.put('/trucks/:id', authenticateToken, async (req: Request, res: Response)
       },
       include: { truckType: { select: { name: true } } },
     });
+    // Remove replaced photos from R2
+    if (d.profileImage !== undefined && existing.profileImage && existing.profileImage !== (d.profileImage || null)) {
+      await deleteUpload(existing.profileImage);
+    }
+    if (d.truckImage !== undefined && existing.truckImage && existing.truckImage !== (d.truckImage || null)) {
+      await deleteUpload(existing.truckImage);
+    }
     res.json(truck);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -285,6 +317,9 @@ router.delete('/trucks/:id', authenticateToken, requireRole('ADMIN'), async (req
     if (!truck) { res.status(404).json({ error: 'Truck not found' }); return; }
     await prisma.truck.delete({ where: { id } });
     if (truck.userId) await prisma.user.delete({ where: { id: truck.userId } }).catch(() => {});
+    // Remove the driver + truck photos from R2
+    await deleteUpload(truck.profileImage);
+    await deleteUpload(truck.truckImage);
     res.json({ success: true });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

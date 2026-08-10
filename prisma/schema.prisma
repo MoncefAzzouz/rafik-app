@@ -694,7 +694,8 @@ model Truck {
   isVerified        Boolean      @default(false)
   isActive          Boolean      @default(true)
   cancellationCount Int          @default(0)
-  profileImage      String?
+  profileImage      String?      // driver's photo
+  truckImage        String?      // photo of the truck itself
   notes             String?
   orders            TruckOrder[]
   createdAt         DateTime     @default(now())
