@@ -23,11 +23,11 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
   }
   upload.single('file')(req, res, async (err) => {
     if (err) {
-      res.status(400).json({ error: 'Upload failed (images only, max 5MB)' });
+      res.status(400).json({ error: `Upload failed: ${err.message || 'unknown error'}` });
       return;
     }
     if (!req.file) {
-      res.status(400).json({ error: 'No file uploaded (images only, max 5MB)' });
+      res.status(400).json({ error: 'No image file received (the file must be an image).' });
       return;
     }
     try {

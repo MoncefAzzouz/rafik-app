@@ -89,8 +89,9 @@ export async function deleteUpload(storedUrl: string | null | undefined): Promis
 }
 
 // Shared multer config: keep files in memory (so we can push the buffer to R2),
-// images only, no size limit.
-export const IMAGE_MIME = /image\/(jpeg|png|gif|webp)/;
+// any image type, no size limit. Accepts jpeg/png/gif/webp plus HEIC/HEIF (iPhone
+// photos), AVIF, BMP, SVG, etc. — anything the browser tags as an image.
+export const IMAGE_MIME = /^image\//;
 
 export function memoryUpload() {
   return multer({
