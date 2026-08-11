@@ -23,6 +23,10 @@ import {
   Ticket,
   Truck,
   ClipboardList,
+  Images,
+  LayoutGrid,
+  BellRing,
+  FileText,
 } from "lucide-react";
 
 interface NavItem {
@@ -68,6 +72,13 @@ const SERVICE_NAV: Record<ServiceType, NavItem[]> = {
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "promos", label: "Promo Codes", icon: Ticket },
     { id: "earnings", label: "Earnings", icon: TrendingUp },
+  ],
+  mobile: [
+    { id: "slides", label: "Slides", icon: Images },
+    { id: "modules", label: "App Icons", icon: LayoutGrid },
+    { id: "app-promos", label: "Promos", icon: Ticket },
+    { id: "notifications", label: "Notifications", icon: BellRing },
+    { id: "legal", label: "Legal Pages", icon: FileText },
   ],
 };
 

@@ -46,6 +46,13 @@
   --primary-400: #14B8A6;
 }
 
+/* ===== MOBILE APP THEME (Violet) ===== */
+.theme-mobile {
+  --primary: #7C3AED;
+  --primary-600: #6D28D9;
+  --primary-400: #8B5CF6;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

@@ -13,6 +13,7 @@ import ServicesDashboard from "@/components/ServicesDashboard";
 import SettingsPage from "@/components/SettingsPage";
 import ChatMonitor from "@/components/ChatMonitor";
 import PromoCodesPage from "@/components/PromoCodesPage";
+import MobileAppDashboard from "@/components/MobileAppDashboard";
 
 function AdminShellWrapper() {
   const params = useParams();
@@ -24,7 +25,7 @@ function AdminShellWrapper() {
 
   // Sync parameters with context state
   useEffect(() => {
-    if (["taxi", "food", "services", "truck"].includes(service)) {
+    if (["taxi", "food", "services", "truck", "mobile"].includes(service)) {
       setActiveService(service as any);
     }
   }, [service, setActiveService]);
@@ -35,6 +36,8 @@ function AdminShellWrapper() {
 
   const renderContent = () => {
     if (page === "settings") return <SettingsPage />;
+    // Mobile App section owns all of its own pages (slides, modules, app-promos, notifications, legal)
+    if (service === "mobile") return <MobileAppDashboard activePage={page} />;
     if (page === "chats") return <ChatMonitor />;
     // Promo codes are shared by taxi, food, and services
     if (page === "promos") return <PromoCodesPage />;
