@@ -472,6 +472,7 @@ function BannerModal({ promo, onClose, onSave }: { promo: AppPromo; onClose: () 
 function NotificationsPage({ notifs, post, del }: {
   notifs: AppNotif[]; post: (p: string, b?: object) => Promise<any>; del: (p: string) => void;
 }) {
+  const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [channel, setChannel] = useState("app");
@@ -479,12 +480,38 @@ function NotificationsPage({ notifs, post, del }: {
   const [link, setLink] = useState("");
   const [sending, setSending] = useState(false);
 
+  // Test-email tool
+  const [testTo, setTestTo] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
   const send = async () => {
     if (!title.trim() || !body.trim()) return alert("Title and message are required");
     setSending(true);
     const r = await post(`/api/app/admin/notifications`, { title, body, channel, audience, link });
     setSending(false);
-    if (r) { setTitle(""); setBody(""); setLink(""); }
+    if (!r) return;
+    setTitle(""); setBody(""); setLink("");
+    if (r.emailing) {
+      if (!r.mailConfigured) alert("Saved — but email is NOT configured on the server (MAIL_HOST is missing in .env), so no emails were sent.");
+      else if (r.failedCount) alert(`Email: sent ${r.sentCount} of ${r.recipientCount}, ${r.failedCount} failed.\nFirst error: ${r.mailError || "unknown"}`);
+      else if (r.sentCount) alert(`Email sent to ${r.sentCount} recipient${r.sentCount === 1 ? "" : "s"} ✅`);
+      else alert("No recipients had an email address for this audience.");
+    }
+  };
+
+  const sendTest = async () => {
+    if (!testTo.trim()) return;
+    setTesting(true); setTestResult(null);
+    try {
+      const res = await fetch(`${API_URL}/api/app/admin/test-email`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ to: testTo }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (d.ok) setTestResult(`✅ ${d.message}`);
+      else setTestResult(`⚠ ${d.error || d.message || "Failed"}${d.code ? ` [${d.code}]` : ""}`);
+    } catch { setTestResult("⚠ Network error reaching the server"); }
+    finally { setTesting(false); }
   };
 
   return (
@@ -520,6 +547,17 @@ function NotificationsPage({ notifs, post, del }: {
           <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Email sending requires SMTP credentials in the backend <code>.env</code> (MAIL_HOST…). Without them, emails are logged, not sent.</p>
         )}
         <button onClick={send} disabled={sending} className={saveBtnCls}>{sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} {sending ? "Sending…" : "Send notification"}</button>
+      </div>
+
+      {/* Verify email setup */}
+      <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-3">
+        <div className="flex items-center gap-2"><Mail size={16} className="text-violet-600" /><h2 className="text-sm font-black text-slate-700 uppercase tracking-wider">Test your email setup</h2></div>
+        <p className="text-[11px] text-slate-400 font-inter">Send one email to yourself to confirm the SMTP settings in the backend <code>.env</code> actually work. The exact error is shown if it fails.</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input value={testTo} onChange={e => setTestTo(e.target.value)} type="email" placeholder="your@email.com" className={`${inputCls} flex-1`} />
+          <button onClick={sendTest} disabled={testing} className="px-5 py-3 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-900 cursor-pointer flex items-center justify-center gap-2 shrink-0">{testing ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Send test</button>
+        </div>
+        {testResult && <p className={`text-[12px] font-bold font-inter break-words ${testResult.startsWith("✅") ? "text-emerald-600" : "text-rose-600"}`}>{testResult}</p>}
       </div>
 
       <section>
