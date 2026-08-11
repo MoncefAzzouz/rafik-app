@@ -3,6 +3,7 @@
 import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import ModalPortal from "@/components/ModalPortal";
 import {
   Plus, X, Check, Trash2, Edit2, Eye, EyeOff, Lock, Clock, ArrowUp, ArrowDown,
   Images, LayoutGrid, Ticket, BellRing, FileText, RefreshCw, Send, Mail, Smartphone,
@@ -216,8 +217,8 @@ function SlidesPage({ slides, put, post, del }: {
       </div>
 
       {(showNew || editing) && (
-        <SlideModal slide={editing} type="home" onClose={() => { setShowNew(false); setEditing(null); }}
-          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/slides/${editing.id}`, f) : await post(`/api/app/admin/slides`, f); if (r) { setShowNew(false); setEditing(null); } }} />
+        <ModalPortal><SlideModal slide={editing} type="home" onClose={() => { setShowNew(false); setEditing(null); }}
+          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/slides/${editing.id}`, f) : await post(`/api/app/admin/slides`, f); if (r) { setShowNew(false); setEditing(null); } }} /></ModalPortal>
       )}
     </div>
   );
@@ -307,8 +308,8 @@ function ModulesPage({ modules, serviceCats, truckCats, post, put, del, showToas
       </div>
 
       {(showNew || editing) && (
-        <ModuleModal module={editing} serviceCats={serviceCats} truckCats={truckCats} onClose={() => { setShowNew(false); setEditing(null); }}
-          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/modules/${editing.id}`, f) : await post(`/api/app/admin/modules`, f); if (r) { setShowNew(false); setEditing(null); } }} />
+        <ModalPortal><ModuleModal module={editing} serviceCats={serviceCats} truckCats={truckCats} onClose={() => { setShowNew(false); setEditing(null); }}
+          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/modules/${editing.id}`, f) : await post(`/api/app/admin/modules`, f); if (r) { setShowNew(false); setEditing(null); } }} /></ModalPortal>
       )}
     </div>
   );
@@ -441,13 +442,13 @@ function PromosPage({ promos, slides, put, post, del, showToast }: {
       </section>
 
       {(showNew || editing) && (
-        <SlideModal slide={editing} type="promo" onClose={() => { setShowNew(false); setEditing(null); }}
-          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/slides/${editing.id}`, f) : await post(`/api/app/admin/slides`, f); if (r) { setShowNew(false); setEditing(null); } }} />
+        <ModalPortal><SlideModal slide={editing} type="promo" onClose={() => { setShowNew(false); setEditing(null); }}
+          onSave={async (f) => { const r = editing ? await put(`/api/app/admin/slides/${editing.id}`, f) : await post(`/api/app/admin/slides`, f); if (r) { setShowNew(false); setEditing(null); } }} /></ModalPortal>
       )}
 
       {banner && (
-        <BannerModal promo={banner} onClose={() => setBanner(null)}
-          onSave={async (url) => { const r = await put(`/api/promos/${banner.id}`, { appBanner: url }); if (r) { setBanner(null); showToast("Banner saved ✓"); } }} />
+        <ModalPortal><BannerModal promo={banner} onClose={() => setBanner(null)}
+          onSave={async (url) => { const r = await put(`/api/promos/${banner.id}`, { appBanner: url }); if (r) { setBanner(null); showToast("Banner saved ✓"); } }} /></ModalPortal>
       )}
     </div>
   );

@@ -162,6 +162,30 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
             System
           </p>
           <button
+            onClick={() => onNavigate("users")}
+            className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 relative group overflow-hidden text-left ${
+              activePage === "users"
+                ? "text-white shadow-xl"
+                : "text-slate-500 hover:text-primary hover:bg-primary/5"
+            }`}
+            style={
+              activePage === "users"
+                ? {
+                    background: "var(--primary)",
+                    boxShadow: `0 10px 30px color-mix(in srgb, var(--primary) 20%, transparent)`,
+                  }
+                : undefined
+            }
+          >
+            <Users
+              size={20}
+              className={`transition-transform duration-300 group-hover:scale-110 ${
+                activePage === "users" ? "text-white" : "text-slate-400 group-hover:text-primary"
+              }`}
+            />
+            <span className="text-sm font-bold uppercase tracking-wider">Users</span>
+          </button>
+          <button
             onClick={() => onNavigate("settings")}
             className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all duration-300 relative group overflow-hidden text-left ${
               activePage === "settings"

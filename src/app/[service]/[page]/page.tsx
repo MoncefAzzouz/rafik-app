@@ -14,6 +14,7 @@ import SettingsPage from "@/components/SettingsPage";
 import ChatMonitor from "@/components/ChatMonitor";
 import PromoCodesPage from "@/components/PromoCodesPage";
 import MobileAppDashboard from "@/components/MobileAppDashboard";
+import UsersPage from "@/components/UsersPage";
 
 function AdminShellWrapper() {
   const params = useParams();
@@ -36,6 +37,8 @@ function AdminShellWrapper() {
 
   const renderContent = () => {
     if (page === "settings") return <SettingsPage />;
+    // Users management is a global admin page (reachable from any workspace)
+    if (page === "users") return <UsersPage />;
     // Mobile App section owns all of its own pages (slides, modules, app-promos, notifications, legal)
     if (service === "mobile") return <MobileAppDashboard activePage={page} />;
     if (page === "chats") return <ChatMonitor />;
