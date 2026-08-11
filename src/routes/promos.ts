@@ -74,6 +74,7 @@ router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, r
   const {
     code, description, scope, discountType, discountValue, maxDiscount,
     minOrderAmount, maxUses, maxUsesPerUser, startsAt, expiresAt, isActive,
+    showInApp, appBanner,
   } = req.body;
 
   if (!code || discountValue === undefined) {
@@ -104,6 +105,8 @@ router.post('/', authenticateToken, requireRole('ADMIN'), async (req: Request, r
         startsAt: startsAt ? new Date(startsAt) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         isActive: isActive !== undefined ? !!isActive : true,
+        showInApp: !!showInApp,
+        appBanner: (appBanner as string) || null,
       },
     });
     res.status(201).json(promo);
@@ -141,6 +144,8 @@ router.put('/:id', authenticateToken, requireRole('ADMIN'), async (req: Request,
         ...(d.startsAt !== undefined && { startsAt: d.startsAt ? new Date(d.startsAt) : null }),
         ...(d.expiresAt !== undefined && { expiresAt: d.expiresAt ? new Date(d.expiresAt) : null }),
         ...(d.isActive !== undefined && { isActive: !!d.isActive }),
+        ...(d.showInApp !== undefined && { showInApp: !!d.showInApp }),
+        ...(d.appBanner !== undefined && { appBanner: d.appBanner || null }),
       },
     });
     res.json(promo);

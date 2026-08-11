@@ -72,6 +72,7 @@ model User {
   address       String?
   createdAt     DateTime      @default(now())
   professional  Professional?
+  passwordResets PasswordResetToken[]
 }
 
 model Category {
@@ -784,6 +785,8 @@ model PromoCode {
   startsAt       DateTime?         // becomes usable from this date
   expiresAt      DateTime?         // deadline; after this the code is dead
   isActive       Boolean           @default(true)
+  showInApp      Boolean           @default(false) // surface this code on the app's Promo page
+  appBanner      String?           // optional banner image shown on the app's Promo page
   redemptions    PromoRedemption[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -804,4 +807,84 @@ model PromoRedemption {
 
   @@index([promoCodeId, userId])
   @@index([promoCodeId, clientPhone])
+}
+
+// ══════════════════ MOBILE APP CONTENT ══════════════════
+// Everything the admin curates for what the phone app shows.
+
+// A tile on the app home grid: Taxi / Food / a service category / a truck
+// category / or a custom link. The admin controls visibility, lock, and the
+// "coming soon" badge per tile.
+model AppModule {
+  id         String   @id @default(cuid())
+  type       String   // "taxi" | "food" | "truck" | "services" | "service_category" | "truck_category" | "custom"
+  refId      String?  // category id when type is service_category / truck_category
+  label      String
+  labelAr    String?  // optional Arabic label
+  icon       String?  // uploaded image URL, or an emoji
+  color      String?  // optional accent color (hex)
+  link       String?  // deep link / url for custom tiles
+  visible    Boolean  @default(true)   // show it or hide it
+  locked     Boolean  @default(false)  // "lock" — visible but not tappable
+  comingSoon Boolean  @default(false)  // show a "Coming soon" badge
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([visible, sortOrder])
+}
+
+// A banner/slide in the app. type separates the home carousel from the promo page.
+model AppSlide {
+  id          String   @id @default(cuid())
+  type        String   @default("home") // "home" | "promo"
+  title       String?
+  subtitle    String?
+  image       String   // uploaded banner
+  link        String?  // deep link / url when tapped
+  promoCodeId String?  // optional: this slide advertises a specific promo code
+  visible     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, visible, sortOrder])
+}
+
+// Editable content for the Play-Store-required open pages.
+// slug ∈ privacy-policy | terms | delete-account | support
+model AppLegalPage {
+  slug      String   @id
+  title     String
+  content   String   // markdown / rich text
+  updatedAt DateTime @updatedAt
+}
+
+// Log of notifications the admin sent (in-app feed + email). The app fetches the
+// in-app ones; email ones are sent immediately via the mailer.
+model AppNotification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  channel   String   @default("app")  // "app" | "email" | "both"
+  audience  String   @default("all")  // "all" | "clients" | "workers" | "drivers"
+  imageUrl  String?
+  link      String?
+  sentCount Int      @default(0)
+  sentAt    DateTime @default(now())
+
+  @@index([sentAt])
+}
+
+// Short-lived token emailed to a user so they can set a new password.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha256 of the token we emailed (never store the raw token)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }

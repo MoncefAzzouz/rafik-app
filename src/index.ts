@@ -19,6 +19,7 @@ import foodAdminRoutes from './routes/foodAdmin';
 import taxiRoutes from './routes/taxi';
 import promosRoutes from './routes/promos';
 import truckRoutes from './routes/truck';
+import appRoutes from './routes/app';
 import { initSocket } from './lib/socket';
 
 dotenv.config();
@@ -67,6 +68,8 @@ app.use('/api/taxi', taxiRoutes);
 app.use('/api/promos', promosRoutes);
 // Truck freight module
 app.use('/api/truck', truckRoutes);
+
+app.use('/api/app', appRoutes);
 
 const PORT = process.env.PORT || 4000;
 
