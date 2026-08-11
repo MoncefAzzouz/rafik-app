@@ -60,6 +60,15 @@ router.post('/login', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
+    // Blocked accounts can't sign in.
+    if (user.bannedForever) {
+      res.status(403).json({ error: 'This account has been suspended.' });
+      return;
+    }
+    if (user.bannedUntil && user.bannedUntil > new Date()) {
+      res.status(403).json({ error: `This account is suspended until ${user.bannedUntil.toISOString().slice(0, 10)}.` });
+      return;
+    }
     const token = signToken(user.id, user.role);
     res.json({ token, user: serializeUser(user) });
   } catch (err) {

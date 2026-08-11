@@ -71,6 +71,10 @@ model User {
   commune       String?
   address       String?
   createdAt     DateTime      @default(now())
+  // Ban controls (admin): forever, or until a date. Enforced at login.
+  bannedForever Boolean       @default(false)
+  bannedUntil   DateTime?     // time-limited ban; null = no time ban
+  banReason     String?
   professional  Professional?
   passwordResets PasswordResetToken[]
 }

@@ -20,6 +20,7 @@ import taxiRoutes from './routes/taxi';
 import promosRoutes from './routes/promos';
 import truckRoutes from './routes/truck';
 import appRoutes from './routes/app';
+import usersRoutes from './routes/users';
 import { initSocket } from './lib/socket';
 
 dotenv.config();
@@ -70,6 +71,8 @@ app.use('/api/promos', promosRoutes);
 app.use('/api/truck', truckRoutes);
 
 app.use('/api/app', appRoutes);
+
+app.use('/api/users', usersRoutes);
 
 const PORT = process.env.PORT || 4000;
 
