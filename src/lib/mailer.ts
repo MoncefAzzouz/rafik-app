@@ -12,14 +12,21 @@ import nodemailer, { Transporter } from 'nodemailer';
 // development and the Play-Store review flow never crash for a missing provider.
 //
 // Read lazily: dotenv.config() runs after module import, so we must not cache at load time.
+// Accepts both MAIL_* and SMTP_* names so either convention in .env just works.
 function cfg() {
+  const host = process.env.MAIL_HOST || process.env.SMTP_HOST || '';
+  const port = parseInt(process.env.MAIL_PORT || process.env.SMTP_PORT || '587', 10);
+  const secureEnv = process.env.MAIL_SECURE ?? process.env.SMTP_SECURE;
+  const user = process.env.MAIL_USER || process.env.SMTP_USER || '';
   return {
-    host: process.env.MAIL_HOST || '',
-    port: parseInt(process.env.MAIL_PORT || '587', 10),
-    secure: (process.env.MAIL_SECURE || 'false') === 'true',
-    user: process.env.MAIL_USER || '',
-    pass: process.env.MAIL_PASS || '',
-    from: process.env.MAIL_FROM || 'Rafik <no-reply@rafik.app>',
+    host,
+    port,
+    // default: TLS only for port 465; port 587 uses STARTTLS (secure: false)
+    secure: secureEnv !== undefined ? secureEnv === 'true' : port === 465,
+    user,
+    pass: process.env.MAIL_PASS || process.env.SMTP_PASS || '',
+    // fall back to the sending account so Gmail doesn't reject a mismatched From
+    from: process.env.MAIL_FROM || process.env.SMTP_FROM || user || 'Rafik <no-reply@rafik.app>',
   };
 }
 
