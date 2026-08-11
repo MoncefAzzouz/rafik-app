@@ -142,6 +142,21 @@ class AppStrings {
       _s('الأرشيف فارغ!', 'Archive vide!', 'Archive is empty!');
   String get parcelReorder => _s('إعادة الطلب', 'Re-commander', 'Reorder');
 
+  // ── Parcel Tracking ───────────────────────────────────────────
+  String get parcelTrackTitle => _s('تتبع الطلب', 'Suivi de commande', 'Track Order');
+  String get parcelStatusAssigned => _s('تم تعيين السائق', 'Chauffeur assigné', 'Driver assigned');
+  String get parcelStatusInTransit => _s('في الطريق إليك', 'En transit', 'In transit');
+  String get parcelStatusDelivering => _s('جاري التوصيل', 'En cours de livraison', 'Out for delivery');
+  String get parcelStatusDelivered => _s('تم التوصيل بنجاح', 'Livré avec succès', 'Delivered successfully');
+  String get parcelStepCreated => _s('تم إنشاء الطلب', 'Commande créée', 'Order created');
+  String get parcelStepAssigned => _s('تم قبول الطلب', 'Accepté par le chauffeur', 'Accepted by driver');
+  String get parcelStepPickedUp => _s('تم استلام الشحنة', 'Colis récupéré', 'Package picked up');
+  String get parcelStepDelivering => _s('جاري التوصيل', 'En cours de livraison', 'Delivering');
+  String get parcelStepCompleted => _s('تم التسليم بنجاح', 'Livré', 'Delivered');
+  String get parcelCallDriver => _s('الاتصال بالسائق', 'Appeler', 'Call driver');
+  String get parcelMessageDriver => _s('مراسلة السائق', 'Message', 'Message driver');
+  String get parcelDriverInfo => _s('معلومات السائق', 'Chauffeur', 'Driver details');
+
   // ── Parcel Categories ─────────────────────────────────────────
   String get parcelNewOrder => _s('طلب جديد', 'Nouvelle commande', 'New order');
   String get catHouseMoving => _s('نقل منزل', 'Déménagement', 'House moving');

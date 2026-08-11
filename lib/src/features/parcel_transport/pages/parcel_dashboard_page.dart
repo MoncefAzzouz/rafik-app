@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
+import 'parcel_track_order_page.dart';
 import 'parcel_vehicle_select_page.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
 import '../data/parcel_order_repository.dart';
-import '../domain/parcel_order.dart';
+
 
 class ParcelDashboardPage extends StatefulWidget {
   const ParcelDashboardPage({super.key});
@@ -347,202 +348,260 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
       itemCount: _orders.activeOrders.length,
       itemBuilder: (context, index) {
         final order = _orders.activeOrders[index];
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(8),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ParcelTrackOrderPage(order: order),
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header: ID and Finding Driver Status
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.inventory_2_outlined,
-                        color: Colors.blue,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        order.id,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'جاري البحث عن عروض...',
-                      style: TextStyle(
-                        color: Colors.orange.shade800,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(height: 24),
-
-              // Route path details
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Container(
-                        width: 1.5,
-                        height: 26,
-                        color: Colors.grey.shade300,
-                      ),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Colors.black,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade100, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(8),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: ID + status + track arrow
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          order.pickup,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
+                        const Icon(
+                          Icons.inventory_2_outlined,
+                          color: Colors.blue,
+                          size: 20,
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(width: 8),
                         Text(
-                          order.delivery,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          order.id,
                           style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: Colors.black,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const Divider(height: 24),
-
-              // Detail Badges
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildDetailBadge('المركبة', order.vehicleName),
-                  _buildDetailBadge(
-                    'العمال',
-                    order.helpers > 0 ? '${order.helpers} أشخاص' : 'لا يوجد',
-                  ),
-                  _buildDetailBadge('الوقت', order.timing.split(' ').first),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              // Complete / Cancel actions
-              Row(
-                children: [
-                  // Cancel Button
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        _orders.cancel(order);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('تم إلغاء الطلب بنجاح')),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red.shade600,
-                        side: BorderSide(
-                          color: Colors.red.shade100,
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'إلغاء الطلب',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Complete Button
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _orders.complete(order);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('تم إكمال شحن الطرد وتوصيله بنجاح!'),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'جاري البحث عن عروض...',
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'إتمام التوصيل',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // Route path details
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      children: [
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 1.5,
+                          height: 26,
+                          color: Colors.grey.shade300,
+                        ),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.pickup,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            order.delivery,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // Detail Badges
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildDetailBadge('المركبة', order.vehicleName),
+                    _buildDetailBadge(
+                      'العمال',
+                      order.helpers > 0 ? '${order.helpers} أشخاص' : 'لا يوجد',
+                    ),
+                    _buildDetailBadge('الوقت', order.timing.split(' ').first),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Track Order CTA
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, Color(0xFF1A6AFF)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
-              ),
-            ],
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: Colors.white,
+                        size: 17,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'تتبع الطلب على الخريطة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Complete / Cancel actions
+                Row(
+                  children: [
+                    // Cancel Button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          _orders.cancel(order);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تم إلغاء الطلب بنجاح'),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade600,
+                          side: BorderSide(
+                            color: Colors.red.shade100,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'إلغاء الطلب',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Complete Button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _orders.complete(order);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'تم إكمال شحن الطرد وتوصيله بنجاح!',
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'إتمام التوصيل',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -707,53 +766,42 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
               ),
               const Divider(height: 20),
 
-              // Reorder / Request Again
-              SizedBox(
-                width: double.infinity,
-                height: 40,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Copy to active list and show active tab
-                    setState(() {
-                      final reordered = ParcelOrder(
-                        id: 'DZA${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 13)}',
-                        vehicleName: order.vehicleName,
-                        pickup: order.pickup,
-                        delivery: order.delivery,
-                        description: order.description,
-                        timing: 'في القريب العاجل',
-                        helpers: order.helpers,
-                        invoice: order.invoice,
-                        dateCreated: DateTime.now(),
-                      );
-                      _orders.add(reordered);
-                      _currentTabIndex = 0;
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'تمت إعادة إرسال الطلب وإضافته للطلبات النشطة',
-                        ),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black87,
-                    side: BorderSide(color: Colors.grey.shade200),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              // Track Order CTA
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ParcelTrackOrderPage(order: order),
                     ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, Color(0xFF1A6AFF)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.replay_rounded, size: 16),
-                      SizedBox(width: 6),
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: Colors.white,
+                        size: 17,
+                      ),
+                      SizedBox(width: 8),
                       Text(
-                        'إعادة الطلب',
+                        'تتبع الطلب على الخريطة',
                         style: TextStyle(
-                          fontSize: 13,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ],

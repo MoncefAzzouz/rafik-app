@@ -4,6 +4,9 @@ import '../../../core/l10n/app_strings.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../parcel_transport/data/parcel_order_repository.dart';
+import '../../parcel_transport/domain/parcel_order.dart';
+import '../../parcel_transport/pages/parcel_track_order_page.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class ActivityItem {
@@ -17,6 +20,7 @@ class ActivityItem {
   final String destinationName;
   final String destinationAddress;
   final String? storeName; // For Food/Shop/Market
+  final ParcelOrder? parcelOrder;
 
   ActivityItem({
     required this.id,
@@ -29,6 +33,7 @@ class ActivityItem {
     required this.destinationName,
     required this.destinationAddress,
     this.storeName,
+    this.parcelOrder,
   });
 }
 
@@ -51,11 +56,16 @@ class _ActivitiesPageState extends State<ActivitiesPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _selectedFilter = 'All';
+  final ParcelOrderRepository _parcelOrders = ParcelOrderRepository.instance;
 
   final List<String> _filters = ['All', 'Completed', 'Scheduled', 'Cancelled'];
 
   // Instance reference to static list for convenience
-  List<ActivityItem> get _activities => _allItemsInternal;
+  List<ActivityItem> get _activities => [
+    ..._parcelOrders.activeOrders.map(_activityFromParcelOrder),
+    ..._parcelOrders.archivedOrders.map(_activityFromParcelOrder),
+    ..._allItemsInternal.where((item) => item.type != 'Parcel'),
+  ];
 
   static final List<ActivityItem> _allItemsInternal = [
     // Rides Tab Items
@@ -144,37 +154,12 @@ class _ActivitiesPageState extends State<ActivitiesPage>
       destinationName: 'Service address',
       destinationAddress: 'Setif Center, Algeria',
     ),
-
-    // Parcel Tab Items
-    ActivityItem(
-      id: '8',
-      date: 'Jul 26, 2026 at 16:42',
-      price: '1,200 DA',
-      type: 'Parcel',
-      status: 'Completed',
-      storeName: '📦 هاربين - نقل طرود',
-      pickupName: 'استلام البضائع',
-      pickupAddress: 'Sétif, الجزائر',
-      destinationName: 'مكان التفريغ',
-      destinationAddress: 'Alger, الجزائر',
-    ),
-    ActivityItem(
-      id: '9',
-      date: 'Jul 27, 2026 at 13:50',
-      price: '1,500 DA',
-      type: 'Parcel',
-      status: 'Scheduled',
-      storeName: '📦 فورغون - نقل طرود',
-      pickupName: 'استلام البضائع',
-      pickupAddress: 'Sétif, الجزائر',
-      destinationName: 'مكان التفريغ',
-      destinationAddress: 'Oran, الجزائر',
-    ),
   ];
 
   @override
   void initState() {
     super.initState();
+    _parcelOrders.addListener(_refreshActivities);
     _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       setState(() {});
@@ -183,8 +168,53 @@ class _ActivitiesPageState extends State<ActivitiesPage>
 
   @override
   void dispose() {
+    _parcelOrders.removeListener(_refreshActivities);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _refreshActivities() {
+    if (mounted) setState(() {});
+  }
+
+  ActivityItem _activityFromParcelOrder(ParcelOrder order) {
+    final isArchived = order.isCompleted || order.isCancelled;
+    return ActivityItem(
+      id: order.id,
+      date: _formatActivityDate(order.dateCreated),
+      price: order.invoice,
+      type: 'Parcel',
+      status: order.isCancelled
+          ? 'Cancelled'
+          : isArchived
+          ? 'Completed'
+          : 'Scheduled',
+      storeName: '📦 ${order.vehicleName} - نقل طرود',
+      pickupName: 'استلام البضائع',
+      pickupAddress: order.pickup,
+      destinationName: 'مكان التفريغ',
+      destinationAddress: order.delivery,
+      parcelOrder: order,
+    );
+  }
+
+  String _formatActivityDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '${months[date.month - 1]} ${date.day}, ${date.year} at ${date.hour}:$minute';
   }
 
   List<ActivityItem> _getFilteredItems(String tabType) {
@@ -713,36 +743,92 @@ class _ActivitiesPageState extends State<ActivitiesPage>
                 ),
               ),
 
-              // Request again / Reorder button
+              // Track parcel / reorder button
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: SizedBox(
                   width: double.infinity,
                   height: 44,
-                  child: OutlinedButton(
-                    onPressed: () => _handleRequestAgain(item),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      side: BorderSide(color: Colors.grey.shade200),
-                      foregroundColor: AppColors.royalBlue,
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.refresh_rounded, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Request again',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                  child: item.type == 'Parcel'
+                      ? GestureDetector(
+                          onTap: () {
+                            final order = item.parcelOrder;
+                            if (order == null) {
+                              Navigator.push(
+                                context,
+                                SmoothPageRoute(
+                                  page: const ParcelDashboardPage(),
+                                  settings: const RouteSettings(
+                                    name: 'parcel_dashboard',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ParcelTrackOrderPage(order: order),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [AppColors.primary, Color(0xFF1A6AFF)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.location_on_rounded,
+                                  color: Colors.white,
+                                  size: 17,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'تتبع الطلب على الخريطة',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : OutlinedButton(
+                          onPressed: () => _handleRequestAgain(item),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade200),
+                            foregroundColor: AppColors.royalBlue,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.refresh_rounded, size: 16),
+                              SizedBox(width: 6),
+                              Text(
+                                'Request again',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ],

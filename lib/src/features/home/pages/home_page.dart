@@ -24,7 +24,7 @@ class _HomePageState extends State<HomePage> {
 
   final List<String> _banners = [
     'assets/imagesss/rafik-secure-tracking-banner.png',
-    'assets/imagesss/IMG_0046.PNG',
+    'assets/imagesss/IMG_0046-algeria.png',
     'assets/imagesss/rafik-port-delivery-banner.png',
     'assets/imagesss/rafik-nationwide-delivery-banner.png',
   ];
