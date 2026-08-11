@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { authenticateToken, requireRole } from '../middlewares/auth';
-import { sendMail, emailShell } from '../lib/mailer';
+import { sendMail, emailShell, isMailEnabled } from '../lib/mailer';
 
 const router = Router();
 
@@ -283,10 +283,13 @@ router.post('/admin/notifications', ...admin, async (req: Request, res: Response
   if (!d.title || !d.body) { res.status(400).json({ error: 'Title and body are required' }); return; }
   const channel = ['app', 'email', 'both'].includes(d.channel) ? d.channel : 'app';
   const audience = ['all', 'clients', 'workers', 'drivers'].includes(d.audience) ? d.audience : 'all';
+  const emailing = channel === 'email' || channel === 'both';
+  const mailConfigured = isMailEnabled();
   try {
-    let sentCount = 0;
-    // Email fan-out (best-effort). "app" notifications are just stored for the feed.
-    if (channel === 'email' || channel === 'both') {
+    let sentCount = 0, failedCount = 0, recipientCount = 0;
+    let mailError = '';
+    // Email fan-out. "app" notifications are just stored for the in-app feed.
+    if (emailing && mailConfigured) {
       const roleFilter =
         audience === 'clients' ? { role: 'CLIENT' as const }
         : audience === 'workers' ? { role: 'WORKER' as const }
@@ -294,12 +297,12 @@ router.post('/admin/notifications', ...admin, async (req: Request, res: Response
         : {};
       const users = await prisma.user.findMany({ where: roleFilter, select: { email: true } });
       const recipients = users.map((u) => u.email).filter(Boolean);
-      if (recipients.length) {
-        const html = emailShell(d.title, `<p style="color:#334155;line-height:1.6">${(d.body as string).replace(/\n/g, '<br/>')}</p>${d.link ? `<p><a href="${d.link}" style="color:#0F766E;font-weight:700">Open</a></p>` : ''}`);
-        // Send individually so one bad address doesn't sink the batch.
-        for (const to of recipients) {
-          try { await sendMail({ to, subject: d.title, html }); sentCount++; } catch (e) { /* skip */ }
-        }
+      recipientCount = recipients.length;
+      const html = emailShell(d.title, `<p style="color:#334155;line-height:1.6">${(d.body as string).replace(/\n/g, '<br/>')}</p>${d.link ? `<p><a href="${d.link}" style="color:#0F766E;font-weight:700">Open</a></p>` : ''}`);
+      // Send individually so one bad address doesn't sink the batch, but capture the first error.
+      for (const to of recipients) {
+        try { await sendMail({ to, subject: d.title, html }); sentCount++; }
+        catch (e: any) { failedCount++; if (!mailError) mailError = e?.message || 'send failed'; }
       }
     }
     const notif = await prisma.appNotification.create({
@@ -308,8 +311,26 @@ router.post('/admin/notifications', ...admin, async (req: Request, res: Response
         imageUrl: d.imageUrl || null, link: d.link || null, sentCount,
       },
     });
-    res.json(notif);
+    // Return the outcome so the admin sees whether email actually went out.
+    res.json({ ...notif, emailing, mailConfigured, recipientCount, sentCount, failedCount, mailError: mailError || undefined });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Send ONE test email and surface the real result/error, so SMTP config can be verified.
+router.post('/admin/test-email', ...admin, async (req: Request, res: Response) => {
+  const to = (req.body?.to || '').trim();
+  if (!to) { res.status(400).json({ error: 'Recipient email is required' }); return; }
+  if (!isMailEnabled()) {
+    res.json({ ok: false, mailConfigured: false, message: 'MAIL_HOST is not set in the backend .env — email is only logged, not sent. Add SMTP settings and restart the backend.' });
+    return;
+  }
+  try {
+    await sendMail({ to, subject: 'Rafik — test email ✅', html: emailShell('It works!', '<p style="color:#334155;line-height:1.6">Your Rafik email settings are working. Password resets and email notifications will now be delivered.</p>') });
+    res.json({ ok: true, message: `Test email sent to ${to}. Check the inbox (and the spam folder).` });
+  } catch (err: any) {
+    console.error('test-email failed:', err);
+    res.status(502).json({ ok: false, error: err?.message || 'Send failed', code: err?.code });
+  }
 });
 
 router.delete('/admin/notifications/:id', ...admin, async (req: Request, res: Response) => {
