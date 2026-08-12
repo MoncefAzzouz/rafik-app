@@ -6,6 +6,7 @@ import { isValidLocation } from '../lib/locations';
 import { canTransition, isKnownStatus, newBookingId } from '../lib/bookingStatus';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 import { memoryUpload, storeUpload, deleteUpload } from '../lib/r2';
+import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const upload = memoryUpload();
 
@@ -13,6 +14,25 @@ const router = Router();
 
 function getUser(req: Request) {
   return (req as AuthenticatedRequest).user!;
+}
+
+// Human labels + email body for booking events.
+const BOOKING_STATUS_LABEL: Record<string, string> = {
+  pending_review: 'Pending review', awaiting_worker: 'Waiting for the professional',
+  accepted: 'Accepted', declined: 'Declined', quote_sent: 'Quote sent',
+  quote_approved: 'Quote approved', in_progress: 'In progress', completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+function bookingRows(b: any): string {
+  return infoTable([
+    pRow('Booking', b.id),
+    pRow('Client', `${b.clientName} · ${b.clientPhone}`),
+    pRow('Service', b.serviceCategory),
+    pRow('Location', [b.clientCommune, b.clientWilaya].filter(Boolean).join(', ')),
+    pRow('Date', b.bookingDate),
+    pRow('Quote', b.workerQuote != null ? `${b.workerQuote} DZD` : b.price),
+    pRow('Description', b.description),
+  ]);
 }
 
 // Is the requester the worker assigned to this professional record?
@@ -176,6 +196,10 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT'), upload.array
       data: { bookings: { increment: 1 } },
     });
 
+    // New service booking → email every admin (and the worker if they have an account).
+    void notifyAdmins(`🔧 New booking ${booking.id} — ${serviceCategory}`, lead('A new service booking was placed.') + bookingRows(booking));
+    void emailUser(worker.userId, `New booking assigned to you — ${serviceCategory}`, lead('A client requested your service.') + bookingRows(booking));
+
     res.status(201).json(booking);
   } catch (err) {
     console.error(err);
@@ -262,6 +286,11 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
         include: { statusHistory: true },
       }),
     ]);
+    const label = BOOKING_STATUS_LABEL[status as string] || (status as string);
+    void emailUser(existing.clientId, `Your booking ${id}: ${label}`, lead(`Your booking status is now: <b>${label}</b>.`) + bookingRows({ ...existing, status }));
+    if (status === 'quote_approved' || status === 'completed') {
+      void notifyAdmins(`Booking ${id}: ${label}`, lead(`This booking is now <b>${label}</b>.`) + bookingRows({ ...existing, status }));
+    }
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -316,6 +345,7 @@ router.put('/:id/quote', authenticateToken, async (req: Request, res: Response) 
         include: { statusHistory: true, worker: true },
       }),
     ]);
+    void emailUser(existing.clientId, `You received a quote for booking ${id}`, lead(`Your professional sent a quote of <b>${parseInt(workerQuote)} DZD</b>${bookingTime ? ` for ${bookingTime}` : ''}. Open the app to approve it.`) + bookingRows(booking));
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -352,6 +382,8 @@ async function workerAcceptDecline(req: Request, res: Response, target: 'accepte
         include: { statusHistory: true, worker: true },
       }),
     ]);
+    const msg = target === 'accepted' ? 'accepted your request and will be in touch' : 'is unable to take this request';
+    void emailUser(existing.clientId, `Your booking ${id} was ${target}`, lead(`The professional ${msg}.`) + bookingRows(booking));
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -441,6 +473,8 @@ router.put('/:id/complete', authenticateToken, async (req: Request, res: Respons
       });
     }
 
+    void emailUser(existing.clientId, `Your booking ${id} is completed ✅`, lead('Your service is complete. Thank you for using Rafik!') + bookingRows(booking));
+    void notifyAdmins(`Booking ${id} completed`, lead('A service booking was completed.') + bookingRows(booking));
     res.json(booking);
   } catch (err) {
     console.error(err);

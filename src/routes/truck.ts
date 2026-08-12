@@ -10,6 +10,7 @@ import {
   estimateTruckPrice, computeTruckCommission, wilayaPriceByName, TRUCK_STATUSES, TRUCK_CANCELLED,
 } from '../lib/truck';
 import { roadDistanceKm, reverseWilaya } from '../lib/geo';
+import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 const INVOICE_STATUSES = ['HAS_INVOICE', 'NO_INVOICE', 'NOT_REQUIRED'];
@@ -86,6 +87,28 @@ function orderMaps(o: any) {
 // Attach the `maps` object (deep links) to an order payload — additive, safe to ignore.
 function withMaps<T extends object>(o: T): T & { maps: ReturnType<typeof orderMaps> } {
   return { ...o, maps: orderMaps(o) };
+}
+
+// ── Email content for order events ──
+const TRUCK_STATUS_LABEL: Record<string, string> = {
+  requested: 'Requested', accepted: 'Accepted by a driver', arrived: 'Driver at pickup',
+  loading: 'Loading cargo', in_transit: 'In transit', delivered: 'Delivered',
+  cancelled_by_client: 'Cancelled by client', cancelled_by_driver: 'Cancelled by driver',
+  cancelled_by_admin: 'Cancelled by admin', expired: 'Expired',
+};
+function truckOrderRows(o: any): string {
+  const m = orderMaps(o);
+  return infoTable([
+    pRow('Order', o.orderNumber),
+    pRow('Client', `${o.clientName} · ${o.clientPhone}`),
+    pRow('From', m.pickupName || o.pickupAddress),
+    pRow('To', m.destinationName || o.destinationAddress),
+    pRow('Category', o.category?.name),
+    pRow('Truck type', o.truckType?.name),
+    pRow('Distance', o.distanceKm != null ? `${o.distanceKm} km` : null),
+    pRow('Price', `${(o.agreedPrice ?? o.estimatedPrice ?? 0).toLocaleString()} DZD`),
+    pRow('When', o.scheduledType === 'scheduled' ? `Scheduled: ${o.scheduledDate || ''}` : 'Now'),
+  ]);
 }
 
 async function getOwnTruck(userId: string) {
@@ -623,6 +646,8 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
     if (promoValidation?.valid && promoValidation.promo) {
       await redeemPromo({ promoId: promoValidation.promo.id, vertical: 'truck', refId: order.id, discount: promoDiscount, userId: user.userId, clientPhone: clientPhone as string });
     }
+    // A new freight order landed → email every admin.
+    void notifyAdmins(`🚚 New freight order ${order.orderNumber}`, lead('A new freight order was placed and is waiting for a driver.') + truckOrderRows(order));
     res.status(201).json(order);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -643,6 +668,7 @@ router.post('/orders/:id/assign', authenticateToken, requireRole('ADMIN'), async
       prisma.truckOrder.update({ where: { id }, data: { status: 'accepted', truckId: truck.id, acceptedAt: new Date() }, include: orderInclude }),
       prisma.truck.update({ where: { id: truck.id }, data: { status: 'busy' } }),
     ]);
+    void emailUser(updated.clientId, `Your freight order ${updated.orderNumber} was assigned`, lead(`A truck (<b>${truck.driverName}</b>) has been assigned to your order.`) + truckOrderRows(updated));
     res.json(withMaps(updated));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -674,6 +700,9 @@ router.post('/orders/:id/accept', authenticateToken, requireRole('TRUCKER'), asy
       await prisma.truck.update({ where: { id: truck.id }, data: { status: 'busy' } });
     }
     const full = await prisma.truckOrder.findUnique({ where: { id }, include: orderInclude });
+    const soon = full!.scheduledType === 'scheduled' ? `scheduled for ${full!.scheduledDate || 'your chosen day'}` : 'on the way';
+    void emailUser(full!.clientId, `Your freight order ${full!.orderNumber} was accepted`, lead(`Good news — <b>${truck.driverName}</b> accepted your freight order and is ${soon}.`) + truckOrderRows(full));
+    void notifyAdmins(`Order ${full!.orderNumber} accepted by ${truck.driverName}`, lead(`Driver <b>${truck.driverName}</b> accepted this order.`) + truckOrderRows(full));
     res.json(withMaps(full!));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -698,6 +727,7 @@ async function lifecycle(req: Request, res: Response, target: 'arrived' | 'loadi
       },
       include: orderInclude,
     });
+    void emailUser(updated.clientId, `Order ${updated.orderNumber}: ${TRUCK_STATUS_LABEL[target]}`, lead(`Your freight order status is now: <b>${TRUCK_STATUS_LABEL[target]}</b>.`) + truckOrderRows(updated));
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }
@@ -726,6 +756,8 @@ router.post('/orders/:id/complete', authenticateToken, async (req: Request, res:
     ];
     if (order.truckId) ops.push(prisma.truck.update({ where: { id: order.truckId }, data: { status: 'available', totalTrips: { increment: 1 } } }));
     const [updated] = await prisma.$transaction(ops);
+    void emailUser(updated.clientId, `Order ${updated.orderNumber} delivered ✅`, lead('Your freight has been delivered. Thank you for using Rafik!') + truckOrderRows(updated));
+    void notifyAdmins(`Order ${updated.orderNumber} delivered`, lead('This freight order was completed and delivered.') + truckOrderRows(updated));
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -754,6 +786,10 @@ router.post('/orders/:id/cancel', authenticateToken, async (req: Request, res: R
     ];
     if (order.truckId) ops.push(prisma.truck.update({ where: { id: order.truckId }, data: { status: 'available', ...(by === 'DRIVER' && { cancellationCount: { increment: 1 } }) } }));
     const [updated] = await prisma.$transaction(ops);
+    const who = by === 'CLIENT' ? 'the client' : by === 'DRIVER' ? 'the driver' : 'an admin';
+    const reasonHtml = reason ? ` Reason: ${reason}.` : '';
+    void emailUser(updated.clientId, `Order ${updated.orderNumber} cancelled`, lead(`Your freight order was cancelled by ${who}.${reasonHtml}`) + truckOrderRows(updated));
+    void notifyAdmins(`Order ${updated.orderNumber} cancelled by ${by}`, lead(`Cancelled by ${who}.${reasonHtml}`) + truckOrderRows(updated));
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

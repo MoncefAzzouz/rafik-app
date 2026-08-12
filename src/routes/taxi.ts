@@ -7,6 +7,7 @@ import {
   computeCommission, runFraudDetection, CANCELLED_STATUSES, RIDE_STATUSES,
 } from '../lib/taxi';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
+import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 
@@ -168,6 +169,14 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
       });
     }
 
+    void notifyAdmins(`🚕 New ride ${ride.rideNumber}`, lead('A new taxi ride was requested.') + infoTable([
+      pRow('Ride', ride.rideNumber),
+      pRow('Client', `${ride.clientName} · ${ride.clientPhone}`),
+      pRow('From', ride.pickupAddress),
+      pRow('To', ride.destinationAddress),
+      pRow('Distance', ride.distanceKm != null ? `${ride.distanceKm} km` : null),
+      pRow('Fare', `${ride.agreedFare ?? ride.estimatedFare} DZD`),
+    ]));
     res.status(201).json(ride);
   } catch (err) {
     console.error(err);
@@ -304,6 +313,12 @@ router.post('/rides/:id/complete', authenticateToken, async (req: Request, res: 
       }));
     }
     const [updated] = await prisma.$transaction(ops);
+    void emailUser(updated.clientId, `Your ride ${updated.rideNumber} is complete ✅`, lead('Your ride is finished. Thank you for riding with Rafik!') + infoTable([
+      pRow('Ride', updated.rideNumber),
+      pRow('From', updated.pickupAddress),
+      pRow('To', updated.destinationAddress),
+      pRow('Fare', `${updated.agreedFare ?? updated.estimatedFare} DZD`),
+    ]));
     res.json(updated);
   } catch (err) {
     console.error(err);
