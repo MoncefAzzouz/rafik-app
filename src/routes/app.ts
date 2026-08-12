@@ -137,6 +137,19 @@ router.get('/admin/status', ...admin, async (_req: Request, res: Response) => {
   res.json({ mailConfigured: isMailEnabled(), pushConfigured: isPushEnabled(), devices });
 });
 
+// Per-vertical count of orders still waiting on someone (drives the sidebar red dot).
+router.get('/admin/pending-counts', ...admin, async (_req: Request, res: Response) => {
+  try {
+    const [truck, food, taxi, services] = await Promise.all([
+      prisma.truckOrder.count({ where: { status: 'requested' } }),
+      prisma.foodOrder.count({ where: { status: 'pending' } }),
+      prisma.taxiRide.count({ where: { status: 'requested' } }),
+      prisma.booking.count({ where: { status: { in: ['pending_review', 'awaiting_worker'] } } }),
+    ]);
+    res.json({ truck, food, taxi, services });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // ── Admin notification bell (top bar) ──
 // List recent admin notifications + unread count.
 router.get('/admin/alerts', ...admin, async (req: Request, res: Response) => {
