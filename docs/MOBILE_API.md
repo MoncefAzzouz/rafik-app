@@ -87,6 +87,18 @@ The admin sends pushes from the dashboard; the app just needs to **register the 
 and **display incoming FCM messages** (foreground + background handlers). Notification
 payloads may carry a `data.link` (a deep link to open).
 
+### Automatic notifications (server-side — nothing to build in the app)
+The backend already reacts to order events on its own:
+- **Clients are emailed automatically** on every order/booking state change — e.g. *accepted →
+  in transit → delivered* (truck), *quote sent / completed* (services), ride/food status, etc.
+  The app does **not** need to send these emails.
+- **Admins** get an in-app bell alert + email in the dashboard for new orders and every state change.
+- To also give the client a phone **pop-up** for these events, just make sure the app registered
+  its FCM token (above) — push can then be enabled to fire alongside the emails.
+
+So the app's only job for notifications is: **register the FCM token** and **show incoming pushes**.
+Fetching the in-app feed (`GET /api/app/notifications`) is optional, for an in-app "notifications" list.
+
 ---
 
 ## 4. App content
