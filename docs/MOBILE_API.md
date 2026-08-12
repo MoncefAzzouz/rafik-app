@@ -4,7 +4,7 @@ Everything the Flutter app needs to talk to the Rafik backend. Covers auth, push
 notifications, app content, and the full **Truck (freight)** flow — including how
 distance and price are calculated (free, no Google billing).
 
-- **Base URL (production):** `http://5.196.32.222`
+- **Base URL (production):** `https://rafik-algerie.com`
 - All request/response bodies are **JSON** (`Content-Type: application/json`), except
   file uploads which use `multipart/form-data`.
 - Auth uses a **JWT Bearer token**: send `Authorization: Bearer <token>` on protected calls.
@@ -60,7 +60,7 @@ Public info page (no login): `GET /delete-account` on the web front.
 
 1. `POST /api/auth/forgot-password` `{ "email": "a@b.com" }`
    → always `200 { "success": true }` (doesn't reveal if the email exists). Sends a
-   link to `http://5.196.32.222/reset-password?token=…` (opens a web page to set a new password).
+   link to `https://rafik-algerie.com/reset-password?token=…` (opens a web page to set a new password).
 2. Optional pre-check: `GET /api/auth/reset-password/:token` → `{ "valid": true|false }`.
 3. `POST /api/auth/reset-password` `{ "token": "...", "password": "newpass" }` → `{ "success": true }`.
 
@@ -306,7 +306,7 @@ Terminal: `delivered`, any `cancelled_*`, `expired`.
 ```bash
 DATABASE_URL=...           # PostgreSQL
 JWT_SECRET=...
-APP_WEB_URL=http://5.196.32.222      # used for password-reset links
+APP_WEB_URL=https://rafik-algerie.com      # used for password-reset links
 
 # Email (SMTP or SMTP_* aliases) — password resets & (optional) email blasts
 SMTP_HOST=smtp.gmail.com

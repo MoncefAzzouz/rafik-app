@@ -10,7 +10,7 @@ const router = Router();
 
 // Where the emailed reset link points (the public web front). Override with env.
 function webBaseUrl() {
-  return (process.env.APP_WEB_URL || 'http://5.196.32.222').replace(/\/$/, '');
+  return (process.env.APP_WEB_URL || 'https://rafik-algerie.com').replace(/\/$/, '');
 }
 function sha256(v: string) {
   return crypto.createHash('sha256').update(v).digest('hex');
