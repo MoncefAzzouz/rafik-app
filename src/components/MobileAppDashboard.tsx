@@ -475,29 +475,44 @@ function NotificationsPage({ notifs, post, del }: {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [channel, setChannel] = useState("app");
+  const [chApp, setChApp] = useState(true);
+  const [chPush, setChPush] = useState(false);
+  const [chEmail, setChEmail] = useState(false);
   const [audience, setAudience] = useState("all");
   const [link, setLink] = useState("");
   const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<{ mailConfigured: boolean; pushConfigured: boolean; devices: number } | null>(null);
 
   // Test-email tool
   const [testTo, setTestTo] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch(`${API_URL}/api/app/admin/status`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null).then(setStatus).catch(() => {});
+  }, [token]);
+
   const send = async () => {
     if (!title.trim() || !body.trim()) return alert("Title and message are required");
+    const channels = [chApp && "app", chPush && "push", chEmail && "email"].filter(Boolean) as string[];
+    if (!channels.length) return alert("Pick at least one channel");
     setSending(true);
-    const r = await post(`/api/app/admin/notifications`, { title, body, channel, audience, link });
+    const r = await post(`/api/app/admin/notifications`, { title, body, channels, audience, link });
     setSending(false);
     if (!r) return;
     setTitle(""); setBody(""); setLink("");
-    if (r.emailing) {
-      if (!r.mailConfigured) alert("Saved — but email is NOT configured on the server (MAIL_HOST is missing in .env), so no emails were sent.");
-      else if (r.failedCount) alert(`Email: sent ${r.sentCount} of ${r.recipientCount}, ${r.failedCount} failed.\nFirst error: ${r.mailError || "unknown"}`);
-      else if (r.sentCount) alert(`Email sent to ${r.sentCount} recipient${r.sentCount === 1 ? "" : "s"} ✅`);
-      else alert("No recipients had an email address for this audience.");
+    const lines: string[] = [];
+    if (r.wantEmail) {
+      if (!r.mailConfigured) lines.push("• Email NOT sent — SMTP not configured on the server.");
+      else if (r.failedCount) lines.push(`• Email: ${r.sentCount}/${r.recipientCount} sent, ${r.failedCount} failed (${r.mailError || "?"}).`);
+      else lines.push(`• Email sent to ${r.sentCount} recipient(s).`);
     }
+    if (r.wantPush) {
+      if (!r.pushConfigured) lines.push("• Push NOT sent — Firebase not configured on the server.");
+      else lines.push(`• Push: ${r.pushSent}/${r.pushTargets} device(s)${r.pushFailed ? `, ${r.pushFailed} failed` : ""}.`);
+    }
+    alert(lines.length ? lines.join("\n") : "Saved to the in-app feed ✅");
   };
 
   const sendTest = async () => {
@@ -525,12 +540,11 @@ function NotificationsPage({ notifs, post, del }: {
         <Field label="Title *"><input value={title} onChange={e => setTitle(e.target.value)} className={inputCls} placeholder="New feature is live!" /></Field>
         <Field label="Message *"><textarea value={body} onChange={e => setBody(e.target.value)} rows={4} className={inputCls} placeholder="Write your announcement…" /></Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Channel">
-            <div className="flex gap-2">
-              {[{ v: "app", l: "In-app", i: Smartphone }, { v: "email", l: "Email", i: Mail }, { v: "both", l: "Both", i: Send }].map(o => {
-                const I = o.i;
-                return <button key={o.v} onClick={() => setChannel(o.v)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider border flex items-center justify-center gap-1.5 cursor-pointer ${channel === o.v ? "bg-violet-600 text-white border-violet-600" : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100"}`}><I size={13} /> {o.l}</button>;
-              })}
+          <Field label="Channels">
+            <div className="flex flex-wrap gap-2">
+              <ChannelChk on={chApp} set={setChApp} icon={Smartphone} label="In-app" />
+              <ChannelChk on={chPush} set={setChPush} icon={BellRing} label="Push" bad={!!status && !status.pushConfigured} />
+              <ChannelChk on={chEmail} set={setChEmail} icon={Mail} label="Email" bad={!!status && !status.mailConfigured} />
             </div>
           </Field>
           <Field label="Audience">
@@ -543,9 +557,13 @@ function NotificationsPage({ notifs, post, del }: {
           </Field>
         </div>
         <Field label="Link (optional)"><input value={link} onChange={e => setLink(e.target.value)} className={inputCls} placeholder="rafik://promos or https://…" /></Field>
-        {(channel === "email" || channel === "both") && (
-          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Email sending requires SMTP credentials in the backend <code>.env</code> (MAIL_HOST…). Without them, emails are logged, not sent.</p>
+        {chEmail && status && !status.mailConfigured && (
+          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Email is not configured — add SMTP settings to the backend <code>.env</code> and restart. Emails won’t send until then.</p>
         )}
+        {chPush && status && !status.pushConfigured && (
+          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Push is not configured — add the Firebase service-account key to the backend <code>.env</code> and restart. See the setup steps.</p>
+        )}
+        {chPush && status?.pushConfigured && <p className="text-[11px] font-bold text-slate-400 font-inter">{status.devices} device(s) registered for push.</p>}
         <button onClick={send} disabled={sending} className={saveBtnCls}>{sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} {sending ? "Sending…" : "Send notification"}</button>
       </div>
 
@@ -659,5 +677,14 @@ function EmptyState({ icon: Icon, text }: { icon: React.ComponentType<{ size?: n
       <Icon size={40} />
       <p className="text-xs font-bold text-slate-400 font-inter">{text}</p>
     </div>
+  );
+}
+function ChannelChk({ on, set, icon: Icon, label, bad }: { on: boolean; set: (v: boolean) => void; icon: React.ComponentType<{ size?: number }>; label: string; bad?: boolean }) {
+  return (
+    <button type="button" onClick={() => set(!on)} className={`px-3.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border flex items-center gap-1.5 cursor-pointer ${on ? "bg-violet-600 text-white border-violet-600" : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100"}`}>
+      <Icon size={13} /> {label}
+      {on && <Check size={12} />}
+      {bad && <span title="Not configured on the server" className="w-2 h-2 rounded-full bg-amber-400" />}
+    </button>
   );
 }
