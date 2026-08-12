@@ -9,6 +9,7 @@ import {
   canTruckTransition, nextTruckOrderNumber, nextTruckCode, haversineKm,
   estimateTruckPrice, computeTruckCommission, wilayaPriceByName, TRUCK_STATUSES, TRUCK_CANCELLED,
 } from '../lib/truck';
+import { roadDistanceKm, reverseWilaya } from '../lib/geo';
 
 const router = Router();
 const INVOICE_STATUSES = ['HAS_INVOICE', 'NO_INVOICE', 'NOT_REQUIRED'];
@@ -459,18 +460,30 @@ router.post('/register', async (req: Request, res: Response) => {
 router.post('/quote', async (req: Request, res: Response) => {
   const { truckTypeId, destinationWilaya, distanceKm, pickupLat, pickupLng, destinationLat, destinationLng } = req.body;
   try {
+    const haveCoords = pickupLat != null && pickupLng != null && destinationLat != null && destinationLng != null;
     let km: number | null = distanceKm != null && `${distanceKm}` !== '' ? parseFloat(distanceKm) : null;
-    if (km === null && pickupLat != null && pickupLng != null && destinationLat != null && destinationLng != null) {
-      km = Math.round(haversineKm(parseFloat(pickupLat), parseFloat(pickupLng), parseFloat(destinationLat), parseFloat(destinationLng)) * 10) / 10;
+    let durationMin: number | null = null;
+    let source = 'given';
+    // No km supplied? Compute the real driving distance A→B (free OSRM, haversine fallback).
+    if (km === null && haveCoords) {
+      const rd = await roadDistanceKm(+pickupLat, +pickupLng, +destinationLat, +destinationLng);
+      km = rd.km; durationMin = rd.durationMin; source = rd.source;
+    }
+    // Which city/wilaya is B in? Use the one sent, else reverse-geocode from the drop coords.
+    let destWilaya: string | null = (destinationWilaya as string) || null;
+    let destDisplay: string | null = null;
+    if (!destWilaya && destinationLat != null && destinationLng != null) {
+      const rev = await reverseWilaya(+destinationLat, +destinationLng);
+      destWilaya = rev.wilaya; destDisplay = rev.display;
     }
     const truckType = truckTypeId ? await prisma.truckType.findUnique({ where: { id: truckTypeId as string } }) : null;
-    const wilayaPrice = await wilayaPriceByName(destinationWilaya as string);
+    const wilayaPrice = await wilayaPriceByName(destWilaya);
     const quote = await estimateTruckPrice({
       distanceKm: km,
       typeMultiplier: truckType?.priceMultiplier ?? null,
       wilayaPrice,
     });
-    res.json({ ...quote, distanceKm: km, estimatedPrice: quote.estimatedPrice });
+    res.json({ ...quote, distanceKm: km, durationMin, source, destinationWilaya: destWilaya, destinationDisplay: destDisplay, estimatedPrice: quote.estimatedPrice });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -561,10 +574,18 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
 
     let km: number | null = distanceKm != null && `${distanceKm}` !== '' ? parseFloat(distanceKm) : null;
     if (km === null && pickupLat != null && pickupLng != null && destinationLat != null && destinationLng != null) {
-      km = Math.round(haversineKm(parseFloat(pickupLat), parseFloat(pickupLng), parseFloat(destinationLat), parseFloat(destinationLng)) * 10) / 10;
+      // Real driving distance (free OSRM; haversine fallback if it's unreachable).
+      const rd = await roadDistanceKm(+pickupLat, +pickupLng, +destinationLat, +destinationLng);
+      km = rd.km;
     }
 
-    const wilayaPrice = await wilayaPriceByName(destinationWilaya as string);
+    // If the client didn't name B's wilaya but dropped a pin, reverse-geocode it (drives the price).
+    let destWilaya: string | null = (destinationWilaya as string) || null;
+    if (!destWilaya && destinationLat != null && destinationLng != null) {
+      destWilaya = (await reverseWilaya(+destinationLat, +destinationLng)).wilaya;
+    }
+
+    const wilayaPrice = await wilayaPriceByName(destWilaya);
     const { estimatedPrice } = await estimateTruckPrice({
       distanceKm: km, typeMultiplier: truckType?.priceMultiplier ?? null, wilayaPrice,
     });
@@ -587,7 +608,7 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
         categoryId: categoryId as string, truckTypeId: (truckTypeId as string) || null,
         pickupAddress: pickupAddress as string, pickupWilaya: (pickupWilaya as string) || null, pickupCommune: (pickupCommune as string) || null,
         pickupLat: pickupLat != null ? parseFloat(pickupLat) : null, pickupLng: pickupLng != null ? parseFloat(pickupLng) : null,
-        destinationAddress: destinationAddress as string, destinationWilaya: (destinationWilaya as string) || null,
+        destinationAddress: destinationAddress as string, destinationWilaya: destWilaya,
         destinationLat: destinationLat != null ? parseFloat(destinationLat) : null, destinationLng: destinationLng != null ? parseFloat(destinationLng) : null,
         distanceKm: km, description: description as string,
         invoiceStatus: (invoiceStatus as any) || 'NOT_REQUIRED',
