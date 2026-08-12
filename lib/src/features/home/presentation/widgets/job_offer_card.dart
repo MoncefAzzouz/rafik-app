@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../deliveries/domain/delivery_job.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../orders/domain/truck_order.dart';
 
 class JobOfferCard extends StatelessWidget {
-  final DeliveryJob job;
+  final TruckOrder order;
   final VoidCallback onTap;
 
-  const JobOfferCard({super.key, required this.job, required this.onTap});
+  const JobOfferCard({super.key, required this.order, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class JobOfferCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
-                  Icons.inventory_2_rounded,
+                  Icons.local_shipping_rounded,
                   color: AppColors.blue,
                 ),
               ),
@@ -38,7 +38,7 @@ class JobOfferCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${job.pickupName} → ${job.destinationName}',
+                      '${order.pickupAddress} → ${order.destinationAddress}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -48,7 +48,9 @@ class JobOfferCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      '${job.pickupKm} km away  •  ${job.tripKm} km  •  ${job.estimatedMinutes} min',
+                      order.distanceKm != null
+                          ? '${order.distanceKm} km'
+                          : 'Distance unknown',
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 12,
@@ -56,7 +58,7 @@ class JobOfferCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      job.packageType,
+                      order.category?.name ?? order.truckType?.name ?? '',
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 12,
@@ -68,7 +70,7 @@ class JobOfferCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                '${job.payoutDzd}\nDA',
+                '${order.estimatedPrice ?? 0}\nDA',
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   color: AppColors.green,

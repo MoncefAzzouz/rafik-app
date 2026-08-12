@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../deliveries/data/delivery_repository.dart';
-import '../../../deliveries/domain/delivery_job.dart';
 import '../../../deliveries/presentation/pages/active_delivery_page.dart';
+import '../../../orders/data/truck_repository.dart';
+import '../../../orders/domain/truck_order.dart';
 
 class DriverActivityPage extends StatefulWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
 
   const DriverActivityPage({super.key, required this.repository});
 
@@ -50,7 +50,7 @@ class _DriverActivityPageState extends State<DriverActivityPage> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
             child: _ActivityTabBar(
               selectedIndex: selectedTab,
-              currentCount: widget.repository.activeJob == null ? 0 : 1,
+              currentCount: widget.repository.active.length,
               onSelected: (value) => setState(() => selectedTab = value),
             ),
           ),
@@ -59,7 +59,7 @@ class _DriverActivityPageState extends State<DriverActivityPage> {
               index: selectedTab,
               children: [
                 _CurrentActivity(repository: widget.repository),
-                const _HistoryActivity(),
+                _HistoryActivity(repository: widget.repository),
               ],
             ),
           ),
@@ -153,14 +153,14 @@ class _ActivityTabBar extends StatelessWidget {
 }
 
 class _CurrentActivity extends StatelessWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
 
   const _CurrentActivity({required this.repository});
 
   @override
   Widget build(BuildContext context) {
-    final job = repository.activeJob;
-    if (job == null) {
+    final orders = repository.active;
+    if (orders.isEmpty) {
       return ListView(
         padding: const EdgeInsets.fromLTRB(20, 40, 20, 120),
         children: const [
@@ -181,7 +181,7 @@ class _CurrentActivity extends StatelessWidget {
           ),
           SizedBox(height: 7),
           Text(
-            'Go online from Home and accept a parcel request. It will appear here.',
+            'Go online from Home and accept a delivery request. It will appear here.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.muted, height: 1.4),
           ),
@@ -192,78 +192,85 @@ class _CurrentActivity extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.royalBlue.withAlpha(35)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    job.id,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
+        for (final order in orders) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.royalBlue.withAlpha(35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      order.orderNumber,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  _StatusChip(status: job.status),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _location(
-                Icons.storefront_rounded,
-                job.pickupName,
-                job.pickupAddress,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 17),
-                child: Container(width: 2, height: 24, color: AppColors.line),
-              ),
-              _location(
-                Icons.location_on_rounded,
-                job.destinationName,
-                job.destinationAddress,
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Text(
-                    '${job.payoutDzd} DA',
-                    style: const TextStyle(
-                      color: AppColors.green,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${job.tripKm} km · ${job.estimatedMinutes} min',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ActiveDeliveryPage(repository: repository),
-                  ),
+                    _StatusChip(status: order.status),
+                  ],
                 ),
-                child: const Text('Continue delivery'),
-              ),
-            ],
+                const SizedBox(height: 18),
+                _location(
+                  Icons.storefront_rounded,
+                  order.pickupAddress,
+                  order.pickupWilaya ?? '',
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 17),
+                  child: Container(width: 2, height: 24, color: AppColors.line),
+                ),
+                _location(
+                  Icons.location_on_rounded,
+                  order.destinationAddress,
+                  order.destinationWilaya ?? '',
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      '${order.agreedPrice ?? order.estimatedPrice ?? 0} DA',
+                      style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (order.distanceKm != null)
+                      Text(
+                        '${order.distanceKm} km',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ActiveDeliveryPage(
+                        repository: repository,
+                        order: order,
+                      ),
+                    ),
+                  ),
+                  child: const Text('Continue delivery'),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -286,17 +293,20 @@ class _CurrentActivity extends StatelessWidget {
           children: [
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.ink,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
+            if (subtitle.isNotEmpty)
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
           ],
         ),
       ),
@@ -305,7 +315,7 @@ class _CurrentActivity extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final DeliveryStatus status;
+  final String status;
 
   const _StatusChip({required this.status});
 
@@ -318,9 +328,10 @@ class _StatusChip extends StatelessWidget {
     ),
     child: Text(
       switch (status) {
-        DeliveryStatus.accepted => 'To pickup',
-        DeliveryStatus.pickedUp => 'Picked up',
-        DeliveryStatus.delivering => 'Delivering',
+        TruckOrderStatus.accepted => 'To pickup',
+        TruckOrderStatus.arrived => 'Arrived',
+        TruckOrderStatus.loading => 'Loading',
+        TruckOrderStatus.inTransit => 'In transit',
         _ => 'Active',
       },
       style: const TextStyle(
@@ -333,130 +344,112 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _HistoryActivity extends StatelessWidget {
-  const _HistoryActivity();
+  final TruckRepository repository;
+
+  const _HistoryActivity({required this.repository});
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
-    children: [
-      _day('Today · July 28', [
-        _item(
-          'RF-4768',
-          'Park Mall → El Hidhab',
-          'Completed · 10:42',
-          '690 DA',
-        ),
-        _item(
-          'RF-4759',
-          'Sétif Centre → Aïn Arnat',
-          'Completed · 09:16',
-          '1,050 DA',
-        ),
-        _item(
-          'RF-4744',
-          'El Bez → Sétif Centre',
-          'Completed · 08:21',
-          '720 DA',
-        ),
-      ]),
-      const SizedBox(height: 22),
-      _day('Yesterday · July 27', [
-        _item(
-          'RF-4692',
-          'Zone Industrielle → El Eulma',
-          'Completed · 17:50',
-          '2,480 DA',
-        ),
-        _item(
-          'RF-4681',
-          'Aïn Arnat → Park Mall',
-          'Cancelled · 15:03',
-          '0 DA',
-          cancelled: true,
-        ),
-        _item(
-          'RF-4660',
-          'Sétif Centre → El Bez',
-          'Completed · 11:37',
-          '830 DA',
-        ),
-      ]),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final orders = repository.completed;
+    if (orders.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 40, 20, 120),
+        children: const [
+          Icon(Icons.history_rounded, color: AppColors.royalBlue, size: 62),
+          SizedBox(height: 18),
+          Text(
+            'No delivery history yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          SizedBox(height: 7),
+          Text(
+            'Completed and cancelled deliveries will show up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.muted, height: 1.4),
+          ),
+        ],
+      );
+    }
 
-  Widget _day(String title, List<Widget> children) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(
-          color: AppColors.ink,
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-        ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 120),
+      children: [for (final order in orders) _item(order)],
+    );
+  }
+
+  Widget _item(TruckOrder order) {
+    final cancelled = order.status.startsWith('cancelled');
+    final statusLabel = switch (order.status) {
+      TruckOrderStatus.delivered => 'Completed',
+      TruckOrderStatus.cancelledByClient => 'Cancelled by client',
+      TruckOrderStatus.cancelledByDriver => 'Cancelled by you',
+      TruckOrderStatus.cancelledByAdmin => 'Cancelled by admin',
+      _ => order.status,
+    };
+    final timestamp = order.deliveredAt ?? order.cancelledAt ?? order.createdAt;
+    final timeLabel = timestamp != null
+        ? '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
+        : '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
       ),
-      const SizedBox(height: 10),
-      ...children,
-    ],
-  );
-
-  Widget _item(
-    String id,
-    String route,
-    String status,
-    String amount, {
-    bool cancelled = false,
-  }) => Container(
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(17),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(19),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: (cancelled ? AppColors.red : AppColors.green).withAlpha(18),
-            borderRadius: BorderRadius.circular(14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: (cancelled ? AppColors.red : AppColors.green).withAlpha(
+                18,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              cancelled ? Icons.close_rounded : Icons.check_rounded,
+              color: cancelled ? AppColors.red : AppColors.green,
+            ),
           ),
-          child: Icon(
-            cancelled ? Icons.close_rounded : Icons.check_rounded,
-            color: cancelled ? AppColors.red : AppColors.green,
-          ),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                route,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w800,
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${order.pickupAddress} → ${order.destinationAddress}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '$id · $status',
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
-              ),
-            ],
+                const SizedBox(height: 3),
+                Text(
+                  '${order.orderNumber} · $statusLabel${timeLabel.isNotEmpty ? ' · $timeLabel' : ''}',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ],
+            ),
           ),
-        ),
-        Text(
-          amount,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontWeight: FontWeight.w900,
+          Text(
+            '${cancelled ? 0 : order.driverEarnings ?? order.agreedPrice ?? order.estimatedPrice ?? 0} DA',
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

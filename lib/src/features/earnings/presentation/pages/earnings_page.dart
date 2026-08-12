@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../deliveries/data/delivery_repository.dart';
+import '../../../orders/data/truck_repository.dart';
 
 class EarningsPage extends StatelessWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
 
   const EarningsPage({super.key, required this.repository});
 
@@ -45,6 +45,9 @@ class EarningsPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
+                // Placeholder pending a backend weekly-earnings endpoint —
+                // no per-trucker aggregate exists yet, only the capped
+                // 30-item `completed` list from the dashboard.
                 const Text(
                   '18,940 DA',
                   style: TextStyle(
@@ -70,13 +73,17 @@ class EarningsPage extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _metric('Deliveries', '31', Icons.inventory_2_outlined),
+                child: _metric(
+                  'Deliveries today',
+                  '${repository.todayTrips}',
+                  Icons.inventory_2_outlined,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _metric(
-                  'Online time',
-                  '27h 40m',
+                  'Status',
+                  repository.online ? 'Online' : 'Offline',
                   Icons.schedule_rounded,
                 ),
               ),

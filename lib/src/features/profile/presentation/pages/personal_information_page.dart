@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../orders/data/truck_repository.dart';
 
 class PersonalInformationPage extends StatefulWidget {
   const PersonalInformationPage({super.key});
@@ -11,20 +13,61 @@ class PersonalInformationPage extends StatefulWidget {
 }
 
 class _PersonalInformationPageState extends State<PersonalInformationPage> {
-  final nameController = TextEditingController(text: 'Moncef Azzouz');
-  final phoneController = TextEditingController(text: '+213 550 123 456');
-  final emailController = TextEditingController(text: 'moncef@email.com');
-  final addressController = TextEditingController(
-    text: 'Cité El Hidhab, Sétif',
+  late final nameController = TextEditingController(
+    text: TruckRepository.instance.truck?.driverName ?? '',
   );
+  late final phoneController = TextEditingController(
+    text: TruckRepository.instance.truck?.phone ?? '',
+  );
+
+  bool _isSaving = false;
 
   @override
   void dispose() {
     nameController.dispose();
     phoneController.dispose();
-    emailController.dispose();
-    addressController.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    final truck = TruckRepository.instance.truck;
+    if (truck == null) return;
+
+    setState(() => _isSaving = true);
+
+    final result = await ApiClient.instance.put(
+      '/api/truck/trucks/${truck.id}',
+      body: {
+        'driverName': nameController.text.trim(),
+        'phone': phoneController.text.trim(),
+      },
+    );
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    result.fold(
+      onSuccess: (_) async {
+        await TruckRepository.instance.refreshTruckProfile();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Personal information saved')),
+        );
+      },
+      onFailure: (failure) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
   }
 
   @override
@@ -34,43 +77,22 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
       children: [
         Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 92,
-                height: 92,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.primaryGradient,
-                ),
-                child: const Text(
-                  'MA',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+          child: Container(
+            width: 92,
+            height: 92,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppColors.primaryGradient,
+            ),
+            child: Text(
+              _initials(TruckRepository.instance.truck?.driverName ?? ''),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
               ),
-              Positioned(
-                right: -2,
-                bottom: -2,
-                child: Material(
-                  color: AppColors.royalBlue,
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: 34),
@@ -81,22 +103,20 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
           Icons.phone_outlined,
           type: TextInputType.phone,
         ),
-        _field(
-          'Email address',
-          emailController,
-          Icons.email_outlined,
-          type: TextInputType.emailAddress,
-        ),
-        _field('Home address', addressController, Icons.home_outlined),
         const SizedBox(height: 8),
         FilledButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Personal information saved')),
-            );
-          },
+          onPressed: _isSaving ? null : _save,
           style: FilledButton.styleFrom(backgroundColor: AppColors.royalBlue),
-          child: const Text('Save changes'),
+          child: _isSaving
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Save changes'),
         ),
       ],
     ),

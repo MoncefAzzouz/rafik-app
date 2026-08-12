@@ -3,21 +3,45 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/driver_map.dart';
-import '../../data/delivery_repository.dart';
-import '../../domain/delivery_job.dart';
+import '../../../orders/data/truck_repository.dart';
+import '../../../orders/domain/truck_order.dart';
 
-class ActiveDeliveryPage extends StatelessWidget {
-  final DeliveryRepository repository;
+class ActiveDeliveryPage extends StatefulWidget {
+  final TruckRepository repository;
+  final TruckOrder order;
 
-  const ActiveDeliveryPage({super.key, required this.repository});
+  const ActiveDeliveryPage({
+    super.key,
+    required this.repository,
+    required this.order,
+  });
+
+  @override
+  State<ActiveDeliveryPage> createState() => _ActiveDeliveryPageState();
+}
+
+class _ActiveDeliveryPageState extends State<ActiveDeliveryPage> {
+  bool _isSubmitting = false;
+
+  TruckRepository get repository => widget.repository;
+
+  /// Finds the freshest copy of the order we're tracking from the
+  /// repository's `active` list (falls back to the widget's order if it has
+  /// since left that list, e.g. right after completing/cancelling).
+  TruckOrder? _currentOrder() {
+    for (final order in repository.active) {
+      if (order.id == widget.order.id) return order;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: repository,
       builder: (context, _) {
-        final job = repository.activeJob;
-        if (job == null) {
+        final order = _currentOrder();
+        if (order == null) {
           return Scaffold(
             body: Center(
               child: Column(
@@ -55,14 +79,15 @@ class ActiveDeliveryPage extends StatelessWidget {
             ),
           );
         }
-        final goingToPickup = job.status == DeliveryStatus.accepted;
+        final goingToPickup = order.status == TruckOrderStatus.accepted;
         return Scaffold(
           body: Stack(
             children: [
               Positioned.fill(
                 child: DriverMap(
-                  online: repository.isOnline,
+                  online: repository.online,
                   borderRadius: BorderRadius.zero,
+                  activeOrder: order,
                 ),
               ),
               SafeArea(
@@ -113,7 +138,7 @@ class ActiveDeliveryPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        _stageLabel(job.status),
+                        _stageLabel(order.status),
                         style: const TextStyle(
                           color: AppColors.blue,
                           fontSize: 12,
@@ -123,7 +148,9 @@ class ActiveDeliveryPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        goingToPickup ? job.pickupName : job.destinationName,
+                        goingToPickup
+                            ? order.pickupAddress
+                            : order.destinationAddress,
                         style: const TextStyle(
                           color: AppColors.ink,
                           fontSize: 23,
@@ -133,8 +160,10 @@ class ActiveDeliveryPage extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         goingToPickup
-                            ? job.pickupAddress
-                            : job.destinationAddress,
+                            ? [order.pickupWilaya, order.pickupCommune]
+                                  .whereType<String>()
+                                  .join(', ')
+                            : order.destinationWilaya ?? '',
                         style: const TextStyle(color: AppColors.muted),
                       ),
                       const SizedBox(height: 18),
@@ -143,22 +172,47 @@ class ActiveDeliveryPage extends StatelessWidget {
                           _action(
                             Icons.navigation_rounded,
                             'Navigate',
-                            onTap: () => _navigate(context, job),
+                            onTap: () => _navigate(context, order),
                           ),
                           const SizedBox(width: 10),
-                          _action(Icons.call_rounded, 'Call', onTap: () {}),
+                          _action(
+                            Icons.call_rounded,
+                            'Call',
+                            onTap: () => _call(context, order),
+                          ),
                           const SizedBox(width: 10),
                           _action(
                             Icons.chat_bubble_outline_rounded,
                             'Message',
-                            onTap: () {},
+                            onTap: null,
                           ),
                         ],
                       ),
                       const SizedBox(height: 18),
                       FilledButton(
-                        onPressed: repository.advanceActiveJob,
-                        child: Text(_buttonLabel(job.status)),
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _advance(context, order),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(_buttonLabel(order.status)),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _confirmCancel(context, order),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.red,
+                        ),
+                        child: const Text('Cancel delivery'),
                       ),
                     ],
                   ),
@@ -171,44 +225,51 @@ class ActiveDeliveryPage extends StatelessWidget {
     );
   }
 
-  Widget _action(IconData icon, String label, {required VoidCallback onTap}) =>
-      Expanded(
-        child: Material(
-          color: AppColors.canvas,
-          borderRadius: BorderRadius.circular(15),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(15),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                children: [
-                  Icon(icon, color: AppColors.navy, size: 21),
-                  const SizedBox(height: 4),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+  Widget _action(
+    IconData icon,
+    String label, {
+    required VoidCallback? onTap,
+  }) => Expanded(
+    child: Material(
+      color: AppColors.canvas,
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: onTap == null ? AppColors.muted : AppColors.navy,
+                size: 21,
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: onTap == null ? AppColors.muted : AppColors.ink,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    ),
+  );
 
-  Future<void> _navigate(BuildContext context, DeliveryJob job) async {
-    final destination = job.status == DeliveryStatus.accepted
-        ? job.pickupPoint
-        : job.destinationPoint;
-    final uri = Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'destination': '${destination.latitude},${destination.longitude}',
-      'travelmode': 'driving',
-    });
+  Future<void> _navigate(BuildContext context, TruckOrder order) async {
+    final url = order.maps.directionsUrl;
+    if (url == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No route available.')));
+      return;
+    }
+    final uri = Uri.parse(url);
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,17 +278,104 @@ class ActiveDeliveryPage extends StatelessWidget {
     }
   }
 
-  String _stageLabel(DeliveryStatus status) => switch (status) {
-    DeliveryStatus.accepted => 'DRIVE TO PICKUP',
-    DeliveryStatus.pickedUp => 'PACKAGE COLLECTED',
-    DeliveryStatus.delivering => 'DRIVE TO DROP-OFF',
+  Future<void> _call(BuildContext context, TruckOrder order) async {
+    final phone = order.clientPhone;
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No phone number available.')),
+      );
+      return;
+    }
+    final uri = Uri.parse('tel:$phone');
+    final opened = await launchUrl(uri);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not place call.')));
+    }
+  }
+
+  Future<void> _advance(BuildContext context, TruckOrder order) async {
+    setState(() => _isSubmitting = true);
+    final action = switch (order.status) {
+      TruckOrderStatus.accepted => repository.markArrived,
+      TruckOrderStatus.arrived => repository.markLoading,
+      TruckOrderStatus.loading => repository.startTransit,
+      TruckOrderStatus.inTransit => repository.completeOrder,
+      _ => null,
+    };
+    if (action == null) {
+      setState(() => _isSubmitting = false);
+      return;
+    }
+    final result = await action(order.id);
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    result.fold(
+      onSuccess: (_) {},
+      onFailure: (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
+    );
+  }
+
+  Future<void> _confirmCancel(BuildContext context, TruckOrder order) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Cancel this delivery?'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Reason (optional)',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Keep delivery'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Cancel delivery'),
+            ),
+          ],
+        );
+      },
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _isSubmitting = true);
+    final result = await repository.cancelOrder(
+      order.id,
+      reason: reason.trim().isEmpty ? null : reason.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    result.fold(
+      onSuccess: (_) {},
+      onFailure: (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
+    );
+  }
+
+  String _stageLabel(String status) => switch (status) {
+    TruckOrderStatus.accepted => 'DRIVE TO PICKUP',
+    TruckOrderStatus.arrived => 'ARRIVED AT PICKUP',
+    TruckOrderStatus.loading => 'LOADING',
+    TruckOrderStatus.inTransit => 'DRIVE TO DROP-OFF',
     _ => 'DELIVERY',
   };
 
-  String _buttonLabel(DeliveryStatus status) => switch (status) {
-    DeliveryStatus.accepted => 'Confirm package pickup',
-    DeliveryStatus.pickedUp => 'Start delivery',
-    DeliveryStatus.delivering => 'Complete delivery',
+  String _buttonLabel(String status) => switch (status) {
+    TruckOrderStatus.accepted => 'Mark arrived',
+    TruckOrderStatus.arrived => 'Start loading',
+    TruckOrderStatus.loading => 'Start delivery',
+    TruckOrderStatus.inTransit => 'Mark delivered',
     _ => 'Continue',
   };
 }

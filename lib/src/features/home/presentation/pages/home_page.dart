@@ -4,15 +4,15 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/driver_map.dart';
-import '../../../deliveries/data/delivery_repository.dart';
-import '../../../deliveries/domain/delivery_job.dart';
 import '../../../deliveries/presentation/pages/active_delivery_page.dart';
+import '../../../orders/data/truck_repository.dart';
+import '../../../orders/domain/truck_order.dart';
 import '../../domain/driver_location.dart';
 import '../widgets/job_offer_card.dart';
 import 'location_picker_page.dart';
 
 class DriverHomePage extends StatefulWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
 
   const DriverHomePage({super.key, required this.repository});
 
@@ -28,7 +28,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
     coordinates: LatLng(36.1911, 5.4137),
   );
 
-  DeliveryRepository get repository => widget.repository;
+  TruckRepository get repository => widget.repository;
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +55,9 @@ class _DriverHomePageState extends State<DriverHomePage> {
                 child: SizedBox(
                   height: 300,
                   child: DriverMap(
-                    online: repository.isOnline,
+                    online: repository.online,
                     center: location.coordinates,
+                    offers: repository.availableNow,
                   ),
                 ),
               ),
@@ -82,7 +83,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       ),
                     ),
                     Text(
-                      '${repository.offers.length} available',
+                      '${repository.availableNow.length} available',
                       style: const TextStyle(
                         color: AppColors.blue,
                         fontWeight: FontWeight.w700,
@@ -92,47 +93,106 @@ class _DriverHomePageState extends State<DriverHomePage> {
                 ),
               ),
             ),
-            if (!repository.isOnline)
+            if (!repository.online)
               const SliverPadding(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
                 sliver: SliverToBoxAdapter(child: _EmptyOnlineState()),
               )
-            else
+            else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                 sliver: SliverList.separated(
-                  itemCount: repository.offers.length,
+                  itemCount: repository.availableNow.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    final job = repository.offers[index];
+                    final order = repository.availableNow[index];
                     return JobOfferCard(
-                      job: job,
-                      onTap: () => _showOffer(context, job),
+                      order: order,
+                      onTap: () => _showOffer(context, order),
                     );
                   },
                 ),
               ),
+              if (repository.availableScheduled.isNotEmpty) ...[
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Scheduled requests',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${repository.availableScheduled.length} available',
+                          style: const TextStyle(
+                            color: AppColors.blue,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  sliver: SliverList.separated(
+                    itemCount: repository.availableScheduled.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final order = repository.availableScheduled[index];
+                      return JobOfferCard(
+                        order: order,
+                        onTap: () => _showOffer(context, order),
+                      );
+                    },
+                  ),
+                ),
+              ] else
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
+                ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  void _showOffer(BuildContext context, DeliveryJob job) {
+  void _showOffer(BuildContext context, TruckOrder order) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => _OfferSheet(
-        job: job,
-        onAccept: () {
-          repository.accept(job);
-          Navigator.pop(sheetContext);
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ActiveDeliveryPage(repository: repository),
-            ),
+        order: order,
+        onAccept: () async {
+          final result = await repository.acceptOrder(order.id);
+          if (!sheetContext.mounted) return;
+          result.fold(
+            onSuccess: (_) {
+              Navigator.pop(sheetContext);
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        ActiveDeliveryPage(repository: repository, order: order),
+                  ),
+                );
+              }
+            },
+            onFailure: (failure) {
+              ScaffoldMessenger.of(sheetContext).showSnackBar(
+                SnackBar(content: Text(failure.message)),
+              );
+            },
           );
         },
       ),
@@ -160,8 +220,15 @@ class _DriverHomePageState extends State<DriverHomePage> {
   }
 
   Future<void> _performToggleAvailability() async {
-    if (repository.isOnline) {
-      repository.toggleOnline();
+    if (repository.online) {
+      final result = await repository.toggleOnline();
+      if (!mounted) return;
+      result.fold(
+        onSuccess: (_) {},
+        onFailure: (failure) => ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message))),
+      );
       return;
     }
 
@@ -228,7 +295,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
           coordinates: coordinates,
         );
       });
-      repository.toggleOnline();
+      final result = await repository.toggleOnline();
+      if (!mounted) return;
+      result.fold(
+        onSuccess: (_) {},
+        onFailure: (failure) => ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message))),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -241,7 +315,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
 }
 
 class _Header extends StatelessWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
   final DriverLocation location;
   final VoidCallback onLocationTap;
   final Future<void> Function() onToggleOnline;
@@ -307,7 +381,7 @@ class _Header extends StatelessWidget {
         ),
       ),
       Semantics(
-        label: repository.isOnline ? 'Go offline' : 'Go online',
+        label: repository.online ? 'Go offline' : 'Go online',
         button: true,
         child: InkWell(
           onTap: onToggleOnline,
@@ -316,10 +390,10 @@ class _Header extends StatelessWidget {
             duration: const Duration(milliseconds: 250),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: repository.isOnline ? AppColors.green : Colors.white,
+              color: repository.online ? AppColors.green : Colors.white,
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: repository.isOnline ? AppColors.green : AppColors.line,
+                color: repository.online ? AppColors.green : AppColors.line,
               ),
             ),
             child: Row(
@@ -328,15 +402,15 @@ class _Header extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: repository.isOnline ? Colors.white : AppColors.muted,
+                    color: repository.online ? Colors.white : AppColors.muted,
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 7),
                 Text(
-                  repository.isOnline ? 'Online' : 'Offline',
+                  repository.online ? 'Online' : 'Offline',
                   style: TextStyle(
-                    color: repository.isOnline ? Colors.white : AppColors.ink,
+                    color: repository.online ? Colors.white : AppColors.ink,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -350,7 +424,7 @@ class _Header extends StatelessWidget {
 }
 
 class _TodayStrip extends StatelessWidget {
-  final DeliveryRepository repository;
+  final TruckRepository repository;
 
   const _TodayStrip({required this.repository});
 
@@ -375,7 +449,7 @@ class _TodayStrip extends StatelessWidget {
         Expanded(child: _metric('DELIVERIES', '${repository.todayTrips}')),
         Container(width: 1, height: 34, color: Colors.white24),
         Expanded(
-          child: _metric('ONLINE', repository.isOnline ? '4h 18m' : '—'),
+          child: _metric('STATUS', repository.online ? 'Online' : 'Offline'),
         ),
       ],
     ),
@@ -425,7 +499,7 @@ class _EmptyOnlineState extends StatelessWidget {
         ),
         SizedBox(height: 4),
         Text(
-          'Go online when you are ready to receive parcel requests.',
+          'Go online when you are ready to receive delivery requests.',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.muted),
         ),
@@ -435,10 +509,10 @@ class _EmptyOnlineState extends StatelessWidget {
 }
 
 class _OfferSheet extends StatelessWidget {
-  final DeliveryJob job;
+  final TruckOrder order;
   final VoidCallback onAccept;
 
-  const _OfferSheet({required this.job, required this.onAccept});
+  const _OfferSheet({required this.order, required this.onAccept});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -474,7 +548,7 @@ class _OfferSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Parcel request · ${job.id}',
+                  'Delivery request · ${order.orderNumber}',
                   style: const TextStyle(
                     color: AppColors.muted,
                     fontWeight: FontWeight.w600,
@@ -482,7 +556,7 @@ class _OfferSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${job.payoutDzd} DA',
+                  '${order.estimatedPrice ?? 0} DA',
                   style: const TextStyle(
                     color: AppColors.green,
                     fontSize: 30,
@@ -491,20 +565,24 @@ class _OfferSheet extends StatelessWidget {
                 ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.canvas,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${job.tripKm} km · ${job.estimatedMinutes} min',
-                style: const TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w800,
+            if (order.distanceKm != null)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.canvas,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${order.distanceKm} km',
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 22),
@@ -512,8 +590,10 @@ class _OfferSheet extends StatelessWidget {
           Icons.storefront_rounded,
           AppColors.blue,
           'PICKUP',
-          job.pickupName,
-          job.pickupAddress,
+          order.pickupAddress,
+          [order.pickupWilaya, order.pickupCommune]
+              .whereType<String>()
+              .join(', '),
         ),
         Padding(
           padding: const EdgeInsets.only(left: 17),
@@ -523,8 +603,8 @@ class _OfferSheet extends StatelessWidget {
           Icons.location_on_rounded,
           AppColors.green,
           'DROP-OFF',
-          job.destinationName,
-          job.destinationAddress,
+          order.destinationAddress,
+          order.destinationWilaya ?? '',
         ),
         const SizedBox(height: 20),
         Container(
@@ -539,7 +619,7 @@ class _OfferSheet extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '${job.packageType} · ${job.packageCount} package${job.packageCount > 1 ? 's' : ''}',
+                  order.category?.name ?? 'Delivery',
                   style: const TextStyle(
                     color: AppColors.ink,
                     fontWeight: FontWeight.w700,
@@ -547,7 +627,7 @@ class _OfferSheet extends StatelessWidget {
                 ),
               ),
               Text(
-                job.vehicleType,
+                order.truckType?.name ?? '',
                 style: const TextStyle(
                   color: AppColors.muted,
                   fontWeight: FontWeight.w700,
@@ -602,17 +682,20 @@ class _OfferSheet extends StatelessWidget {
             ),
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.ink,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
+            if (subtitle.isNotEmpty)
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
           ],
         ),
       ),

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../activity/presentation/pages/activity_page.dart';
-import '../../../deliveries/data/delivery_repository.dart';
 import '../../../deliveries/presentation/pages/active_delivery_page.dart';
 import '../../../earnings/presentation/pages/earnings_page.dart';
+import '../../../orders/data/truck_repository.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import 'home_page.dart';
 
@@ -16,20 +16,22 @@ class DriverShell extends StatefulWidget {
 }
 
 class _DriverShellState extends State<DriverShell> {
-  final repository = DeliveryRepository.instance;
+  final repository = TruckRepository.instance;
   int index = 0;
 
   late final pages = [
     DriverHomePage(repository: repository),
     DriverActivityPage(repository: repository),
     EarningsPage(repository: repository),
-    const DriverProfilePage(),
+    DriverProfilePage(repository: repository),
   ];
 
   @override
   void initState() {
     super.initState();
     repository.addListener(_refresh);
+    repository.refreshDashboard();
+    repository.refreshTruckProfile();
   }
 
   void _refresh() {
@@ -49,7 +51,7 @@ class _DriverShellState extends State<DriverShell> {
     body: Stack(
       children: [
         IndexedStack(index: index, children: pages),
-        if (repository.activeJob != null)
+        if (repository.active.isNotEmpty)
           Positioned(
             left: 20,
             right: 20,
@@ -58,7 +60,10 @@ class _DriverShellState extends State<DriverShell> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ActiveDeliveryPage(repository: repository),
+                  builder: (_) => ActiveDeliveryPage(
+                    repository: repository,
+                    order: repository.active.first,
+                  ),
                 ),
               ),
             ),
