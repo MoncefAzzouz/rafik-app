@@ -137,6 +137,43 @@ router.get('/admin/status', ...admin, async (_req: Request, res: Response) => {
   res.json({ mailConfigured: isMailEnabled(), pushConfigured: isPushEnabled(), devices });
 });
 
+// ── Admin notification bell (top bar) ──
+// List recent admin notifications + unread count.
+router.get('/admin/alerts', ...admin, async (req: Request, res: Response) => {
+  const limit = Math.min(parseInt((req.query.limit as string) || '30', 10), 100);
+  try {
+    const [items, unread] = await Promise.all([
+      prisma.adminNotification.findMany({ orderBy: { createdAt: 'desc' }, take: limit }),
+      prisma.adminNotification.count({ where: { readAt: null } }),
+    ]);
+    res.json({ items, unread });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Mark everything read.
+router.put('/admin/alerts/read-all', ...admin, async (_req: Request, res: Response) => {
+  try {
+    await prisma.adminNotification.updateMany({ where: { readAt: null }, data: { readAt: new Date() } });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Mark one read.
+router.put('/admin/alerts/:id/read', ...admin, async (req: Request, res: Response) => {
+  try {
+    await prisma.adminNotification.update({ where: { id: req.params.id as string }, data: { readAt: new Date() } });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Clear (delete) all admin notifications.
+router.delete('/admin/alerts', ...admin, async (_req: Request, res: Response) => {
+  try {
+    await prisma.adminNotification.deleteMany({});
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // ── Modules (home grid) ──
 router.get('/admin/modules', ...admin, async (_req: Request, res: Response) => {
   const modules = await prisma.appModule.findMany({ orderBy: { sortOrder: 'asc' } });

@@ -856,6 +856,24 @@ model AppSlide {
   @@index([type, visible, sortOrder])
 }
 
+// In-app admin notifications — the bell in the admin top bar. One shared feed for
+// all admins; mirrors the event emails (new orders, approvals, completions…).
+model AdminNotification {
+  id        String    @id @default(cuid())
+  type      String    @default("generic") // truck_order | booking | food_order | taxi_ride | generic
+  vertical  String?   // truck | services | food | taxi
+  event     String?   // new | accepted | completed | cancelled | approved …
+  title     String
+  body      String?
+  refId     String?   // the related order/booking id
+  link      String?   // admin route to open, e.g. /truck/orders
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([readAt, createdAt])
+  @@index([createdAt])
+}
+
 // Editable content for the Play-Store-required open pages.
 // slug ∈ privacy-policy | terms | delete-account | support
 model AppLegalPage {

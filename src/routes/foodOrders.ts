@@ -6,7 +6,7 @@ import {
   computeDeliveryFee, haversineKm,
 } from '../lib/food';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
-import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
+import { adminAlert, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 
@@ -249,13 +249,13 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT', 'CASHIER', 'R
       });
     }
 
-    void notifyAdmins(`🍕 New food order ${order.orderNumber}`, lead('A new food order was placed.') + infoTable([
+    void adminAlert({ title: `🍕 New food order ${order.orderNumber}`, body: `${order.clientName} · ${(order as any).restaurant?.name || ''}`, type: 'food_order', vertical: 'food', event: 'new', refId: order.id, link: '/food/orders', emailHtml: lead('A new food order was placed.') + infoTable([
       pRow('Order', order.orderNumber),
       pRow('Restaurant', (order as any).restaurant?.name),
       pRow('Client', `${order.clientName} · ${order.clientPhone}`),
       pRow('Type', order.orderType),
       pRow('Total', `${order.totalAmount} DZD`),
-    ]));
+    ]) });
     res.status(201).json(order);
   } catch (err) {
     console.error(err);

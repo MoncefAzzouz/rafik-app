@@ -36,6 +36,25 @@ export async function emailAddress(to: string | null | undefined, subject: strin
   await deliver(to, subject, bodyHtml);
 }
 
+// Fire an admin event: record it for the in-app bell AND email the admins.
+// Safe & non-blocking (call with `void adminAlert(...)`). The in-app record is
+// stored even when email is off, so the bell always works.
+export async function adminAlert(opts: {
+  title: string; body?: string; emailHtml?: string;
+  type?: string; vertical?: string; event?: string; refId?: string; link?: string;
+}): Promise<void> {
+  try {
+    await prisma.adminNotification.create({
+      data: {
+        title: opts.title, body: opts.body ?? null,
+        type: opts.type ?? 'generic', vertical: opts.vertical ?? null,
+        event: opts.event ?? null, refId: opts.refId ?? null, link: opts.link ?? null,
+      },
+    });
+  } catch (e) { console.error('[notify] admin alert store failed', e); }
+  if (opts.emailHtml) await notifyAdmins(opts.title, opts.emailHtml);
+}
+
 // ── Small HTML building blocks so every email looks consistent ──
 export function pRow(label: string, value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === '') return '';

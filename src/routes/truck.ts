@@ -10,7 +10,7 @@ import {
   estimateTruckPrice, computeTruckCommission, wilayaPriceByName, TRUCK_STATUSES, TRUCK_CANCELLED,
 } from '../lib/truck';
 import { roadDistanceKm, reverseWilaya } from '../lib/geo';
-import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
+import { adminAlert, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 const INVOICE_STATUSES = ['HAS_INVOICE', 'NO_INVOICE', 'NOT_REQUIRED'];
@@ -646,8 +646,8 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
     if (promoValidation?.valid && promoValidation.promo) {
       await redeemPromo({ promoId: promoValidation.promo.id, vertical: 'truck', refId: order.id, discount: promoDiscount, userId: user.userId, clientPhone: clientPhone as string });
     }
-    // A new freight order landed → email every admin.
-    void notifyAdmins(`🚚 New freight order ${order.orderNumber}`, lead('A new freight order was placed and is waiting for a driver.') + truckOrderRows(order));
+    // A new freight order landed → in-app bell + email for every admin.
+    void adminAlert({ title: `🚚 New freight order ${order.orderNumber}`, body: `${order.clientName} · ${order.pickupWilaya || order.pickupAddress} → ${destWilaya || order.destinationAddress}`, type: 'truck_order', vertical: 'truck', event: 'new', refId: order.id, link: '/truck/orders', emailHtml: lead('A new freight order was placed and is waiting for a driver.') + truckOrderRows(order) });
     res.status(201).json(order);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -702,7 +702,7 @@ router.post('/orders/:id/accept', authenticateToken, requireRole('TRUCKER'), asy
     const full = await prisma.truckOrder.findUnique({ where: { id }, include: orderInclude });
     const soon = full!.scheduledType === 'scheduled' ? `scheduled for ${full!.scheduledDate || 'your chosen day'}` : 'on the way';
     void emailUser(full!.clientId, `Your freight order ${full!.orderNumber} was accepted`, lead(`Good news — <b>${truck.driverName}</b> accepted your freight order and is ${soon}.`) + truckOrderRows(full));
-    void notifyAdmins(`Order ${full!.orderNumber} accepted by ${truck.driverName}`, lead(`Driver <b>${truck.driverName}</b> accepted this order.`) + truckOrderRows(full));
+    void adminAlert({ title: `Order ${full!.orderNumber} accepted by ${truck.driverName}`, body: `Driver ${truck.driverName} took the job`, type: 'truck_order', vertical: 'truck', event: 'accepted', refId: full!.id, link: '/truck/orders', emailHtml: lead(`Driver <b>${truck.driverName}</b> accepted this order.`) + truckOrderRows(full) });
     res.json(withMaps(full!));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -757,7 +757,7 @@ router.post('/orders/:id/complete', authenticateToken, async (req: Request, res:
     if (order.truckId) ops.push(prisma.truck.update({ where: { id: order.truckId }, data: { status: 'available', totalTrips: { increment: 1 } } }));
     const [updated] = await prisma.$transaction(ops);
     void emailUser(updated.clientId, `Order ${updated.orderNumber} delivered ✅`, lead('Your freight has been delivered. Thank you for using Rafik!') + truckOrderRows(updated));
-    void notifyAdmins(`Order ${updated.orderNumber} delivered`, lead('This freight order was completed and delivered.') + truckOrderRows(updated));
+    void adminAlert({ title: `Order ${updated.orderNumber} delivered`, body: `${updated.clientName}`, type: 'truck_order', vertical: 'truck', event: 'completed', refId: updated.id, link: '/truck/orders', emailHtml: lead('This freight order was completed and delivered.') + truckOrderRows(updated) });
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
@@ -789,7 +789,7 @@ router.post('/orders/:id/cancel', authenticateToken, async (req: Request, res: R
     const who = by === 'CLIENT' ? 'the client' : by === 'DRIVER' ? 'the driver' : 'an admin';
     const reasonHtml = reason ? ` Reason: ${reason}.` : '';
     void emailUser(updated.clientId, `Order ${updated.orderNumber} cancelled`, lead(`Your freight order was cancelled by ${who}.${reasonHtml}`) + truckOrderRows(updated));
-    void notifyAdmins(`Order ${updated.orderNumber} cancelled by ${by}`, lead(`Cancelled by ${who}.${reasonHtml}`) + truckOrderRows(updated));
+    void adminAlert({ title: `Order ${updated.orderNumber} cancelled by ${by}`, body: reason ? `Reason: ${reason}` : `Cancelled by ${who}`, type: 'truck_order', vertical: 'truck', event: 'cancelled', refId: updated.id, link: '/truck/orders', emailHtml: lead(`Cancelled by ${who}.${reasonHtml}`) + truckOrderRows(updated) });
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });

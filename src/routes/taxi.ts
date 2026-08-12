@@ -7,7 +7,7 @@ import {
   computeCommission, runFraudDetection, CANCELLED_STATUSES, RIDE_STATUSES,
 } from '../lib/taxi';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
-import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
+import { adminAlert, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 
@@ -169,14 +169,14 @@ router.post('/rides', authenticateToken, requireRole('ADMIN', 'CLIENT'), async (
       });
     }
 
-    void notifyAdmins(`🚕 New ride ${ride.rideNumber}`, lead('A new taxi ride was requested.') + infoTable([
+    void adminAlert({ title: `🚕 New ride ${ride.rideNumber}`, body: `${ride.clientName} · ${ride.pickupAddress} → ${ride.destinationAddress}`, type: 'taxi_ride', vertical: 'taxi', event: 'new', refId: ride.id, link: '/taxi/rides', emailHtml: lead('A new taxi ride was requested.') + infoTable([
       pRow('Ride', ride.rideNumber),
       pRow('Client', `${ride.clientName} · ${ride.clientPhone}`),
       pRow('From', ride.pickupAddress),
       pRow('To', ride.destinationAddress),
       pRow('Distance', ride.distanceKm != null ? `${ride.distanceKm} km` : null),
       pRow('Fare', `${ride.agreedFare ?? ride.estimatedFare} DZD`),
-    ]));
+    ]) });
     res.status(201).json(ride);
   } catch (err) {
     console.error(err);

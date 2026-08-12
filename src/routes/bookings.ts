@@ -6,7 +6,7 @@ import { isValidLocation } from '../lib/locations';
 import { canTransition, isKnownStatus, newBookingId } from '../lib/bookingStatus';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
 import { memoryUpload, storeUpload, deleteUpload } from '../lib/r2';
-import { notifyAdmins, emailUser, lead, infoTable, pRow } from '../lib/notify';
+import { adminAlert, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const upload = memoryUpload();
 
@@ -197,7 +197,7 @@ router.post('/', authenticateToken, requireRole('ADMIN', 'CLIENT'), upload.array
     });
 
     // New service booking → email every admin (and the worker if they have an account).
-    void notifyAdmins(`🔧 New booking ${booking.id} — ${serviceCategory}`, lead('A new service booking was placed.') + bookingRows(booking));
+    void adminAlert({ title: `🔧 New booking — ${serviceCategory}`, body: `${clientName} · ${clientWilaya}`, type: 'booking', vertical: 'services', event: 'new', refId: booking.id, link: '/services/bookings', emailHtml: lead('A new service booking was placed.') + bookingRows(booking) });
     void emailUser(worker.userId, `New booking assigned to you — ${serviceCategory}`, lead('A client requested your service.') + bookingRows(booking));
 
     res.status(201).json(booking);
@@ -289,7 +289,7 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
     const label = BOOKING_STATUS_LABEL[status as string] || (status as string);
     void emailUser(existing.clientId, `Your booking ${id}: ${label}`, lead(`Your booking status is now: <b>${label}</b>.`) + bookingRows({ ...existing, status }));
     if (status === 'quote_approved' || status === 'completed') {
-      void notifyAdmins(`Booking ${id}: ${label}`, lead(`This booking is now <b>${label}</b>.`) + bookingRows({ ...existing, status }));
+      void adminAlert({ title: `Booking ${id}: ${label}`, body: existing.clientName, type: 'booking', vertical: 'services', event: status as string, refId: id, link: '/services/bookings', emailHtml: lead(`This booking is now <b>${label}</b>.`) + bookingRows({ ...existing, status }) });
     }
     res.json(booking);
   } catch (err) {
@@ -474,7 +474,7 @@ router.put('/:id/complete', authenticateToken, async (req: Request, res: Respons
     }
 
     void emailUser(existing.clientId, `Your booking ${id} is completed ✅`, lead('Your service is complete. Thank you for using Rafik!') + bookingRows(booking));
-    void notifyAdmins(`Booking ${id} completed`, lead('A service booking was completed.') + bookingRows(booking));
+    void adminAlert({ title: `Booking ${id} completed`, body: existing.clientName, type: 'booking', vertical: 'services', event: 'completed', refId: id, link: '/services/bookings', emailHtml: lead('A service booking was completed.') + bookingRows(booking) });
     res.json(booking);
   } catch (err) {
     console.error(err);
