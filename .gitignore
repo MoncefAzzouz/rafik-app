@@ -2,3 +2,7 @@ node_modules
 dist
 .env
 uploads/
+
+# Firebase service account key (never commit)
+firebase-service-account.json
+*firebase*.json

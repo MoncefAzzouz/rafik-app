@@ -1,9 +1,28 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
 import { authenticateToken, requireRole } from '../middlewares/auth';
 import { sendMail, emailShell, isMailEnabled } from '../lib/mailer';
+import { sendPush, isPushEnabled } from '../lib/push';
 
 const router = Router();
+
+// Decode a Bearer token if present, but don't require it (device registration can
+// happen before or after login).
+function optionalUser(req: Request): { userId: string; role: string } | null {
+  const h = req.headers.authorization;
+  if (!h?.startsWith('Bearer ')) return null;
+  try { return jwt.verify(h.slice(7), process.env.JWT_SECRET as string) as any; }
+  catch { return null; }
+}
+
+// Audience → Prisma role filter (shared by email + push fan-out).
+function roleWhere(audience: string) {
+  if (audience === 'clients') return { role: 'CLIENT' as const };
+  if (audience === 'workers') return { role: 'WORKER' as const };
+  if (audience === 'drivers') return { role: 'DRIVER' as const };
+  return {};
+}
 
 // The four open pages the Play Store requires. slug is fixed to this set.
 const LEGAL_SLUGS = ['privacy-policy', 'terms', 'delete-account', 'support'];
@@ -64,7 +83,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
   const limit = Math.min(parseInt((req.query.limit as string) || '30', 10), 100);
   try {
     const items = await prisma.appNotification.findMany({
-      where: { channel: { in: ['app', 'both'] } },
+      where: { channel: { contains: 'app' } }, // channel is a comma list, e.g. "app,push"
       orderBy: { sentAt: 'desc' },
       take: limit,
     });
@@ -82,8 +101,41 @@ router.get('/legal/:slug', async (req: Request, res: Response) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
+// Register a phone's FCM token (the Flutter app calls this on login/startup).
+// Optional auth: if a Bearer token is sent, the device is linked to that user.
+router.post('/device-token', async (req: Request, res: Response) => {
+  const token = (req.body?.token || '').trim();
+  const platform = req.body?.platform || null;
+  if (!token) { res.status(400).json({ error: 'token is required' }); return; }
+  const user = optionalUser(req);
+  try {
+    await prisma.deviceToken.upsert({
+      where: { token },
+      update: { userId: user?.userId ?? null, platform },
+      create: { token, userId: user?.userId ?? null, platform },
+    });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Unregister a token (app calls this on logout / uninstall cleanup).
+router.delete('/device-token', async (req: Request, res: Response) => {
+  const token = (req.body?.token || '').trim();
+  if (!token) { res.status(400).json({ error: 'token is required' }); return; }
+  try {
+    await prisma.deviceToken.deleteMany({ where: { token } });
+    res.json({ success: true });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
 // ═══════════════════════ ADMIN ═══════════════════════
 const admin = [authenticateToken, requireRole('ADMIN')];
+
+// Whether email + push are configured on the server (drives UI hints).
+router.get('/admin/status', ...admin, async (_req: Request, res: Response) => {
+  const devices = await prisma.deviceToken.count();
+  res.json({ mailConfigured: isMailEnabled(), pushConfigured: isPushEnabled(), devices });
+});
 
 // ── Modules (home grid) ──
 router.get('/admin/modules', ...admin, async (_req: Request, res: Response) => {
@@ -281,38 +333,57 @@ router.get('/admin/notifications', ...admin, async (_req: Request, res: Response
 router.post('/admin/notifications', ...admin, async (req: Request, res: Response) => {
   const d = req.body;
   if (!d.title || !d.body) { res.status(400).json({ error: 'Title and body are required' }); return; }
-  const channel = ['app', 'email', 'both'].includes(d.channel) ? d.channel : 'app';
+  // Channels: prefer the array; fall back to the legacy single "channel" ("both" = app+email).
+  let channels: string[] = Array.isArray(d.channels) ? d.channels : [];
+  if (!channels.length && d.channel) channels = d.channel === 'both' ? ['app', 'email'] : [d.channel];
+  channels = channels.filter((c) => ['app', 'email', 'push'].includes(c));
+  if (!channels.length) channels = ['app'];
   const audience = ['all', 'clients', 'workers', 'drivers'].includes(d.audience) ? d.audience : 'all';
-  const emailing = channel === 'email' || channel === 'both';
+
+  const wantEmail = channels.includes('email');
+  const wantPush = channels.includes('push');
   const mailConfigured = isMailEnabled();
+  const pushConfigured = isPushEnabled();
+  const role = roleWhere(audience);
+
   try {
-    let sentCount = 0, failedCount = 0, recipientCount = 0;
-    let mailError = '';
-    // Email fan-out. "app" notifications are just stored for the in-app feed.
-    if (emailing && mailConfigured) {
-      const roleFilter =
-        audience === 'clients' ? { role: 'CLIENT' as const }
-        : audience === 'workers' ? { role: 'WORKER' as const }
-        : audience === 'drivers' ? { role: 'DRIVER' as const }
-        : {};
-      const users = await prisma.user.findMany({ where: roleFilter, select: { email: true } });
+    // ── Email fan-out ──
+    let sentCount = 0, failedCount = 0, recipientCount = 0, mailError = '';
+    if (wantEmail && mailConfigured) {
+      const users = await prisma.user.findMany({ where: role, select: { email: true } });
       const recipients = users.map((u) => u.email).filter(Boolean);
       recipientCount = recipients.length;
       const html = emailShell(d.title, `<p style="color:#334155;line-height:1.6">${(d.body as string).replace(/\n/g, '<br/>')}</p>${d.link ? `<p><a href="${d.link}" style="color:#0F766E;font-weight:700">Open</a></p>` : ''}`);
-      // Send individually so one bad address doesn't sink the batch, but capture the first error.
       for (const to of recipients) {
         try { await sendMail({ to, subject: d.title, html }); sentCount++; }
         catch (e: any) { failedCount++; if (!mailError) mailError = e?.message || 'send failed'; }
       }
     }
+
+    // ── Push fan-out ──
+    let pushTargets = 0, pushSent = 0, pushFailed = 0;
+    if (wantPush && pushConfigured) {
+      // 'all' → every device; otherwise only devices linked to a user with that role.
+      const where = audience === 'all' ? {} : { user: { is: role } };
+      const rows = await prisma.deviceToken.findMany({ where, select: { token: true } });
+      const tokens = rows.map((r) => r.token);
+      pushTargets = tokens.length;
+      const pr = await sendPush(tokens, { title: d.title, body: d.body, ...(d.link ? { data: { link: d.link } } : {}) });
+      pushSent = pr.sent; pushFailed = pr.failed;
+      if (pr.invalidTokens.length) await prisma.deviceToken.deleteMany({ where: { token: { in: pr.invalidTokens } } });
+    }
+
     const notif = await prisma.appNotification.create({
       data: {
-        title: d.title, body: d.body, channel, audience,
-        imageUrl: d.imageUrl || null, link: d.link || null, sentCount,
+        title: d.title, body: d.body, channel: channels.join(','), audience,
+        imageUrl: d.imageUrl || null, link: d.link || null, sentCount: sentCount + pushSent,
       },
     });
-    // Return the outcome so the admin sees whether email actually went out.
-    res.json({ ...notif, emailing, mailConfigured, recipientCount, sentCount, failedCount, mailError: mailError || undefined });
+    res.json({
+      ...notif, channels, wantEmail, wantPush, mailConfigured, pushConfigured,
+      recipientCount, sentCount, failedCount, mailError: mailError || undefined,
+      pushTargets, pushSent, pushFailed,
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

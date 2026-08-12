@@ -77,6 +77,7 @@ model User {
   banReason     String?
   professional  Professional?
   passwordResets PasswordResetToken[]
+  deviceTokens  DeviceToken[]
 }
 
 model Category {
@@ -878,6 +879,20 @@ model AppNotification {
   sentAt    DateTime @default(now())
 
   @@index([sentAt])
+}
+
+// A phone's FCM registration token, so the backend can send push notifications.
+// The Flutter app POSTs this on login/startup; userId links it for audience filtering.
+model DeviceToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  platform  String?  // "android" | "ios" | "web"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // Short-lived token emailed to a user so they can set a new password.
