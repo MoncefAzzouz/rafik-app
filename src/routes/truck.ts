@@ -61,6 +61,32 @@ const orderInclude = {
   truck: { select: { id: true, truckCode: true, driverName: true, phone: true, plate: true, status: true, rating: true, truckType: { select: { name: true } } } },
 };
 
+// Ready-to-open Google Maps links so the app/admin can tap a place (opens it on the
+// map) or tap "Directions" (turn-by-turn from pickup → destination). Uses precise
+// coordinates when available, otherwise falls back to the place name.
+function orderMaps(o: any) {
+  const place = (lat: number | null, lng: number | null, name: string) =>
+    lat != null && lng != null
+      ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+      : name ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}` : null;
+  const pickupName = [o.pickupAddress, o.pickupCommune, o.pickupWilaya].filter(Boolean).join(', ');
+  const destinationName = [o.destinationAddress, o.destinationWilaya].filter(Boolean).join(', ');
+  const haveCoords = o.pickupLat != null && o.pickupLng != null && o.destinationLat != null && o.destinationLng != null;
+  const directionsUrl = haveCoords
+    ? `https://www.google.com/maps/dir/?api=1&origin=${o.pickupLat},${o.pickupLng}&destination=${o.destinationLat},${o.destinationLng}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(pickupName)}&destination=${encodeURIComponent(destinationName)}&travelmode=driving`;
+  return {
+    pickupName, destinationName,
+    pickupMapUrl: place(o.pickupLat, o.pickupLng, pickupName),
+    destinationMapUrl: place(o.destinationLat, o.destinationLng, destinationName),
+    directionsUrl,
+  };
+}
+// Attach the `maps` object (deep links) to an order payload — additive, safe to ignore.
+function withMaps<T extends object>(o: T): T & { maps: ReturnType<typeof orderMaps> } {
+  return { ...o, maps: orderMaps(o) };
+}
+
 async function getOwnTruck(userId: string) {
   return prisma.truck.findUnique({ where: { userId } });
 }
@@ -485,7 +511,7 @@ router.get('/orders', authenticateToken, async (req: Request, res: Response) => 
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    res.json(orders);
+    res.json(orders.map(withMaps));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -498,7 +524,7 @@ router.get('/orders/:id', authenticateToken, async (req: Request, res: Response)
     const allowed = user.role === 'ADMIN' || order.clientId === user.userId ||
       (await isOrderTrucker(req, order)) || (user.role === 'TRUCKER' && order.status === 'requested');
     if (!allowed) { res.status(403).json({ error: 'Insufficient permissions' }); return; }
-    res.json(order);
+    res.json(withMaps(order));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -596,7 +622,38 @@ router.post('/orders/:id/assign', authenticateToken, requireRole('ADMIN'), async
       prisma.truckOrder.update({ where: { id }, data: { status: 'accepted', truckId: truck.id, acceptedAt: new Date() }, include: orderInclude }),
       prisma.truck.update({ where: { id: truck.id }, data: { status: 'busy' } }),
     ]);
-    res.json(updated);
+    res.json(withMaps(updated));
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Driver SELF-accepts an open order — no admin approval (Tawsil / inDrive style).
+// The order goes straight to whichever online driver grabs it first.
+router.post('/orders/:id/accept', authenticateToken, requireRole('TRUCKER'), async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const user = getUser(req);
+  try {
+    const truck = await getOwnTruck(user.userId);
+    if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    if (truck.status === 'suspended' || !truck.isActive) { res.status(403).json({ error: 'Your account is suspended or inactive' }); return; }
+    if (truck.status === 'offline') { res.status(400).json({ error: 'Go online before accepting orders' }); return; }
+    const order = await prisma.truckOrder.findUnique({ where: { id } });
+    if (!order) { res.status(404).json({ error: 'Order not found' }); return; }
+    if (order.status !== 'requested' || order.truckId) { res.status(409).json({ error: 'This order was already taken by another driver' }); return; }
+    if (order.truckTypeId && truck.truckTypeId && order.truckTypeId !== truck.truckTypeId) {
+      res.status(400).json({ error: 'This order needs a different truck type' }); return;
+    }
+    // Atomic claim: only succeeds if it is still open — prevents two drivers taking it.
+    const claim = await prisma.truckOrder.updateMany({
+      where: { id, status: 'requested', truckId: null },
+      data: { status: 'accepted', truckId: truck.id, acceptedAt: new Date() },
+    });
+    if (claim.count === 0) { res.status(409).json({ error: 'This order was already taken by another driver' }); return; }
+    // Immediate jobs make the truck busy; scheduled (future-day) jobs keep it free to take a "now" job.
+    if (order.scheduledType !== 'scheduled') {
+      await prisma.truck.update({ where: { id: truck.id }, data: { status: 'busy' } });
+    }
+    const full = await prisma.truckOrder.findUnique({ where: { id }, include: orderInclude });
+    res.json(withMaps(full!));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -677,6 +734,64 @@ router.post('/orders/:id/cancel', authenticateToken, async (req: Request, res: R
     if (order.truckId) ops.push(prisma.truck.update({ where: { id: order.truckId }, data: { status: 'available', ...(by === 'DRIVER' && { cancellationCount: { increment: 1 } }) } }));
     const [updated] = await prisma.$transaction(ops);
     res.json(updated);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// ══════════════════ DRIVER APP (Tawsil-style, for the mobile app) ══════════════════
+
+// Go online / offline. Online = the driver is available and will see open orders.
+//   PATCH /api/truck/driver/status   body { "online": true }   -> { status, online }
+router.patch('/driver/status', authenticateToken, requireRole('TRUCKER'), async (req: Request, res: Response) => {
+  const user = getUser(req);
+  try {
+    const truck = await getOwnTruck(user.userId);
+    if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    if (truck.status === 'suspended') { res.status(403).json({ error: 'Your account is suspended' }); return; }
+    const online = req.body?.online === true || req.body?.online === 'true';
+    // If mid-delivery, going "online" keeps busy; otherwise available/offline.
+    const hasActive = await prisma.truckOrder.count({ where: { truckId: truck.id, status: { in: ['arrived', 'loading', 'in_transit'] } } });
+    const nextStatus = online ? (hasActive ? 'busy' : 'available') : 'offline';
+    const updated = await prisma.truck.update({ where: { id: truck.id }, data: { status: nextStatus } });
+    res.json({ status: updated.status, online: updated.status !== 'offline' });
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+});
+
+// Everything the driver's home screen needs, in one call:
+//   GET /api/truck/driver/dashboard
+//   -> { truck, online, available:{now,scheduled}, active, scheduled, completed }
+// - available.now / available.scheduled : open orders he can grab (only when online)
+// - active   : his in-progress jobs to show on the map ("now" drive)
+// - scheduled: his accepted jobs for another day (show as a list)
+// - completed: recent finished jobs
+// Each order carries a `maps` object (pickupMapUrl, destinationMapUrl, directionsUrl).
+router.get('/driver/dashboard', authenticateToken, requireRole('TRUCKER'), async (req: Request, res: Response) => {
+  const user = getUser(req);
+  try {
+    const truck = await getOwnTruck(user.userId);
+    if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    const online = truck.status !== 'offline' && truck.status !== 'suspended';
+    const typeMatch = { OR: [{ truckTypeId: truck.truckTypeId ?? '—' }, { truckTypeId: null }] };
+    const [availableRaw, mine, completed] = await Promise.all([
+      online
+        ? prisma.truckOrder.findMany({ where: { status: 'requested', truckId: null, ...typeMatch }, include: orderInclude, orderBy: { createdAt: 'desc' }, take: 100 })
+        : Promise.resolve([]),
+      prisma.truckOrder.findMany({ where: { truckId: truck.id, status: { in: ['accepted', 'arrived', 'loading', 'in_transit'] } }, include: orderInclude, orderBy: { createdAt: 'asc' } }),
+      prisma.truckOrder.findMany({ where: { truckId: truck.id, status: 'delivered' }, include: orderInclude, orderBy: { deliveredAt: 'desc' }, take: 30 }),
+    ]);
+    const isNow = (o: any) => o.scheduledType !== 'scheduled';
+    res.json({
+      truck: { id: truck.id, truckCode: truck.truckCode, driverName: truck.driverName, status: truck.status, isVerified: truck.isVerified, truckTypeId: truck.truckTypeId, rating: truck.rating, totalTrips: truck.totalTrips },
+      online,
+      available: {
+        now: availableRaw.filter(isNow).map(withMaps),
+        scheduled: availableRaw.filter((o) => !isNow(o)).map(withMaps),
+      },
+      // active = shown on the map: in-progress, or an accepted "now" job
+      active: mine.filter((o) => o.status !== 'accepted' || isNow(o)).map(withMaps),
+      // scheduled = accepted jobs for another day, shown as a list
+      scheduled: mine.filter((o) => o.status === 'accepted' && !isNow(o)).map(withMaps),
+      completed: completed.map(withMaps),
+    });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
