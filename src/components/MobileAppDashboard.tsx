@@ -475,18 +475,10 @@ function NotificationsPage({ notifs, post, del }: {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [chApp, setChApp] = useState(true);
-  const [chPush, setChPush] = useState(false);
-  const [chEmail, setChEmail] = useState(false);
   const [audience, setAudience] = useState("all");
   const [link, setLink] = useState("");
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<{ mailConfigured: boolean; pushConfigured: boolean; devices: number } | null>(null);
-
-  // Test-email tool
-  const [testTo, setTestTo] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API_URL}/api/app/admin/status`, { headers: { Authorization: `Bearer ${token}` } })
@@ -495,87 +487,40 @@ function NotificationsPage({ notifs, post, del }: {
 
   const send = async () => {
     if (!title.trim() || !body.trim()) return alert("Title and message are required");
-    const channels = [chApp && "app", chPush && "push", chEmail && "email"].filter(Boolean) as string[];
-    if (!channels.length) return alert("Pick at least one channel");
     setSending(true);
-    const r = await post(`/api/app/admin/notifications`, { title, body, channels, audience, link });
+    // Firebase push only. Every send is also recorded in the history below.
+    const r = await post(`/api/app/admin/notifications`, { title, body, channels: ["push"], audience, link });
     setSending(false);
     if (!r) return;
     setTitle(""); setBody(""); setLink("");
-    const lines: string[] = [];
-    if (r.wantEmail) {
-      if (!r.mailConfigured) lines.push("• Email NOT sent — SMTP not configured on the server.");
-      else if (r.failedCount) lines.push(`• Email: ${r.sentCount}/${r.recipientCount} sent, ${r.failedCount} failed (${r.mailError || "?"}).`);
-      else lines.push(`• Email sent to ${r.sentCount} recipient(s).`);
-    }
-    if (r.wantPush) {
-      if (!r.pushConfigured) lines.push("• Push NOT sent — Firebase not configured on the server.");
-      else lines.push(`• Push: ${r.pushSent}/${r.pushTargets} device(s)${r.pushFailed ? `, ${r.pushFailed} failed` : ""}.`);
-    }
-    alert(lines.length ? lines.join("\n") : "Saved to the in-app feed ✅");
-  };
-
-  const sendTest = async () => {
-    if (!testTo.trim()) return;
-    setTesting(true); setTestResult(null);
-    try {
-      const res = await fetch(`${API_URL}/api/app/admin/test-email`, {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ to: testTo }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (d.ok) setTestResult(`✅ ${d.message}`);
-      else setTestResult(`⚠ ${d.error || d.message || "Failed"}${d.code ? ` [${d.code}]` : ""}`);
-    } catch { setTestResult("⚠ Network error reaching the server"); }
-    finally { setTesting(false); }
+    if (!r.pushConfigured) alert("Saved — but push is NOT configured on the server yet (Firebase key missing), so nothing was delivered.");
+    else alert(`Push sent to ${r.pushSent}/${r.pushTargets} device(s)${r.pushFailed ? `, ${r.pushFailed} failed` : ""}.`);
   };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto animate-fadeIn pb-16 text-left">
       <div className="space-y-2">
         <h1 className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Notifications</h1>
-        <p className="text-sm text-slate-400 font-medium font-inter">Send an in-app announcement or an email blast to your users</p>
+        <p className="text-sm text-slate-400 font-medium font-inter">Send a push notification to your users’ phones (Firebase)</p>
       </div>
 
       <div className="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm space-y-5">
         <Field label="Title *"><input value={title} onChange={e => setTitle(e.target.value)} className={inputCls} placeholder="New feature is live!" /></Field>
         <Field label="Message *"><textarea value={body} onChange={e => setBody(e.target.value)} rows={4} className={inputCls} placeholder="Write your announcement…" /></Field>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Channels">
-            <div className="flex flex-wrap gap-2">
-              <ChannelChk on={chApp} set={setChApp} icon={Smartphone} label="In-app" />
-              <ChannelChk on={chPush} set={setChPush} icon={BellRing} label="Push" bad={!!status && !status.pushConfigured} />
-              <ChannelChk on={chEmail} set={setChEmail} icon={Mail} label="Email" bad={!!status && !status.mailConfigured} />
-            </div>
-          </Field>
-          <Field label="Audience">
-            <select value={audience} onChange={e => setAudience(e.target.value)} className={inputCls}>
-              <option value="all">Everyone</option>
-              <option value="clients">Clients</option>
-              <option value="workers">Workers</option>
-              <option value="drivers">Drivers</option>
-            </select>
-          </Field>
-        </div>
+        <Field label="Audience">
+          <select value={audience} onChange={e => setAudience(e.target.value)} className={inputCls}>
+            <option value="all">Everyone</option>
+            <option value="clients">Clients</option>
+            <option value="workers">Workers</option>
+            <option value="drivers">Drivers</option>
+          </select>
+        </Field>
         <Field label="Link (optional)"><input value={link} onChange={e => setLink(e.target.value)} className={inputCls} placeholder="rafik://promos or https://…" /></Field>
-        {chEmail && status && !status.mailConfigured && (
-          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Email is not configured — add SMTP settings to the backend <code>.env</code> and restart. Emails won’t send until then.</p>
+        {status && !status.pushConfigured && (
+          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Push is not configured yet — add the Firebase service-account key to the backend <code>.env</code> and restart. Notifications won’t deliver until then.</p>
         )}
-        {chPush && status && !status.pushConfigured && (
-          <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 font-inter">Push is not configured — add the Firebase service-account key to the backend <code>.env</code> and restart. See the setup steps.</p>
-        )}
-        {chPush && status?.pushConfigured && <p className="text-[11px] font-bold text-slate-400 font-inter">{status.devices} device(s) registered for push.</p>}
-        <button onClick={send} disabled={sending} className={saveBtnCls}>{sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} {sending ? "Sending…" : "Send notification"}</button>
-      </div>
-
-      {/* Verify email setup */}
-      <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm space-y-3">
-        <div className="flex items-center gap-2"><Mail size={16} className="text-violet-600" /><h2 className="text-sm font-black text-slate-700 uppercase tracking-wider">Test your email setup</h2></div>
-        <p className="text-[11px] text-slate-400 font-inter">Send one email to yourself to confirm the SMTP settings in the backend <code>.env</code> actually work. The exact error is shown if it fails.</p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input value={testTo} onChange={e => setTestTo(e.target.value)} type="email" placeholder="your@email.com" className={`${inputCls} flex-1`} />
-          <button onClick={sendTest} disabled={testing} className="px-5 py-3 bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-slate-900 cursor-pointer flex items-center justify-center gap-2 shrink-0">{testing ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Send test</button>
-        </div>
-        {testResult && <p className={`text-[12px] font-bold font-inter break-words ${testResult.startsWith("✅") ? "text-emerald-600" : "text-rose-600"}`}>{testResult}</p>}
+        {status?.pushConfigured && <p className="text-[11px] font-bold text-slate-400 font-inter">{status.devices} device(s) registered for push.</p>}
+        <button onClick={send} disabled={sending} className={saveBtnCls}>{sending ? <Loader2 size={16} className="animate-spin" /> : <BellRing size={16} />} {sending ? "Sending…" : "Send push notification"}</button>
       </div>
 
       <section>
@@ -677,14 +622,5 @@ function EmptyState({ icon: Icon, text }: { icon: React.ComponentType<{ size?: n
       <Icon size={40} />
       <p className="text-xs font-bold text-slate-400 font-inter">{text}</p>
     </div>
-  );
-}
-function ChannelChk({ on, set, icon: Icon, label, bad }: { on: boolean; set: (v: boolean) => void; icon: React.ComponentType<{ size?: number }>; label: string; bad?: boolean }) {
-  return (
-    <button type="button" onClick={() => set(!on)} className={`px-3.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border flex items-center gap-1.5 cursor-pointer ${on ? "bg-violet-600 text-white border-violet-600" : "bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100"}`}>
-      <Icon size={13} /> {label}
-      {on && <Check size={12} />}
-      {bad && <span title="Not configured on the server" className="w-2 h-2 rounded-full bg-amber-400" />}
-    </button>
   );
 }
