@@ -79,6 +79,7 @@ interface TruckOrder {
   truckId?: string | null;
   truck?: { id: string; truckCode: string; driverName: string; phone: string; plate?: string | null; status: string; rating: number; truckType?: { name: string } | null } | null;
   cancelledBy?: string | null; cancelReason?: string | null; cancelStage?: string | null;
+  maps?: { pickupName: string; destinationName: string; pickupMapUrl: string | null; destinationMapUrl: string | null; directionsUrl: string };
   createdAt: string;
 }
 interface TruckStats {
@@ -368,11 +369,24 @@ function OrderDrawer({ order, trucks, onClose, onAction }: {
           </div>
         </div>
 
-        {/* Route */}
+        {/* Route — tap a place to open it on Google Maps, or get directions */}
         <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-2">
-          <p className="text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5"><MapPin size={12} className="text-emerald-500 mt-0.5 shrink-0" /> {order.pickupAddress}{order.pickupCommune && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-slate-500 rounded-lg border border-slate-100 ml-1">{order.pickupCommune}</span>}</p>
-          <p className="text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5"><Navigation size={12} className="text-rose-500 mt-0.5 shrink-0" /> {order.destinationAddress}{order.destinationWilaya && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-rose-600 rounded-lg border border-slate-100 ml-1">{order.destinationWilaya}</span>}</p>
-          {order.distanceKm != null && <p className="text-[10px] font-black text-slate-400 uppercase">Distance: {order.distanceKm} km</p>}
+          <a href={order.maps?.pickupMapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.pickupAddress)}`} target="_blank" rel="noreferrer" className="group text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5 hover:text-emerald-700">
+            <MapPin size={12} className="text-emerald-500 mt-0.5 shrink-0" />
+            <span className="group-hover:underline">{order.pickupAddress}</span>
+            {order.pickupCommune && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-slate-500 rounded-lg border border-slate-100 ml-1">{order.pickupCommune}</span>}
+          </a>
+          <a href={order.maps?.destinationMapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.destinationAddress)}`} target="_blank" rel="noreferrer" className="group text-xs font-bold text-slate-600 font-inter flex items-start gap-1.5 hover:text-rose-700">
+            <Navigation size={12} className="text-rose-500 mt-0.5 shrink-0" />
+            <span className="group-hover:underline">{order.destinationAddress}</span>
+            {order.destinationWilaya && <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-white text-rose-600 rounded-lg border border-slate-100 ml-1">{order.destinationWilaya}</span>}
+          </a>
+          <div className="flex items-center justify-between pt-1">
+            {order.distanceKm != null ? <p className="text-[10px] font-black text-slate-400 uppercase">Distance: {order.distanceKm} km</p> : <span />}
+            <a href={order.maps?.directionsUrl || `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(order.pickupAddress)}&destination=${encodeURIComponent(order.destinationAddress)}&travelmode=driving`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 bg-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-teal-700 cursor-pointer">
+              <Navigation size={12} /> Directions
+            </a>
+          </div>
         </div>
 
         {/* Cargo details */}
