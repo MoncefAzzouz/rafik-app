@@ -728,6 +728,7 @@ async function lifecycle(req: Request, res: Response, target: 'arrived' | 'loadi
       include: orderInclude,
     });
     void emailUser(updated.clientId, `Order ${updated.orderNumber}: ${TRUCK_STATUS_LABEL[target]}`, lead(`Your freight order status is now: <b>${TRUCK_STATUS_LABEL[target]}</b>.`) + truckOrderRows(updated));
+    void adminAlert({ title: `${updated.orderNumber} → ${TRUCK_STATUS_LABEL[target]}`, body: updated.clientName, type: 'truck_order', vertical: 'truck', event: target, refId: updated.id, link: '/truck/orders', emailHtml: lead(`Freight order status is now: <b>${TRUCK_STATUS_LABEL[target]}</b>.`) + truckOrderRows(updated) });
     res.json(updated);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 }

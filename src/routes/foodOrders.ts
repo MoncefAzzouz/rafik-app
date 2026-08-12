@@ -6,7 +6,7 @@ import {
   computeDeliveryFee, haversineKm,
 } from '../lib/food';
 import { validatePromo, redeemPromo, PromoResult } from '../lib/promo';
-import { adminAlert, lead, infoTable, pRow } from '../lib/notify';
+import { adminAlert, emailUser, lead, infoTable, pRow } from '../lib/notify';
 
 const router = Router();
 
@@ -43,11 +43,27 @@ async function canActOnOrder(req: Request, order: { restaurantId: string; driver
   return null;
 }
 
+const FOOD_STATUS_LABEL: Record<string, string> = {
+  pending: 'Pending', accepted: 'Accepted', declined: 'Declined', preparing: 'Preparing',
+  ready: 'Ready', assigned: 'Driver assigned', arrived: 'Driver at restaurant',
+  delivering: 'Out for delivery', delivered: 'Delivered', cancelled: 'Cancelled',
+};
+
 async function moveStatus(orderId: string, status: string, extra: Record<string, unknown> = {}) {
   const [, order] = await prisma.$transaction([
     prisma.foodOrderStatusHistory.create({ data: { orderId, status } }),
     prisma.foodOrder.update({ where: { id: orderId }, data: { status, ...extra }, include: ORDER_INCLUDE }),
   ]);
+  // Notify on every state change: client (email) + admins (bell + email).
+  const label = FOOD_STATUS_LABEL[status] || status;
+  const html = lead(`Food order status is now: <b>${label}</b>.`) + infoTable([
+    pRow('Order', order.orderNumber),
+    pRow('Restaurant', (order as any).restaurant?.name),
+    pRow('Client', `${order.clientName} · ${order.clientPhone}`),
+    pRow('Total', `${order.totalAmount} DZD`),
+  ]);
+  void emailUser(order.clientId, `Your food order ${order.orderNumber}: ${label}`, html);
+  void adminAlert({ title: `Food order ${order.orderNumber} → ${label}`, body: order.clientName, type: 'food_order', vertical: 'food', event: status, refId: order.id, link: '/food/orders', emailHtml: html });
   return order;
 }
 

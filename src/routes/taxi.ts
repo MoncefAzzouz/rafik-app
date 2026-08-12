@@ -19,6 +19,28 @@ const rideInclude = {
   driver: { select: { id: true, name: true, phone: true, vehicleType: true, vehicleModel: true, vehicleColor: true, vehiclePlate: true, rating: true, status: true, profileImage: true } },
 };
 
+const RIDE_STATUS_LABEL: Record<string, string> = {
+  requested: 'Requested', accepted: 'Driver assigned', driver_arrived: 'Driver arrived',
+  in_ride: 'In ride', completed: 'Completed',
+  cancelled_by_client: 'Cancelled by client', cancelled_by_driver: 'Cancelled by driver', cancelled_by_admin: 'Cancelled by admin',
+};
+function taxiRideRows(r: any): string {
+  return infoTable([
+    pRow('Ride', r.rideNumber),
+    pRow('Client', `${r.clientName} · ${r.clientPhone}`),
+    pRow('From', r.pickupAddress),
+    pRow('To', r.destinationAddress),
+    pRow('Fare', `${r.agreedFare ?? r.estimatedFare} DZD`),
+  ]);
+}
+// Notify client (email) + admins (bell + email) on a ride state change.
+function notifyRideStatus(r: any, status: string) {
+  const label = RIDE_STATUS_LABEL[status] || status;
+  const html = lead(`Ride status is now: <b>${label}</b>.`) + taxiRideRows(r);
+  void emailUser(r.clientId, `Your ride ${r.rideNumber}: ${label}`, html);
+  void adminAlert({ title: `Ride ${r.rideNumber} → ${label}`, body: r.clientName, type: 'taxi_ride', vertical: 'taxi', event: status, refId: r.id, link: '/taxi/rides', emailHtml: html });
+}
+
 async function getOwnDriver(userId: string) {
   return prisma.driver.findUnique({ where: { userId } });
 }
@@ -222,6 +244,7 @@ router.post('/rides/:id/assign', authenticateToken, requireRole('ADMIN'), async 
       prisma.taxiRideOffer.updateMany({ where: { rideId: id, status: 'pending' }, data: { status: 'rejected' } }),
       prisma.driver.update({ where: { id: driver.id }, data: { status: 'BUSY' } }),
     ]);
+    notifyRideStatus(updated, 'accepted');
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -257,6 +280,7 @@ async function rideLifecycle(req: Request, res: Response, target: 'driver_arrive
       },
       include: rideInclude,
     });
+    notifyRideStatus(updated, target);
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -313,12 +337,7 @@ router.post('/rides/:id/complete', authenticateToken, async (req: Request, res: 
       }));
     }
     const [updated] = await prisma.$transaction(ops);
-    void emailUser(updated.clientId, `Your ride ${updated.rideNumber} is complete ✅`, lead('Your ride is finished. Thank you for riding with Rafik!') + infoTable([
-      pRow('Ride', updated.rideNumber),
-      pRow('From', updated.pickupAddress),
-      pRow('To', updated.destinationAddress),
-      pRow('Fare', `${updated.agreedFare ?? updated.estimatedFare} DZD`),
-    ]));
+    notifyRideStatus(updated, 'completed');
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -377,6 +396,7 @@ router.post('/rides/:id/cancel', authenticateToken, async (req: Request, res: Re
       }));
     }
     const [updated] = await prisma.$transaction(ops);
+    notifyRideStatus(updated, target);
 
     // 🔍 Anti-scam engine
     const fraud = await runFraudDetection(id);

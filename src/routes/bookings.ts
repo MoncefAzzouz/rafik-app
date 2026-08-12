@@ -287,10 +287,9 @@ router.put('/:id/status', authenticateToken, async (req: Request, res: Response)
       }),
     ]);
     const label = BOOKING_STATUS_LABEL[status as string] || (status as string);
-    void emailUser(existing.clientId, `Your booking ${id}: ${label}`, lead(`Your booking status is now: <b>${label}</b>.`) + bookingRows({ ...existing, status }));
-    if (status === 'quote_approved' || status === 'completed') {
-      void adminAlert({ title: `Booking ${id}: ${label}`, body: existing.clientName, type: 'booking', vertical: 'services', event: status as string, refId: id, link: '/services/bookings', emailHtml: lead(`This booking is now <b>${label}</b>.`) + bookingRows({ ...existing, status }) });
-    }
+    const bodyRows = lead(`Booking status is now: <b>${label}</b>.`) + bookingRows({ ...existing, status });
+    void emailUser(existing.clientId, `Your booking ${id}: ${label}`, bodyRows);
+    void adminAlert({ title: `Booking ${id} → ${label}`, body: existing.clientName, type: 'booking', vertical: 'services', event: status as string, refId: id, link: '/services/bookings', emailHtml: bodyRows });
     res.json(booking);
   } catch (err) {
     console.error(err);
