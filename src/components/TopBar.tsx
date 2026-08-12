@@ -2,16 +2,76 @@
 
 import { useTheme, SERVICE_CONFIGS, ServiceType } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
-import { Bell, Search, Sparkles, Menu } from "lucide-react";
-import { useState } from "react";
+import { API_URL } from "@/lib/api";
+import { Bell, Search, Sparkles, Menu, CheckCheck, Trash2, Package } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
+
+interface AdminAlert {
+  id: string; type: string; vertical?: string | null; event?: string | null;
+  title: string; body?: string | null; link?: string | null; readAt?: string | null; createdAt: string;
+}
+function timeAgo(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+const VERTICAL_EMOJI: Record<string, string> = { truck: "🚚", services: "🔧", food: "🍕", taxi: "🚕" };
 
 export default function TopBar() {
   const { activeService, setActiveService, config } = useTheme();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [alerts, setAlerts] = useState<AdminAlert[]>([]);
+  const [unread, setUnread] = useState(0);
+  const bellRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  const fetchAlerts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/app/admin/alerts?limit=30`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) { const d = await res.json(); setAlerts(d.items || []); setUnread(d.unread || 0); }
+    } catch { /* ignore */ }
+  }, [token]);
+
+  // Load on mount, then poll every 30s so the badge stays fresh.
+  useEffect(() => {
+    fetchAlerts();
+    const t = setInterval(fetchAlerts, 30000);
+    return () => clearInterval(t);
+  }, [fetchAlerts]);
+
+  // Close the dropdown when clicking outside it.
+  useEffect(() => {
+    if (!isAlertsOpen) return;
+    const onClick = (e: MouseEvent) => { if (bellRef.current && !bellRef.current.contains(e.target as Node)) setIsAlertsOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [isAlertsOpen]);
+
+  const openBell = async () => {
+    const next = !isAlertsOpen;
+    setIsAlertsOpen(next);
+    if (next && unread > 0) {
+      setUnread(0);
+      try { await fetch(`${API_URL}/api/app/admin/alerts/read-all`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } }); } catch {}
+      setAlerts(prev => prev.map(a => ({ ...a, readAt: a.readAt || new Date().toISOString() })));
+    }
+  };
+
+  const openAlert = (a: AdminAlert) => {
+    setIsAlertsOpen(false);
+    if (a.link) router.push(a.link);
+  };
+
+  const clearAll = async () => {
+    setAlerts([]); setUnread(0);
+    try { await fetch(`${API_URL}/api/app/admin/alerts`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }); } catch {}
+  };
 
   const services = Object.values(SERVICE_CONFIGS);
 
@@ -51,15 +111,48 @@ export default function TopBar() {
       {/* Right: Actions */}
       <div className="flex items-center gap-4">
         {/* Notification Bell */}
-        <div className="relative">
+        <div className="relative" ref={bellRef}>
           <button
-            onClick={() => setIsAlertsOpen(!isAlertsOpen)}
+            onClick={openBell}
             className="w-12 h-12 bg-slate-50 hover:bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-100 text-slate-500 relative transition-all active:scale-95 cursor-pointer"
           >
             <Bell size={18} />
-            <span className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full animate-ping" />
-            <span className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full" />
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
           </button>
+
+          {isAlertsOpen && (
+            <div className="absolute right-0 mt-3 w-[360px] max-w-[90vw] bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fadeIn">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Notifications</span>
+                {alerts.length > 0 && (
+                  <button onClick={clearAll} className="text-[10px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-wider flex items-center gap-1 cursor-pointer"><Trash2 size={12} /> Clear</button>
+                )}
+              </div>
+              <div className="max-h-[420px] overflow-y-auto">
+                {alerts.length === 0 && (
+                  <div className="py-12 flex flex-col items-center justify-center text-slate-300 gap-2">
+                    <CheckCheck size={28} />
+                    <p className="text-xs font-bold text-slate-400">You're all caught up</p>
+                  </div>
+                )}
+                {alerts.map((a) => (
+                  <button key={a.id} onClick={() => openAlert(a)} className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer ${a.readAt ? "" : "bg-primary/5"}`}>
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-base shrink-0">{VERTICAL_EMOJI[a.vertical || ""] || <Package size={15} className="text-slate-400" />}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-black text-slate-800 leading-tight">{a.title}</p>
+                      {a.body && <p className="text-[11px] text-slate-500 font-inter truncate">{a.body}</p>}
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">{timeAgo(a.createdAt)}</p>
+                    </div>
+                    {!a.readAt && <span className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Admin Profile */}
