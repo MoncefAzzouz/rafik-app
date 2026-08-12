@@ -2,6 +2,8 @@
 
 import { useTheme, ServiceType } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   Car,
@@ -87,10 +89,37 @@ interface SidebarProps {
   onNavigate: (pageId: string) => void;
 }
 
+// Which nav item shows the "pending orders" red dot, per vertical.
+const PENDING_NAV: Partial<Record<ServiceType, { navId: string; key: string }>> = {
+  truck: { navId: "orders", key: "truck" },
+  food: { navId: "orders", key: "food" },
+  taxi: { navId: "rides", key: "taxi" },
+  services: { navId: "bookings", key: "services" },
+};
+
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   const { activeService, config } = useTheme();
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
   const navItems = SERVICE_NAV[activeService];
+
+  // Poll pending-order counts so a red dot appears without a manual refresh.
+  const [pending, setPending] = useState<Record<string, number>>({});
+  const fetchPending = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/app/admin/pending-counts`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setPending(await res.json());
+    } catch { /* ignore */ }
+  }, [token]);
+  useEffect(() => {
+    fetchPending();
+    const t = setInterval(fetchPending, 20000);
+    const onFocus = () => fetchPending();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(t); window.removeEventListener("focus", onFocus); };
+  }, [fetchPending]);
+  const pendingNav = PENDING_NAV[activeService];
+  const pendingCount = pendingNav ? (pending[pendingNav.key] || 0) : 0;
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-100 p-6 h-full sticky top-0 shrink-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -123,6 +152,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
+          const showPending = !!pendingNav && item.id === pendingNav.navId && pendingCount > 0;
 
           return (
             <button
@@ -142,14 +172,23 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
                   : undefined
               }
             >
-              <Icon
-                size={20}
-                className={`transition-transform duration-300 group-hover:scale-110 ${
-                  isActive ? "text-white" : "text-slate-400 group-hover:text-primary"
-                }`}
-              />
+              <span className="relative">
+                <Icon
+                  size={20}
+                  className={`transition-transform duration-300 group-hover:scale-110 ${
+                    isActive ? "text-white" : "text-slate-400 group-hover:text-primary"
+                  }`}
+                />
+                {/* red dot on the icon when this vertical has pending orders */}
+                {showPending && <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />}
+              </span>
               <span className="text-sm font-bold uppercase tracking-wider">{item.label}</span>
-              {isActive && (
+              {showPending && (
+                <span className={`ml-auto min-w-[20px] h-5 px-1.5 text-[10px] font-black rounded-full flex items-center justify-center ${isActive ? "bg-white text-rose-600" : "bg-rose-500 text-white"}`}>
+                  {pendingCount > 99 ? "99+" : pendingCount}
+                </span>
+              )}
+              {isActive && !showPending && (
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-l-full" />
               )}
             </button>

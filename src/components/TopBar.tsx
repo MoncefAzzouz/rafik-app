@@ -38,11 +38,15 @@ export default function TopBar() {
     } catch { /* ignore */ }
   }, [token]);
 
-  // Load on mount, then poll every 30s so the badge stays fresh.
+  // Load on mount, poll every 20s, and refresh instantly when the tab regains focus.
   useEffect(() => {
     fetchAlerts();
-    const t = setInterval(fetchAlerts, 30000);
-    return () => clearInterval(t);
+    const t = setInterval(fetchAlerts, 20000);
+    const onFocus = () => fetchAlerts();
+    const onVisible = () => { if (document.visibilityState === "visible") fetchAlerts(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(t); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVisible); };
   }, [fetchAlerts]);
 
   // Close the dropdown when clicking outside it.
