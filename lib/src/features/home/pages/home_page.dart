@@ -140,7 +140,10 @@ class _HomePageState extends State<HomePage> {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      // Matches the light content container below, not the header's navy —
+      // any gap below short content (e.g. after hiding a section) then
+      // reads as more of the same light background instead of exposed blue.
+      backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
         onRefresh: _content.refreshHome,
         child: SingleChildScrollView(
@@ -261,9 +264,7 @@ class _HomePageState extends State<HomePage> {
                                   margin: const EdgeInsets.symmetric(
                                     horizontal: 3,
                                   ),
-                                  width: _currentBannerIndex == index
-                                      ? 12
-                                      : 6,
+                                  width: _currentBannerIndex == index ? 12 : 6,
                                   height: 6,
                                   decoration: BoxDecoration(
                                     color: _currentBannerIndex == index
@@ -327,10 +328,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 SizedBox(
                                   width: tileWidth,
-                                  child: _buildServiceItem(
-                                    null,
-                                    _moreLabel(),
-                                  ),
+                                  child: _buildServiceItem(null, _moreLabel()),
                                 ),
                               ],
                             );

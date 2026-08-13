@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/cached_image.dart';
 import '../data/content_repository.dart';
-import '../domain/app_promo.dart';
+import '../domain/app_slide.dart';
 
 class OffersPage extends StatefulWidget {
   const OffersPage({super.key});
@@ -33,11 +33,11 @@ class _OffersPageState extends State<OffersPage> {
     super.dispose();
   }
 
-  void _copyCode(AppPromo promo) {
-    Clipboard.setData(ClipboardData(text: promo.code));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${promo.code} copied')),
-    );
+  Future<void> _openBannerLink(String? link) async {
+    if (link == null || link.isEmpty) return;
+    if (link.toLowerCase().startsWith('http')) {
+      await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -73,45 +73,22 @@ class _OffersPageState extends State<OffersPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Promo codes (admin-managed)
-              const Text(
-                'Offers',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (_content.promos.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 28),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF6F7FB),
-                    borderRadius: BorderRadius.circular(16),
+              // Standalone promo banners (admin-managed, "New Banner" on
+              // the app-promos page) — purely visual, not tied to a code.
+              if (_content.promoBanners.isNotEmpty) ...[
+                SizedBox(
+                  height: 140,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    itemCount: _content.promoBanners.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) =>
+                        _buildBanner(_content.promoBanners[index]),
                   ),
-                  child: const Center(
-                    child: Text(
-                      'No offers right now — check back soon',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Column(
-                  children: [
-                    for (final promo in _content.promos) ...[
-                      _buildPromoCard(promo),
-                      const SizedBox(height: 16),
-                    ],
-                  ],
                 ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 20),
+              ],
 
               // Just for you
               const Text(
@@ -168,126 +145,86 @@ class _OffersPageState extends State<OffersPage> {
     );
   }
 
-  Widget _buildPromoCard(AppPromo promo) {
-    final hasBanner = (promo.appBanner ?? '').isNotEmpty;
+  Widget _buildBanner(AppSlide slide) {
+    final hasText =
+        (slide.title ?? '').isNotEmpty || (slide.subtitle ?? '').isNotEmpty;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(10),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasBanner)
-            CachedImage(
-              url: promo.appBanner!,
-              width: double.infinity,
-              height: 120,
-              errorBuilder: (context) => Container(
-                width: double.infinity,
-                height: 120,
-                color: AppColors.primary.withAlpha(20),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        promo.discountLabel,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _copyCode(promo),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.royalBlue.withAlpha(20),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              promo.code,
-                              style: const TextStyle(
-                                color: AppColors.royalBlue,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.copy_rounded,
-                              size: 14,
-                              color: AppColors.royalBlue,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if ((promo.description ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    promo.description!,
-                    style: const TextStyle(
+    return GestureDetector(
+      onTap: () => _openBannerLink(slide.link),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 260,
+          height: 140,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedImage(
+                url: slide.image,
+                errorBuilder: (context) => Container(
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported_rounded,
                       color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                ],
-                if (promo.expiresAt != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Expires ${_formatDate(promo.expiresAt!)}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary.withAlpha(180),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (hasText) ...[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withAlpha(160),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
-                ],
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if ((slide.title ?? '').isNotEmpty)
+                        Text(
+                          slide.title!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      if ((slide.subtitle ?? '').isNotEmpty)
+                        Text(
+                          slide.subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(220),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
 
   Widget _buildServiceCard({
     required IconData icon,

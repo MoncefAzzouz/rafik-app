@@ -102,73 +102,29 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                             vertical: 12,
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => Navigator.pop(context),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.grey.shade100,
-                                      ),
-                                      child: const Icon(
-                                        Icons.arrow_back,
-                                        color: Colors.black87,
-                                        size: 20,
-                                      ),
-                                    ),
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.grey.shade100,
                                   ),
-                                  const SizedBox(width: 12),
-                                  // Profile picture (MA brand gradient)
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          AppColors.royalBlue,
-                                          AppColors.electricBlue,
-                                        ],
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: Text(
-                                        'MA',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
+                                  child: const Icon(
+                                    Icons.arrow_back,
+                                    color: Colors.black87,
+                                    size: 20,
                                   ),
-                                  const SizedBox(width: 12),
-                                  // Title text
-                                  Text(
-                                    '${s.hello}, Moncef!',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Notification bell icon
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.grey.shade100,
                                 ),
-                                child: const Icon(
-                                  Icons.notifications_none_rounded,
-                                  color: Colors.black87,
-                                  size: 22,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                s.profileOrders,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ],
