@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../data/parcel_order_repository.dart';
 import '../domain/parcel_order.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
@@ -16,15 +17,65 @@ class ParcelTrackOrderPage extends StatefulWidget {
 }
 
 class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
-  final MapController _mapController = MapController();
+  static const _pollInterval = Duration(seconds: 12);
 
-  // Simulated Coordinates for Sétif route
-  final LatLng _pickupLocation = const LatLng(36.1911, 5.4137);
-  final LatLng _driverLocation = const LatLng(36.1870, 5.4210);
-  final LatLng _deliveryLocation = const LatLng(36.1790, 5.4320);
+  late ParcelOrder _order;
+  bool _isCancelling = false;
+  Timer? _pollTimer;
 
-  final int _currentStep =
-      3; // 0: Created, 1: Assigned, 2: Picked up, 3: Delivering, 4: Completed
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.order;
+    // The backend has no realtime push — poll while tracking this order so
+    // status changes the driver makes (accepted/arrived/delivered/...) show
+    // up here without the customer having to leave and reopen the screen.
+    if (!_order.isArchived) {
+      _pollTimer = Timer.periodic(_pollInterval, (_) => _refreshStatus());
+    }
+  }
+
+  Future<void> _refreshStatus() async {
+    final result = await ParcelOrderRepository.instance.fetchOne(_order.id);
+    if (!mounted) return;
+    result.fold(
+      onSuccess: (order) {
+        setState(() => _order = order);
+        if (order.isArchived) _pollTimer?.cancel();
+      },
+      onFailure: (_) {
+        // Transient network hiccup — keep showing the last known status and
+        // just retry on the next tick.
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  String _formatPrice(num? price) {
+    if (price == null) return '—';
+    final rounded = price.round();
+    final str = rounded.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(str[i]);
+    }
+    return '${buffer.toString()} DZD';
+  }
+
+  Future<void> _openUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,77 +84,18 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
       builder: (context, lang, _) {
         final s = AppStrings(lang);
         final isRtl = lang == AppLang.ar;
+        final stepIndex = parcelStatusStepIndex(_order.status);
+        final isCancelled = _order.isCancelled;
 
         return Directionality(
           textDirection: AppLanguage.instance.textDirection,
           child: Scaffold(
-            body: Stack(
-              children: [
-                // ── Live Interactive Map ──────────────────────────────────────
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: const LatLng(36.1850, 5.4220),
-                    initialZoom: 14.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.rafik.app',
-                    ),
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: [
-                            _pickupLocation,
-                            _driverLocation,
-                            _deliveryLocation,
-                          ],
-                          strokeWidth: 4.5,
-                          color: AppColors.primary,
-                        ),
-                      ],
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        // Pickup Marker
-                        Marker(
-                          point: _pickupLocation,
-                          width: 44,
-                          height: 44,
-                          child: _buildLocationMarker(
-                            icon: Icons.storefront_rounded,
-                            color: Colors.blue.shade700,
-                            label: 'Pickup',
-                          ),
-                        ),
-                        // Driver Live Marker
-                        Marker(
-                          point: _driverLocation,
-                          width: 50,
-                          height: 50,
-                          child: _buildDriverMarker(),
-                        ),
-                        // Delivery Marker
-                        Marker(
-                          point: _deliveryLocation,
-                          width: 44,
-                          height: 44,
-                          child: _buildLocationMarker(
-                            icon: Icons.flag_rounded,
-                            color: Colors.black87,
-                            label: 'Delivery',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                // ── Top Bar Overlay ──────────────────────────────────────────
-                SafeArea(
-                  child: Padding(
+            backgroundColor: const Color(0xFFF7F8FA),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  // ── Top Bar ──────────────────────────────────────────
+                  Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 10,
@@ -158,7 +150,9 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                widget.order.id,
+                                _order.orderNumber.isNotEmpty
+                                    ? _order.orderNumber
+                                    : _order.id,
                                 style: const TextStyle(
                                   color: Colors.black87,
                                   fontSize: 13,
@@ -168,93 +162,37 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 40), // Balance top row
+                        const SizedBox(width: 40),
                       ],
                     ),
                   ),
-                ),
 
-                // ── Map Floating Control Buttons ──────────────────────────────
-                Positioned(
-                  right: isRtl ? null : 16,
-                  left: isRtl ? 16 : null,
-                  top: 100,
-                  child: FloatingActionButton.small(
-                    heroTag: 'recenter_map',
-                    onPressed: () {
-                      _mapController.move(_driverLocation, 14.5);
-                    },
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    child: const Icon(Icons.my_location_rounded),
-                  ),
-                ),
-
-                // ── Bottom Tracking Sheet ──────────────────────────────────────
-                DraggableScrollableSheet(
-                  initialChildSize: 0.48,
-                  minChildSize: 0.28,
-                  maxChildSize: 0.88,
-                  builder: (context, scrollController) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(28),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(25),
-                            blurRadius: 20,
-                            offset: const Offset(0, -4),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      children: [
+                        // ── Status Banner ──────────────────────────────
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
-                        ],
-                      ),
-                      child: ListView(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        children: [
-                          // Sheet Drag Handle
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade300,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Live Status Banner Header
-                          Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    s.parcelStatusDelivering,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                    ),
+                              Expanded(
+                                child: Text(
+                                  isCancelled
+                                      ? s.parcelStatusCancelled
+                                      : _statusLabel(s, _order.status),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Estimated arrival: 12 mins',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -262,10 +200,14 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
+                                  color: isCancelled
+                                      ? Colors.red.shade50
+                                      : Colors.orange.shade50,
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: Colors.orange.shade200,
+                                    color: isCancelled
+                                        ? Colors.red.shade200
+                                        : Colors.orange.shade200,
                                   ),
                                 ),
                                 child: Row(
@@ -274,15 +216,19 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                                       width: 8,
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: Colors.orange.shade800,
+                                        color: isCancelled
+                                            ? Colors.red.shade800
+                                            : Colors.orange.shade800,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'En Route',
+                                      isCancelled ? 'ملغي' : 'نشط',
                                       style: TextStyle(
-                                        color: Colors.orange.shade900,
+                                        color: isCancelled
+                                            ? Colors.red.shade900
+                                            : Colors.orange.shade900,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w900,
                                       ),
@@ -292,29 +238,16 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                               ),
                             ],
                           ),
+                        ),
 
-                          const SizedBox(height: 14),
+                        const SizedBox(height: 20),
 
-                          // Progress Bar
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: 0.70,
-                              minHeight: 7,
-                              backgroundColor: Colors.grey.shade100,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.primary,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── Status Stepper ─────────────────────────────────
+                        // ── Status Stepper ─────────────────────────────
+                        if (!isCancelled)
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF9FAFB),
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.grey.shade200),
                             ),
@@ -322,265 +255,217 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                               children: [
                                 _buildStepRow(
                                   title: s.parcelStepCreated,
-                                  time: '10:30 AM',
-                                  isDone: _currentStep >= 0,
-                                  isCurrent: _currentStep == 0,
+                                  isDone: stepIndex >= 0,
+                                  isCurrent: stepIndex == 0,
                                   isLast: false,
                                 ),
                                 _buildStepRow(
                                   title: s.parcelStepAssigned,
-                                  time: '10:33 AM',
-                                  isDone: _currentStep >= 1,
-                                  isCurrent: _currentStep == 1,
+                                  isDone: stepIndex >= 1,
+                                  isCurrent: stepIndex == 1,
                                   isLast: false,
                                 ),
                                 _buildStepRow(
                                   title: s.parcelStepPickedUp,
-                                  time: '10:38 AM',
-                                  isDone: _currentStep >= 2,
-                                  isCurrent: _currentStep == 2,
+                                  isDone: stepIndex >= 2,
+                                  isCurrent: stepIndex == 2,
                                   isLast: false,
                                 ),
                                 _buildStepRow(
                                   title: s.parcelStepDelivering,
-                                  time: '10:42 AM',
-                                  isDone: _currentStep >= 3,
-                                  isCurrent: _currentStep == 3,
+                                  isDone: stepIndex >= 3,
+                                  isCurrent: stepIndex == 3,
                                   isLast: false,
                                 ),
                                 _buildStepRow(
                                   title: s.parcelStepCompleted,
-                                  time: 'Est. 10:54 AM',
-                                  isDone: _currentStep >= 4,
-                                  isCurrent: _currentStep == 4,
+                                  isDone: stepIndex >= 4,
+                                  isCurrent: stepIndex == 4,
                                   isLast: true,
                                 ),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                          // ── Driver Info Card ───────────────────────────────
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.grey.shade200),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withAlpha(4),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 30,
-                                      backgroundColor: Color(0xFFF2F4F7),
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        color: Color(0xFF7B8492),
-                                        size: 34,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const Text(
-                                            'Mourad Belkacem',
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w900,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.star_rounded,
-                                                color: Colors.amber.shade700,
-                                                size: 15,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              const Text(
-                                                '4.9',
-                                                style: TextStyle(
-                                                  color: Color(0xFFFFC107),
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    _buildDriverIconButton(
-                                      icon: Icons.chat_bubble_outline_rounded,
-                                      onTap: () {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'جاري فتح المحادثة مع السائق...',
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 8),
-                                    _buildDriverIconButton(
-                                      icon: Icons.phone_rounded,
-                                      onTap: () async {
-                                        final url = Uri.parse(
-                                          'tel:+213550123456',
-                                        );
-                                        if (await canLaunchUrl(url)) {
-                                          await launchUrl(url);
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                        // ── Map / Navigation Actions ───────────────────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.grey.shade200),
                           ),
-
-                          const SizedBox(height: 20),
-
-                          // ── Route & Order Details Card ────────────────────
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        widget.order.pickup,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s.parcelDriverInfo,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black87,
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 3),
-                                  child: Container(
-                                    width: 2,
-                                    height: 16,
-                                    color: Colors.grey.shade300,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildMapActionButton(
+                                icon: Icons.alt_route_rounded,
+                                label: s.parcelOpenDirections,
+                                onTap: () => _openUrl(_order.mapsDirectionsUrl),
+                                enabled: _order.mapsDirectionsUrl != null,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildMapActionButton(
+                                icon: Icons.storefront_rounded,
+                                label: s.parcelOpenPickup,
+                                onTap: () => _openUrl(_order.mapsPickupUrl),
+                                enabled: _order.mapsPickupUrl != null,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildMapActionButton(
+                                icon: Icons.flag_rounded,
+                                label: s.parcelOpenDestination,
+                                onTap: () =>
+                                    _openUrl(_order.mapsDestinationUrl),
+                                enabled: _order.mapsDestinationUrl != null,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Route & Order Details Card ────────────────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _order.pickupAddress,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 3),
+                                child: Container(
+                                  width: 2,
+                                  height: 16,
+                                  color: Colors.grey.shade300,
                                 ),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.black,
-                                        shape: BoxShape.circle,
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      _order.destinationAddress,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        widget.order.delivery,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 24),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'الوصف:',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
                                     ),
-                                  ],
-                                ),
-                                const Divider(height: 24),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Description:',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    Text(
-                                      widget.order.description,
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      _order.description.isNotEmpty
+                                          ? _order.description
+                                          : '—',
+                                      textAlign: TextAlign.end,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Price:',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                      ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'السعر:',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
                                     ),
-                                    Text(
-                                      widget.order.invoice,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        color: AppColors.primary,
-                                        fontSize: 14,
-                                      ),
+                                  ),
+                                  Text(
+                                    _formatPrice(
+                                      _order.agreedPrice ??
+                                          _order.estimatedPrice,
                                     ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.primary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
+                        ),
 
-                          const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                          // ── Cancel Order Button ────────────────────────────
+                        // ── Cancel Order Button ─────────────────────
+                        if (!isCancelled && !_order.isDelivered)
                           SizedBox(
                             width: double.infinity,
                             child: TextButton.icon(
-                              onPressed: () {
-                                _showCancelDialog(context, s);
-                              },
+                              onPressed: _isCancelling
+                                  ? null
+                                  : () => _showCancelDialog(context, s),
                               icon: const Icon(
                                 Icons.cancel_outlined,
                                 color: Colors.red,
@@ -595,13 +480,11 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -609,72 +492,52 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
     );
   }
 
-  Widget _buildLocationMarker({
+  String _statusLabel(AppStrings s, String status) {
+    switch (status) {
+      case 'requested':
+        return s.parcelStatusSearching;
+      case 'accepted':
+        return s.parcelStatusAssigned;
+      case 'arrived':
+      case 'loading':
+        return s.parcelStatusInTransit;
+      case 'in_transit':
+        return s.parcelStatusDelivering;
+      case 'delivered':
+        return s.parcelStatusDelivered;
+      default:
+        return s.parcelStatusCancelled;
+    }
+  }
+
+  Widget _buildMapActionButton({
     required IconData icon,
-    required Color color,
     required String label,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: color.withAlpha(80),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Icon(icon, color: Colors.white, size: 22),
-    );
-  }
-
-  Widget _buildDriverMarker() {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withAlpha(100),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.local_shipping_rounded,
-        color: Colors.white,
-        size: 24,
-      ),
-    );
-  }
-
-  Widget _buildDriverIconButton({
-    required IconData icon,
     required VoidCallback onTap,
+    required bool enabled,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: enabled ? onTap : null,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(
+            color: enabled ? AppColors.primary : Colors.grey.shade300,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
-        child: Icon(icon, color: Colors.black87, size: 22),
+        icon: Icon(icon, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   Widget _buildStepRow({
     required String title,
-    required String time,
     required bool isDone,
     required bool isCurrent,
     required bool isLast,
@@ -730,26 +593,17 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: isDone || isCurrent
-                          ? FontWeight.bold
-                          : FontWeight.w500,
-                      color: isDone || isCurrent
-                          ? Colors.black87
-                          : Colors.grey.shade500,
-                    ),
-                  ),
-                  Text(
-                    time,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                  ),
-                ],
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isDone || isCurrent
+                      ? FontWeight.bold
+                      : FontWeight.w500,
+                  color: isDone || isCurrent
+                      ? Colors.black87
+                      : Colors.grey.shade500,
+                ),
               ),
             ),
           ),
@@ -761,20 +615,41 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
   void _showCancelDialog(BuildContext context, AppStrings s) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(s.parcelCancelOrder),
         content: const Text('هل أنت تأكد من رغبتك في إلغاء هذا الطلب؟'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () {
-              widget.order.isCancelled = true;
-              Navigator.pop(context);
-              Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              setState(() => _isCancelling = true);
+              final result = await ParcelOrderRepository.instance.cancel(
+                _order.id,
+              );
+              if (!mounted) return;
+              result.fold(
+                onSuccess: (order) {
+                  setState(() {
+                    _order = order;
+                    _isCancelling = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم إلغاء الطلب بنجاح')),
+                  );
+                  Navigator.pop(context);
+                },
+                onFailure: (failure) {
+                  setState(() => _isCancelling = false);
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(failure.message)));
+                },
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text(

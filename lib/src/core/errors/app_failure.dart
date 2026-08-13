@@ -9,6 +9,10 @@ final class NetworkFailure extends AppFailure {
   const NetworkFailure(super.message, [super.cause]);
 }
 
+final class AuthFailure extends AppFailure {
+  const AuthFailure(super.message, [super.cause]);
+}
+
 final class LocationFailure extends AppFailure {
   const LocationFailure(super.message, [super.cause]);
 }

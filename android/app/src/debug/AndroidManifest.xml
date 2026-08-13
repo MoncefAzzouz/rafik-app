@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dev-only: allow plain-HTTP calls to a local backend (e.g. http://10.0.2.2:4000).
+         Merged into debug builds only — production (HTTPS) never needs this. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

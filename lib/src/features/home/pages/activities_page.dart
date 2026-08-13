@@ -178,22 +178,24 @@ class _ActivitiesPageState extends State<ActivitiesPage>
   }
 
   ActivityItem _activityFromParcelOrder(ParcelOrder order) {
-    final isArchived = order.isCompleted || order.isCancelled;
     return ActivityItem(
-      id: order.id,
-      date: _formatActivityDate(order.dateCreated),
-      price: order.invoice,
+      id: order.orderNumber.isNotEmpty ? order.orderNumber : order.id,
+      date: _formatActivityDate(order.createdAt),
+      price: order.agreedPrice != null || order.estimatedPrice != null
+          ? '${(order.agreedPrice ?? order.estimatedPrice)!.round()} DA'
+          : '—',
       type: 'Parcel',
       status: order.isCancelled
           ? 'Cancelled'
-          : isArchived
+          : order.isDelivered
           ? 'Completed'
           : 'Scheduled',
-      storeName: '📦 ${order.vehicleName} - نقل طرود',
+      storeName:
+          '📦 ${order.truckTypeName ?? order.categoryName} - نقل طرود',
       pickupName: 'استلام البضائع',
-      pickupAddress: order.pickup,
+      pickupAddress: order.pickupAddress,
       destinationName: 'مكان التفريغ',
-      destinationAddress: order.delivery,
+      destinationAddress: order.destinationAddress,
       parcelOrder: order,
     );
   }

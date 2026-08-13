@@ -1,23 +1,44 @@
 import 'package:flutter/material.dart';
 import 'parcel_vehicle_select_page.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/result/result.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
-class CategoryItem {
+/// A truck category from `GET /api/truck/categories`, with its nested,
+/// allowed `truckTypes` — booking requires picking a category first since
+/// `POST /api/truck/orders` requires `categoryId`.
+class TruckCategory {
   final String id;
-  final String Function(AppStrings s) titleGetter;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
+  final String name;
+  final String? description;
+  final String? image;
+  final bool isActive;
+  final List<TruckTypeOption> truckTypes;
 
-  const CategoryItem({
+  const TruckCategory({
     required this.id,
-    required this.titleGetter,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
+    required this.name,
+    this.description,
+    this.image,
+    required this.isActive,
+    required this.truckTypes,
   });
+
+  factory TruckCategory.fromJson(Map<String, dynamic> json) {
+    final types = (json['truckTypes'] as List<dynamic>? ?? [])
+        .map((e) => TruckTypeOption.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return TruckCategory(
+      id: json['id'].toString(),
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      image: json['image']?.toString(),
+      isActive: json['isActive'] as bool? ?? true,
+      truckTypes: types,
+    );
+  }
 }
 
 class ParcelCategorySelectPage extends StatefulWidget {
@@ -29,78 +50,57 @@ class ParcelCategorySelectPage extends StatefulWidget {
 }
 
 class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
-  final List<CategoryItem> _categories = [
-    CategoryItem(
-      id: 'house_moving',
-      titleGetter: (s) => s.catHouseMoving,
-      icon: Icons.chair_rounded,
-      iconColor: const Color(0xFFAB47BC),
-      bgColor: const Color(0xFFF3E5F5),
-    ),
-    CategoryItem(
-      id: 'commercial',
-      titleGetter: (s) => s.catCommercial,
-      icon: Icons.inventory_2_rounded,
-      iconColor: const Color(0xFFFFA726),
-      bgColor: const Color(0xFFFFF3E0),
-    ),
-    CategoryItem(
-      id: 'appliances',
-      titleGetter: (s) => s.catAppliances,
-      icon: Icons.kitchen_rounded,
-      iconColor: const Color(0xFF29B6F6),
-      bgColor: const Color(0xFFE1F5FE),
-    ),
-    CategoryItem(
-      id: 'towing',
-      titleGetter: (s) => s.catTowing,
-      icon: Icons.car_repair_rounded,
-      iconColor: const Color(0xFFFF7043),
-      bgColor: const Color(0xFFFBE9E7),
-    ),
-    CategoryItem(
-      id: 'construction',
-      titleGetter: (s) => s.catConstruction,
-      icon: Icons.foundation_rounded,
-      iconColor: const Color(0xFFD84315),
-      bgColor: const Color(0xFFFBE9E7),
-    ),
-    CategoryItem(
-      id: 'heavy_equipment',
-      titleGetter: (s) => s.catHeavyEquipment,
-      icon: Icons.shopping_bag_rounded,
-      iconColor: const Color(0xFF1E88E5),
-      bgColor: const Color(0xFFE3F2FD),
-    ),
-    CategoryItem(
-      id: 'refrigerated',
-      titleGetter: (s) => s.catRefrigerated,
-      icon: Icons.ac_unit_rounded,
-      iconColor: const Color(0xFFEF5350),
-      bgColor: const Color(0xFFFFEBEE),
-    ),
-    CategoryItem(
-      id: 'water',
-      titleGetter: (s) => s.catWater,
-      icon: Icons.water_drop_rounded,
-      iconColor: const Color(0xFF0288D1),
-      bgColor: const Color(0xFFE0F7FA),
-    ),
-    CategoryItem(
-      id: 'fuels_chemicals',
-      titleGetter: (s) => s.catFuelsChemicals,
-      icon: Icons.local_gas_station_rounded,
-      iconColor: const Color(0xFFE53935),
-      bgColor: const Color(0xFFFFEBEE),
-    ),
-    CategoryItem(
-      id: 'other',
-      titleGetter: (s) => s.catOther,
-      icon: Icons.more_horiz_rounded,
-      iconColor: const Color(0xFF78909C),
-      bgColor: const Color(0xFFECEFF1),
-    ),
+  // Cosmetic icon/color pairing cycled by index — the backend doesn't send
+  // per-category colors, only an optional image.
+  static const List<List<Color>> _palette = [
+    [Color(0xFFAB47BC), Color(0xFFF3E5F5)],
+    [Color(0xFFFFA726), Color(0xFFFFF3E0)],
+    [Color(0xFF29B6F6), Color(0xFFE1F5FE)],
+    [Color(0xFFFF7043), Color(0xFFFBE9E7)],
+    [Color(0xFFD84315), Color(0xFFFBE9E7)],
+    [Color(0xFF1E88E5), Color(0xFFE3F2FD)],
+    [Color(0xFFEF5350), Color(0xFFFFEBEE)],
+    [Color(0xFF0288D1), Color(0xFFE0F7FA)],
+    [Color(0xFFE53935), Color(0xFFFFEBEE)],
+    [Color(0xFF78909C), Color(0xFFECEFF1)],
   ];
+
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<TruckCategory> _categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final result = await ApiClient.instance.get('/api/truck/categories');
+    if (!mounted) return;
+
+    switch (result) {
+      case Success(value: final data):
+        final categories = (data as List)
+            .map((e) => TruckCategory.fromJson(e as Map<String, dynamic>))
+            .where((c) => c.isActive)
+            .toList();
+        setState(() {
+          _categories = categories;
+          _isLoading = false;
+        });
+      case Failure(failure: final failure):
+        setState(() {
+          _errorMessage = failure.message;
+          _isLoading = false;
+        });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -178,84 +178,145 @@ class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
 
                   const SizedBox(height: 8),
 
-                  // Category Grid
-                  Expanded(
-                    child: GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.15,
-                      ),
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final item = _categories[index];
-                        final title = item.titleGetter(s);
-
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              SmoothPageRoute(
-                                page: const ParcelVehicleSelectPage(),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7F8FA),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.grey.shade100,
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Icon graphic container
-                                Container(
-                                  width: 52,
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    color: item.bgColor,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Icon(
-                                    item.icon,
-                                    color: item.iconColor,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: Text(
-                                    title,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  Expanded(child: _buildBody(s)),
                 ],
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(AppStrings s) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadCategories,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(s.retry),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_categories.isEmpty) {
+      return Center(
+        child: Text(
+          s.noResults,
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+        childAspectRatio: 1.15,
+      ),
+      itemCount: _categories.length,
+      itemBuilder: (context, index) {
+        final category = _categories[index];
+        final colors = _palette[index % _palette.length];
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              SmoothPageRoute(
+                page: ParcelVehicleSelectPage(
+                  categoryId: category.id,
+                  categoryName: category.name,
+                  truckTypes: category.truckTypes,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade100, width: 1),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: colors[1],
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: category.image != null && category.image!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            category.image!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Icon(
+                                  Icons.local_shipping_rounded,
+                                  color: colors[0],
+                                  size: 28,
+                                ),
+                          ),
+                        )
+                      : Icon(
+                          Icons.local_shipping_rounded,
+                          color: colors[0],
+                          size: 28,
+                        ),
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    category.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );

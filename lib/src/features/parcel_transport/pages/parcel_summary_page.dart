@@ -1,30 +1,149 @@
 import 'package:flutter/material.dart';
-import 'parcel_vehicle_select_page.dart'; // import VehicleType
+import 'parcel_vehicle_select_page.dart'; // import TruckTypeOption
 import 'parcel_success_page.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../auth/data/auth_repository.dart';
 import '../data/parcel_order_repository.dart';
-import '../domain/parcel_order.dart';
 
-class ParcelSummaryPage extends StatelessWidget {
-  final VehicleType selectedVehicle;
+class ParcelSummaryPage extends StatefulWidget {
+  final String categoryId;
+  final String categoryName;
+  final TruckTypeOption truckType;
   final String pickupAddress;
-  final String deliveryAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final String destinationAddress;
+  final double? destinationLat;
+  final double? destinationLng;
   final String description;
-  final String invoiceOption;
+  final String invoiceLabel;
+  final String invoiceStatus;
   final String timingText;
-  final int helperCount;
+  final String scheduledType;
+  final DateTime? scheduledDate;
 
   const ParcelSummaryPage({
     super.key,
-    required this.selectedVehicle,
+    required this.categoryId,
+    required this.categoryName,
+    required this.truckType,
     required this.pickupAddress,
-    required this.deliveryAddress,
+    this.pickupLat,
+    this.pickupLng,
+    required this.destinationAddress,
+    this.destinationLat,
+    this.destinationLng,
     required this.description,
-    required this.invoiceOption,
+    required this.invoiceLabel,
+    required this.invoiceStatus,
     required this.timingText,
-    required this.helperCount,
+    required this.scheduledType,
+    this.scheduledDate,
   });
+
+  @override
+  State<ParcelSummaryPage> createState() => _ParcelSummaryPageState();
+}
+
+class _ParcelSummaryPageState extends State<ParcelSummaryPage> {
+  bool _isQuoting = false;
+  bool _isSubmitting = false;
+  String? _quoteText;
+
+  String _formatPrice(num? price) {
+    if (price == null) return '—';
+    final rounded = price.round();
+    final str = rounded.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(str[i]);
+    }
+    return '${buffer.toString()} DZD';
+  }
+
+  Future<void> _fetchQuote() async {
+    setState(() {
+      _isQuoting = true;
+      _quoteText = null;
+    });
+
+    final result = await ParcelOrderRepository.instance.quote(
+      truckTypeId: widget.truckType.id,
+      pickupLat: widget.pickupLat,
+      pickupLng: widget.pickupLng,
+      destinationLat: widget.destinationLat,
+      destinationLng: widget.destinationLng,
+    );
+
+    if (!mounted) return;
+
+    result.fold(
+      onSuccess: (quote) {
+        setState(() {
+          _isQuoting = false;
+          _quoteText = quote.estimatedPrice != null
+              ? _formatPrice(quote.estimatedPrice)
+              : 'السعر التقديري غير متوفر لهذا المسار';
+        });
+      },
+      onFailure: (failure) {
+        setState(() {
+          _isQuoting = false;
+          _quoteText = failure.message;
+        });
+      },
+    );
+  }
+
+  Future<void> _submitOrder() async {
+    final user = AuthRepository.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى تسجيل الدخول لإرسال الطلب')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final result = await ParcelOrderRepository.instance.create(
+      clientName: user.fullName,
+      clientPhone: user.phone,
+      categoryId: widget.categoryId,
+      truckTypeId: widget.truckType.id,
+      pickupAddress: widget.pickupAddress,
+      pickupLat: widget.pickupLat,
+      pickupLng: widget.pickupLng,
+      destinationAddress: widget.destinationAddress,
+      destinationLat: widget.destinationLat,
+      destinationLng: widget.destinationLng,
+      description: widget.description,
+      invoiceStatus: widget.invoiceStatus,
+      scheduledType: widget.scheduledType,
+      scheduledDate: widget.scheduledDate,
+    );
+
+    if (!mounted) return;
+
+    result.fold(
+      onSuccess: (order) {
+        Navigator.push(
+          context,
+          SmoothPageRoute(
+            page: ParcelSuccessPage(orderId: order.orderNumber),
+          ),
+        );
+      },
+      onFailure: (failure) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +259,7 @@ class ParcelSummaryPage extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    pickupAddress,
+                                    widget.pickupAddress,
                                     style: const TextStyle(
                                       color: Colors.black87,
                                       fontSize: 14,
@@ -149,7 +268,7 @@ class ParcelSummaryPage extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 24),
                                   Text(
-                                    deliveryAddress,
+                                    widget.destinationAddress,
                                     style: const TextStyle(
                                       color: Colors.black87,
                                       fontSize: 14,
@@ -192,7 +311,7 @@ class ParcelSummaryPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              selectedVehicle.name,
+                              widget.truckType.name,
                               style: const TextStyle(
                                 color: Colors.black,
                                 fontSize: 14,
@@ -224,28 +343,58 @@ class ParcelSummaryPage extends StatelessWidget {
                           children: [
                             _buildInfoRow(
                               'سلعة',
-                              description.isNotEmpty
-                                  ? description
+                              widget.description.isNotEmpty
+                                  ? widget.description
                                   : 'شحنة طرود',
                             ),
                             const SizedBox(height: 16),
                             _buildInfoRow(
                               'التاريخ والوقت',
-                              timingText,
-                              valueColor: timingText == 'في القريب العاجل'
+                              widget.timingText,
+                              valueColor: widget.timingText == 'في القريب العاجل'
                                   ? AppColors.primary
                                   : Colors.black,
                             ),
                             const SizedBox(height: 16),
-                            _buildInfoRow(
-                              'مساعدين التحميل',
-                              helperCount > 0 ? '$helperCount عمال' : 'لا يوجد',
-                            ),
-                            const SizedBox(height: 16),
-                            _buildInfoRow('فاتورة', invoiceOption),
+                            _buildInfoRow('فاتورة', widget.invoiceLabel),
                           ],
                         ),
                       ),
+
+                      if (_quoteText != null) ...[
+                        const SizedBox(height: 24),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(10),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primary.withAlpha(60),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.price_check_rounded,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _quoteText!,
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -262,7 +411,7 @@ class ParcelSummaryPage extends StatelessWidget {
                       width: double.infinity,
                       height: 52,
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: _isQuoting ? null : _fetchQuote,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black87,
                           side: BorderSide(
@@ -274,13 +423,21 @@ class ParcelSummaryPage extends StatelessWidget {
                           ),
                           elevation: 0,
                         ),
-                        child: const Text(
-                          'متوسط الأسعار',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isQuoting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                ),
+                              )
+                            : const Text(
+                                'متوسط الأسعار',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -290,32 +447,7 @@ class ParcelSummaryPage extends StatelessWidget {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // Build order ID and go to Success screen
-                          final orderId =
-                              'DZA${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 13)}';
-
-                          // Create new order and add it to active list
-                          final newOrder = ParcelOrder(
-                            id: orderId,
-                            vehicleName: selectedVehicle.name,
-                            pickup: pickupAddress,
-                            delivery: deliveryAddress,
-                            description: description,
-                            timing: timingText,
-                            helpers: helperCount,
-                            invoice: invoiceOption,
-                            dateCreated: DateTime.now(),
-                          );
-                          ParcelOrderRepository.instance.add(newOrder);
-
-                          Navigator.push(
-                            context,
-                            SmoothPageRoute(
-                              page: ParcelSuccessPage(orderId: orderId),
-                            ),
-                          );
-                        },
+                        onPressed: _isSubmitting ? null : _submitOrder,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -324,13 +456,22 @@ class ParcelSummaryPage extends StatelessWidget {
                           ),
                           elevation: 0,
                         ),
-                        child: const Text(
-                          'إرسال الطلب',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'إرسال الطلب',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
                   ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../home/pages/main_page.dart';
+import '../data/auth_repository.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -12,9 +13,12 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _errorText;
 
   @override
   void dispose() {
@@ -23,10 +27,38 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _login() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const MainPage()),
+  Future<void> _login() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    debugPrint('[LoginPage] Login tapped');
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
+    final result = await AuthRepository.instance.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    result.fold(
+      onSuccess: (user) {
+        debugPrint('[LoginPage] Login succeeded, navigating to MainPage');
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const MainPage()),
+          (route) => false,
+        );
+      },
+      onFailure: (failure) {
+        debugPrint('[LoginPage] Login failed: ${failure.message}');
+        setState(() {
+          _isLoading = false;
+          _errorText = failure.message;
+        });
+      },
     );
   }
 
@@ -38,7 +70,9 @@ class _LoginPageState extends State<LoginPage> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
-            child: Column(
+            child: Form(
+              key: _formKey,
+              child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -86,7 +120,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 40),
 
                 // Email Field
-                TextField(
+                TextFormField(
                   controller: _emailController,
                   style: const TextStyle(color: AppColors.textPrimary),
                   keyboardType: TextInputType.emailAddress,
@@ -97,11 +131,20 @@ class _LoginPageState extends State<LoginPage> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Email is required';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Enter a valid email';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 20),
 
                 // Password Field
-                TextField(
+                TextFormField(
                   controller: _passwordController,
                   style: const TextStyle(color: AppColors.textPrimary),
                   obscureText: _obscurePassword,
@@ -125,7 +168,26 @@ class _LoginPageState extends State<LoginPage> {
                       },
                     ),
                   ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Password is required';
+                    }
+                    return null;
+                  },
                 ),
+
+                if (_errorText != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorText!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 12),
 
                 // Forgot password
@@ -148,15 +210,24 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(
                   height: 55,
                   child: ElevatedButton(
-                    onPressed: _login,
-                    child: const Text(
-                      'LOGIN',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
+                    onPressed: _isLoading ? null : _login,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'LOGIN',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -189,6 +260,7 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ],
+              ),
             ),
           ),
         ),

@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
-import 'parcel_vehicle_select_page.dart'; // import VehicleType
+import 'parcel_vehicle_select_page.dart'; // import TruckTypeOption
 import 'parcel_summary_page.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class ParcelDetailsPage extends StatefulWidget {
-  final VehicleType selectedVehicle;
+  final String categoryId;
+  final String categoryName;
+  final TruckTypeOption truckType;
   final String pickupAddress;
-  final String deliveryAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final String destinationAddress;
+  final double? destinationLat;
+  final double? destinationLng;
 
   const ParcelDetailsPage({
     super.key,
-    required this.selectedVehicle,
+    required this.categoryId,
+    required this.categoryName,
+    required this.truckType,
     required this.pickupAddress,
-    required this.deliveryAddress,
+    this.pickupLat,
+    this.pickupLng,
+    required this.destinationAddress,
+    this.destinationLat,
+    this.destinationLng,
   });
 
   @override
@@ -31,6 +43,14 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
     'نعم عندي.',
     'لا، ليس لدي.',
     'هذه الخدمة لا تحتاج إلى فاتورة.',
+  ];
+
+  // Backend enum values (`invoiceStatus`), positionally aligned with
+  // _invoiceOptions above.
+  static const List<String> _invoiceValues = [
+    'HAS_INVOICE',
+    'NO_INVOICE',
+    'NOT_REQUIRED',
   ];
 
   @override
@@ -249,7 +269,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(ctx); // Close sheet
-                          _navigateToSummary(localHelperCount);
+                          _navigateToSummary();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
@@ -277,7 +297,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                       child: OutlinedButton(
                         onPressed: () {
                           Navigator.pop(ctx); // Close sheet
-                          _navigateToSummary(0);
+                          _navigateToSummary();
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.black87,
@@ -309,21 +329,39 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
     );
   }
 
-  void _navigateToSummary(int helperCount) {
+  void _navigateToSummary() {
     final timing = _isLater
         ? 'لاحقاً (${_dateController.text})'
         : 'في القريب العاجل';
+    DateTime? scheduledDate;
+    if (_isLater) {
+      final parts = _dateController.text.split('/');
+      if (parts.length == 3) {
+        scheduledDate = DateTime.tryParse(
+          '${parts[0]}-${parts[1].padLeft(2, '0')}-${parts[2].padLeft(2, '0')}',
+        );
+      }
+    }
+
     Navigator.push(
       context,
       SmoothPageRoute(
         page: ParcelSummaryPage(
-          selectedVehicle: widget.selectedVehicle,
+          categoryId: widget.categoryId,
+          categoryName: widget.categoryName,
+          truckType: widget.truckType,
           pickupAddress: widget.pickupAddress,
-          deliveryAddress: widget.deliveryAddress,
+          pickupLat: widget.pickupLat,
+          pickupLng: widget.pickupLng,
+          destinationAddress: widget.destinationAddress,
+          destinationLat: widget.destinationLat,
+          destinationLng: widget.destinationLng,
           description: _descController.text,
-          invoiceOption: _invoiceOptions[_selectedInvoiceOption],
+          invoiceLabel: _invoiceOptions[_selectedInvoiceOption],
+          invoiceStatus: _invoiceValues[_selectedInvoiceOption],
           timingText: timing,
-          helperCount: helperCount,
+          scheduledType: _isLater ? 'scheduled' : 'now',
+          scheduledDate: scheduledDate,
         ),
       ),
     );
@@ -732,7 +770,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: () => _navigateToSummary(0),
+                        onPressed: _navigateToSummary,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,

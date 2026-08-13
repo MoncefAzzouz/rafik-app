@@ -52,6 +52,9 @@ class AppStrings {
   String get back => _s('رجوع', 'Retour', 'Back');
   String get search => _s('بحث', 'Rechercher', 'Search');
   String get noResults => _s('لا توجد نتائج', 'Aucun résultat', 'No results');
+  String get retry => _s('إعادة المحاولة', 'Réessayer', 'Retry');
+  String get errorGeneric =>
+      _s('حدث خطأ ما، حاول مجدداً', 'Une erreur est survenue', 'Something went wrong');
 
   // ── Bottom Nav ────────────────────────────────────────────────
   String get navHome => _s('الرئيسية', 'Accueil', 'Home');
@@ -156,6 +159,16 @@ class AppStrings {
   String get parcelCallDriver => _s('الاتصال بالسائق', 'Appeler', 'Call driver');
   String get parcelMessageDriver => _s('مراسلة السائق', 'Message', 'Message driver');
   String get parcelDriverInfo => _s('معلومات السائق', 'Chauffeur', 'Driver details');
+  String get parcelStatusCancelled =>
+      _s('تم إلغاء الطلب', 'Commande annulée', 'Order cancelled');
+  String get parcelOpenDirections =>
+      _s('فتح المسار في الخرائط', 'Ouvrir l\'itinéraire', 'Open directions');
+  String get parcelOpenPickup =>
+      _s('نقطة الاستلام', 'Point de retrait', 'Pickup point');
+  String get parcelOpenDestination =>
+      _s('نقطة التسليم', 'Point de livraison', 'Destination point');
+  String get parcelEstimatedPrice =>
+      _s('السعر التقديري', 'Prix estimé', 'Estimated price');
 
   // ── Parcel Categories ─────────────────────────────────────────
   String get parcelNewOrder => _s('طلب جديد', 'Nouvelle commande', 'New order');

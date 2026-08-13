@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_strings.dart';
+import '../../../core/widgets/cached_image.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
-import '../../electricity/pages/electrician_list_page.dart';
 import '../../parcel_transport/pages/parcel_dashboard_page.dart';
 import '../../parcel_transport/data/parcel_order_repository.dart';
+import '../data/content_repository.dart';
+import '../domain/app_module.dart';
+import '../domain/app_slide.dart';
 import '../../../core/utils/smooth_page_route.dart';
 
 class HomePage extends StatefulWidget {
@@ -19,49 +24,108 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController();
   final ParcelOrderRepository _parcelOrders = ParcelOrderRepository.instance;
+  final ContentRepository _content = ContentRepository.instance;
   int _currentBannerIndex = 0;
   Timer? _bannerTimer;
-
-  final List<String> _banners = [
-    'assets/imagesss/rafik-secure-tracking-banner.png',
-    'assets/imagesss/IMG_0046-algeria.png',
-    'assets/imagesss/rafik-port-delivery-banner.png',
-    'assets/imagesss/rafik-nationwide-delivery-banner.png',
-  ];
 
   @override
   void initState() {
     super.initState();
-    _parcelOrders.addListener(_onParcelOrdersChanged);
+    _parcelOrders.addListener(_onExternalStateChanged);
+    _content.addListener(_onExternalStateChanged);
     _startBannerTimer();
+    _content.refreshHome();
   }
 
-  void _onParcelOrdersChanged() {
+  void _onExternalStateChanged() {
     if (mounted) setState(() {});
   }
 
   void _startBannerTimer() {
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (_bannerController.hasClients) {
-        int nextIndex = _currentBannerIndex + 1;
-        if (nextIndex >= _banners.length) {
-          nextIndex = 0;
-        }
-        _bannerController.animateToPage(
-          nextIndex,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
+      final count = _content.homeSlides.length;
+      if (count == 0 || !_bannerController.hasClients) return;
+      int nextIndex = _currentBannerIndex + 1;
+      if (nextIndex >= count) {
+        nextIndex = 0;
       }
+      _bannerController.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
     });
   }
 
   @override
   void dispose() {
-    _parcelOrders.removeListener(_onParcelOrdersChanged);
+    _parcelOrders.removeListener(_onExternalStateChanged);
+    _content.removeListener(_onExternalStateChanged);
     _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
+  }
+
+  void _handleSlideTap(AppSlide slide) {
+    final link = slide.link?.trim();
+    if (link == null || link.isEmpty) return;
+
+    if (link.toLowerCase().startsWith('http')) {
+      launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    final normalized = link.toLowerCase();
+    if (normalized.contains('truck')) {
+      _openParcelDashboard();
+    } else if (normalized.contains('taxi')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const TaxiBookingPage()),
+      );
+    } else if (normalized.contains('food')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const FoodPage()),
+      );
+    }
+  }
+
+  void _openParcelDashboard() {
+    Navigator.push(
+      context,
+      SmoothPageRoute(
+        page: const ParcelDashboardPage(),
+        settings: const RouteSettings(name: 'parcel_dashboard'),
+      ),
+    );
+  }
+
+  VoidCallback? _moduleOnTap(AppModule module) {
+    if (!module.isTappable) return null;
+    if (module.isTruck) return _openParcelDashboard;
+    switch (module.type) {
+      case 'taxi':
+        return () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const TaxiBookingPage()),
+        );
+      case 'food':
+        return () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const FoodPage()),
+        );
+      default:
+        return null;
+    }
+  }
+
+  String _moduleLabel(AppModule module) {
+    if (AppLanguage.instance.value == AppLang.ar &&
+        (module.labelAr ?? '').isNotEmpty) {
+      return module.labelAr!;
+    }
+    return module.label;
   }
 
   @override
@@ -77,419 +141,332 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: AppColors.primary,
-      body: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        child: Column(
-          children: [
-            // 1. Navy Gradient Header Section
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: AppColors.headerGradient,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Greeting & Location
-                    const Text(
-                      'Hello, Moncef',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: _showLocationSheet,
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            color: AppColors.cyan,
-                            size: 12,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Setif, Algeria',
-                            style: TextStyle(
-                              color: AppColors.cyan,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 2),
-                          Icon(
-                            Icons.keyboard_arrow_right_rounded,
-                            color: AppColors.cyan,
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _content.refreshHome,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          child: Column(
+            children: [
+              // 1. Navy Gradient Header Section
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.headerGradient,
                 ),
-              ),
-            ),
-
-            // 2. White Rounded Container (Rest of the Page Content)
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: AppColors.backgroundLight,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
-                ),
-              ),
-              padding: const EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: 24,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Promotional Banner Section (Swipable PageView)
-                  Stack(
-                    alignment: Alignment.bottomCenter,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: 180,
-                        width: double.infinity,
-                        child: PageView.builder(
-                          controller: _bannerController,
-                          onPageChanged: (index) {
-                            setState(() {
-                              _currentBannerIndex = index;
-                            });
-                          },
-                          itemCount: _banners.length,
-                          itemBuilder: (context, index) {
-                            return GestureDetector(
-                              onTap: () {
-                                if (index <= 3) {
-                                  Navigator.push(
-                                    context,
-                                    SmoothPageRoute(
-                                      page: const ParcelDashboardPage(),
-                                      settings: const RouteSettings(
-                                        name: 'parcel_dashboard',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: _buildBannerCard(index),
-                            );
-                          },
+                      // Greeting & Location
+                      const Text(
+                        'Hello, Moncef',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      Positioned(
-                        bottom: 12,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            _banners.length,
-                            (index) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: _currentBannerIndex == index ? 12 : 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: _currentBannerIndex == index
-                                    ? Colors.white
-                                    : Colors.white.withAlpha(128),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Services Grid Container (White Card style)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 20,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(8),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0043.PNG',
-                              'Parcel\nTransport',
-                              isLocked: false,
-                              badgeCount: _parcelOrders.activeCount,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  SmoothPageRoute(
-                                    page: const ParcelDashboardPage(),
-                                    settings: const RouteSettings(
-                                      name: 'parcel_dashboard',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0080.PNG',
-                              'Fourgon',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0044.PNG',
-                              'Colis',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/food icon.PNG',
-                              'Food',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const FoodPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0038.PNG',
-                              'Taxi',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const TaxiBookingPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0039.PNG',
-                              'Supermarket',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0040.PNG',
-                              'Home Service',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0041.PNG',
-                              'Electricity',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ElectricianListPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0042.PNG',
-                              'Bricolage\n(DIY)',
-                            ),
-                            _buildServiceItem(
-                              'assets/imagesss/IMG_0045.PNG',
-                              'Plumbing',
-                            ),
-                            _buildServiceItem('', 'More', isCustomMore: true),
-                            const Expanded(child: SizedBox()),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_parcelOrders.activeCount > 0) ...[
-                    const SizedBox(height: 14),
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(18),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            SmoothPageRoute(
-                              page: const ParcelDashboardPage(),
-                              settings: const RouteSettings(
-                                name: 'parcel_dashboard',
-                              ),
-                            ),
-                          );
-                        },
-                        child: Ink(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 13,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.royalBlue.withAlpha(18),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: AppColors.royalBlue.withAlpha(45),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.royalBlue,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.local_shipping_rounded,
-                                  color: Colors.white,
-                                  size: 21,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${_parcelOrders.activeCount} active parcel ${_parcelOrders.activeCount == 1 ? 'order' : 'orders'}',
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'Tap to view and manage your delivery',
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: AppColors.royalBlue,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  // Reorder Section
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.refresh_rounded,
-                            color: AppColors.royalBlue,
-                            size: 22,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Reorder your favorite meals',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(height: 4),
                       GestureDetector(
-                        onTap: () {},
+                        onTap: _showLocationSheet,
                         child: const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
+                            Icon(
+                              Icons.location_on_rounded,
+                              color: AppColors.cyan,
+                              size: 12,
+                            ),
+                            SizedBox(width: 4),
                             Text(
-                              'View all',
+                              'Setif, Algeria',
                               style: TextStyle(
-                                color: AppColors.royalBlue,
+                                color: AppColors.cyan,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                            SizedBox(width: 2),
                             Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.royalBlue,
+                              Icons.keyboard_arrow_right_rounded,
+                              color: AppColors.cyan,
                               size: 16,
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.grey.shade100,
-                        width: 1.0,
+                ),
+              ),
+
+              // 2. White Rounded Container (Rest of the Page Content)
+              Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: AppColors.backgroundLight,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
+                  ),
+                ),
+                padding: const EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 16,
+                  bottom: 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Promotional Banner Section (admin-managed slides)
+                    if (_content.homeSlides.isNotEmpty) ...[
+                      Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          SizedBox(
+                            height: 180,
+                            width: double.infinity,
+                            child: PageView.builder(
+                              controller: _bannerController,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentBannerIndex = index;
+                                });
+                              },
+                              itemCount: _content.homeSlides.length,
+                              itemBuilder: (context, index) {
+                                final slide = _content.homeSlides[index];
+                                return GestureDetector(
+                                  onTap: () => _handleSlideTap(slide),
+                                  child: _buildBannerCard(slide),
+                                );
+                              },
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 12,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                _content.homeSlides.length,
+                                (index) => AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 3,
+                                  ),
+                                  width: _currentBannerIndex == index
+                                      ? 12
+                                      : 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: _currentBannerIndex == index
+                                        ? Colors.white
+                                        : Colors.white.withAlpha(128),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(8),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Services Grid Container (White Card style, admin-managed modules)
+                    if (_content.modules.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 20,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(8),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                mainAxisSpacing: 20,
+                                childAspectRatio: 0.8,
+                              ),
+                          itemCount: _content.modules.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == _content.modules.length) {
+                              return _buildServiceItem(null, _moreLabel());
+                            }
+                            final module = _content.modules[index];
+                            return _buildServiceItem(
+                              module,
+                              _moduleLabel(module),
+                              badgeCount: module.isTruck
+                                  ? _parcelOrders.activeCount
+                                  : 0,
+                              onTap: _moduleOnTap(module),
+                            );
+                          },
+                        ),
+                      ),
+                    if (_parcelOrders.activeCount > 0) ...[
+                      const SizedBox(height: 14),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: _openParcelDashboard,
+                          child: Ink(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 13,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.royalBlue.withAlpha(18),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: AppColors.royalBlue.withAlpha(45),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.royalBlue,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.local_shipping_rounded,
+                                    color: Colors.white,
+                                    size: 21,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${_parcelOrders.activeCount} active parcel ${_parcelOrders.activeCount == 1 ? 'order' : 'orders'}',
+                                        style: const TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Tap to view and manage your delivery',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppColors.royalBlue,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    // Reorder Section
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.refresh_rounded,
+                              color: AppColors.royalBlue,
+                              size: 22,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Reorder your favorite meals',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () {},
+                          child: const Row(
+                            children: [
+                              Text(
+                                'View all',
+                                style: TextStyle(
+                                  color: AppColors.royalBlue,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.royalBlue,
+                                size: 16,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200',
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.grey.shade100,
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(8),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedImage(
+                              url:
+                                  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200',
+                              width: 72,
+                              height: 72,
+                              errorBuilder: (context) => Container(
                                 width: 72,
                                 height: 72,
                                 color: Colors.grey.shade200,
@@ -497,72 +474,72 @@ class _HomePageState extends State<HomePage> {
                                   Icons.restaurant_rounded,
                                   color: AppColors.textSecondary,
                                 ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pizzeria Apollino',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                '2 items',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'May 12, 2024 at 18:45',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEFF5FF),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.shopping_cart_outlined,
-                              color: AppColors.royalBlue,
-                              size: 20,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pizzeria Apollino',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '2 items',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'May 12, 2024 at 18:45',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () {},
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEFF5FF),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.shopping_cart_outlined,
+                                color: AppColors.royalBlue,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(
-                    height: 120,
-                  ), // Spacing for floating bottom nav
-                ],
+                    const SizedBox(
+                      height: 120,
+                    ), // Spacing for floating bottom nav
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -687,20 +664,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBannerCard(int index) {
-    final bannerText = _bannerText(index);
+  Widget _buildBannerCard(AppSlide slide) {
+    final hasText =
+        (slide.title ?? '').isNotEmpty || (slide.subtitle ?? '').isNotEmpty;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            _banners[index],
+          CachedImage(
+            url: slide.image,
             width: double.infinity,
-            fit: BoxFit.cover,
+            errorBuilder: (context) => Container(
+              color: Colors.grey.shade200,
+              child: const Center(
+                child: Icon(
+                  Icons.image_not_supported_rounded,
+                  color: AppColors.textSecondary,
+                  size: 32,
+                ),
+              ),
+            ),
           ),
-          if (bannerText != null) ...[
+          if (hasText) ...[
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -714,62 +701,38 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(2, 18, 20, 18),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 170),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if ((slide.title ?? '').isNotEmpty)
                         Text(
-                          bannerText['title']!,
-                          textAlign: TextAlign.right,
+                          slide.title!,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
+                            fontSize: 22,
                             height: 1.12,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                      if ((slide.subtitle ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 6),
                         Text(
-                          bannerText['subtitle']!,
-                          textAlign: TextAlign.right,
+                          slide.subtitle!,
                           style: TextStyle(
                             color: Colors.white.withAlpha(230),
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: Text(
-                              bannerText['action']!,
-                              style: const TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -780,134 +743,151 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Map<String, String>? _bannerText(int index) {
-    switch (index) {
-      case 1:
-        return {
-          'title': 'توصيل السلع\nبين الولايات',
-          'subtitle': 'في كامل الجزائر',
-          'action': 'أرسل الآن',
-        };
-      default:
-        return null;
+  /// Renders `module.icon`, which the backend gives as either a full image
+  /// URL or a bare emoji string with no flag distinguishing which.
+  Widget _buildModuleIcon(AppModule module) {
+    final icon = module.icon?.trim();
+    if (icon == null || icon.isEmpty) {
+      return const Icon(
+        Icons.apps_rounded,
+        color: AppColors.royalBlue,
+        size: 28,
+      );
     }
+    if (icon.toLowerCase().startsWith('http')) {
+      return Padding(
+        padding: const EdgeInsets.all(4),
+        child: CachedImage(
+          url: icon,
+          fit: BoxFit.contain,
+          errorBuilder: (context) => const Icon(
+            Icons.apps_rounded,
+            color: AppColors.royalBlue,
+            size: 28,
+          ),
+        ),
+      );
+    }
+    return Center(child: Text(icon, style: const TextStyle(fontSize: 30)));
   }
 
-  // Service Grid Item Builder
+  // Service Grid Item Builder. `module` is null only for the static "More" tile.
   Widget _buildServiceItem(
-    String assetPath,
+    AppModule? module,
     String title, {
-    bool isCustomMore = false,
-    bool isLocked = true,
     int badgeCount = 0,
     VoidCallback? onTap,
   }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: isLocked ? null : onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Opacity(
-                  opacity: isLocked ? 0.45 : 1,
-                  child: Container(
-                    width: 68,
-                    height: 68,
-                    decoration: const BoxDecoration(shape: BoxShape.circle),
-                    child: ClipOval(
-                      child: isCustomMore
-                          ? const Center(
-                              child: Icon(
-                                Icons.more_horiz_rounded,
-                                color: AppColors.royalBlue,
-                                size: 32,
-                              ),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Image.asset(
-                                assetPath,
-                                fit: BoxFit.contain,
-                              ),
+    final isLocked = module != null && !module.isTappable;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Opacity(
+                opacity: isLocked ? 0.45 : 1,
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: const BoxDecoration(shape: BoxShape.circle),
+                  child: ClipOval(
+                    child: module == null
+                        ? const Center(
+                            child: Icon(
+                              Icons.more_horiz_rounded,
+                              color: AppColors.royalBlue,
+                              size: 32,
                             ),
+                          )
+                        : _buildModuleIcon(module),
+                  ),
+                ),
+              ),
+              if (isLocked)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    width: 25,
+                    height: 25,
+                    decoration: BoxDecoration(
+                      color: AppColors.royalBlue,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(35),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.lock_rounded,
+                      color: Colors.white,
+                      size: 14,
                     ),
                   ),
                 ),
-                if (isLocked)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      width: 25,
-                      height: 25,
-                      decoration: BoxDecoration(
-                        color: AppColors.royalBlue,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(35),
-                            blurRadius: 5,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.lock_rounded,
+              if (!isLocked && badgeCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 24,
+                      minHeight: 24,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : '$badgeCount',
+                      style: const TextStyle(
                         color: Colors.white,
-                        size: 14,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                if (!isLocked && badgeCount > 0)
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: Text(
-                        badgeCount > 99 ? '99+' : '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isLocked
+                  ? AppColors.textPrimary.withAlpha(120)
+                  : AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isLocked
-                    ? AppColors.textPrimary.withAlpha(120)
-                    : AppColors.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                height: 1.2,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
+  }
+
+  String _moreLabel() {
+    switch (AppLanguage.instance.value) {
+      case AppLang.ar:
+        return 'المزيد';
+      case AppLang.fr:
+        return 'Plus';
+      case AppLang.en:
+        return 'More';
+    }
   }
 }

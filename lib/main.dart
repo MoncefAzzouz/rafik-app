@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/l10n/app_strings.dart';
-import 'src/features/onboarding/pages/onboarding_page.dart';
+import 'src/features/splash/pages/bootstrap_page.dart';
 
 void main() {
   runApp(const RafikApp());
@@ -24,7 +24,7 @@ class RafikApp extends StatelessWidget {
             textDirection: AppLanguage.instance.textDirection,
             child: child!,
           ),
-          home: const OnboardingPage(),
+          home: const BootstrapPage(),
         );
       },
     );

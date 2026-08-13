@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'parcel_track_order_page.dart';
-import 'parcel_vehicle_select_page.dart';
+import 'parcel_category_select_page.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../auth/pages/login_page.dart';
 import '../data/parcel_order_repository.dart';
 
 
@@ -16,15 +20,24 @@ class ParcelDashboardPage extends StatefulWidget {
 }
 
 class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
+  static const _pollInterval = Duration(seconds: 15);
+
   final _orders = ParcelOrderRepository.instance;
   bool _isLoading = true;
   int _currentTabIndex = 0; // 0 for الرئيسية, 1 for الأرشيف
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _orders.addListener(_onOrdersChanged);
-    _simulateLoading();
+    _loadOrders();
+    // The backend has no realtime push — poll while this screen is open so
+    // status changes made by a driver (accepted/arrived/delivered/...) show
+    // up without the customer having to force-close and reopen the app.
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      if (AuthRepository.instance.isAuthenticated) _orders.fetchAll();
+    });
   }
 
   void _onOrdersChanged() {
@@ -34,23 +47,31 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
   @override
   void dispose() {
     _orders.removeListener(_onOrdersChanged);
+    _pollTimer?.cancel();
     super.dispose();
   }
 
-  void _simulateLoading() {
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
+  Future<void> _loadOrders() async {
+    if (AuthRepository.instance.isAuthenticated) {
+      await _orders.fetchAll();
+    }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _navigateToCreateRequest() {
+    if (!AuthRepository.instance.isAuthenticated) {
+      Navigator.push(
+        context,
+        SmoothPageRoute(page: const LoginPage()),
+      ).then((_) {
+        if (mounted) setState(() {});
+      });
+      return;
+    }
+
     Navigator.push(
       context,
-      SmoothPageRoute(page: const ParcelVehicleSelectPage()),
+      SmoothPageRoute(page: const ParcelCategorySelectPage()),
     ).then((_) {
       // Rebuild when returning to dashboard to reflect new orders
       if (mounted) {
@@ -375,7 +396,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: ID + status + track arrow
+                // Header: order number + status + track arrow
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -388,7 +409,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          order.id,
+                          order.orderNumber.isNotEmpty
+                              ? order.orderNumber
+                              : order.id,
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 14,
@@ -409,7 +432,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            'جاري البحث عن عروض...',
+                            _statusBadgeLabel(order.status),
                             style: TextStyle(
                               color: Colors.orange.shade800,
                               fontSize: 11,
@@ -465,7 +488,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            order.pickup,
+                            order.pickupAddress,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -476,7 +499,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                           ),
                           const SizedBox(height: 14),
                           Text(
-                            order.delivery,
+                            order.destinationAddress,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -496,12 +519,16 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildDetailBadge('المركبة', order.vehicleName),
                     _buildDetailBadge(
-                      'العمال',
-                      order.helpers > 0 ? '${order.helpers} أشخاص' : 'لا يوجد',
+                      'المركبة',
+                      order.truckTypeName ?? order.categoryName,
                     ),
-                    _buildDetailBadge('الوقت', order.timing.split(' ').first),
+                    _buildDetailBadge(
+                      'الموعد',
+                      order.scheduledType == 'scheduled'
+                          ? 'مجدول'
+                          : 'الآن',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -540,65 +567,43 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 ),
                 const SizedBox(height: 10),
 
-                // Complete / Cancel actions
-                Row(
-                  children: [
-                    // Cancel Button
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          _orders.cancel(order);
+                // Cancel action
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final result = await _orders.cancel(order.id);
+                      if (!mounted) return;
+                      result.fold(
+                        onSuccess: (_) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('تم إلغاء الطلب بنجاح'),
                             ),
                           );
                         },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade600,
-                          side: BorderSide(
-                            color: Colors.red.shade100,
-                            width: 1.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'إلغاء الطلب',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Complete Button
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          _orders.complete(order);
+                        onFailure: (failure) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'تم إكمال شحن الطرد وتوصيله بنجاح!',
-                              ),
-                            ),
+                            SnackBar(content: Text(failure.message)),
                           );
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'إتمام التوصيل',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      side: BorderSide(
+                        color: Colors.red.shade100,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ],
+                    child: const Text(
+                      'إلغاء الطلب',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -606,6 +611,25 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
         );
       },
     );
+  }
+
+  String _statusBadgeLabel(String status) {
+    switch (status) {
+      case 'requested':
+        return 'جاري البحث عن عروض...';
+      case 'accepted':
+        return 'تم قبول الطلب';
+      case 'arrived':
+        return 'وصل السائق';
+      case 'loading':
+        return 'جاري التحميل';
+      case 'in_transit':
+        return 'في الطريق';
+      case 'delivered':
+        return 'تم التسليم';
+      default:
+        return 'ملغي';
+    }
   }
 
   // TAB 2: Archive Content
@@ -656,7 +680,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
       itemCount: _orders.archivedOrders.length,
       itemBuilder: (context, index) {
         final order = _orders.archivedOrders[index];
-        final isCompleted = order.isCompleted;
+        final isCompleted = order.isDelivered;
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -674,7 +698,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    order.id,
+                    order.orderNumber.isNotEmpty
+                        ? order.orderNumber
+                        : order.id,
                     style: const TextStyle(
                       color: Colors.black87,
                       fontSize: 14,
@@ -743,7 +769,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.pickup,
+                          order.pickupAddress,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade700,
@@ -752,7 +778,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          order.delivery,
+                          order.destinationAddress,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade700,
