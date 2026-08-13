@@ -34,125 +34,65 @@ class _DriverHomePageState extends State<DriverHomePage> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: repository,
-      builder: (context, _) => SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: _Header(
-                  repository: repository,
-                  location: location,
-                  onLocationTap: _chooseLocation,
-                  onToggleOnline: _toggleAvailability,
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              sliver: SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 300,
-                  child: DriverMap(
-                    online: repository.online,
-                    center: location.coordinates,
-                    // Every open order the driver could grab — "now" and
-                    // "scheduled" alike — should show as a pin, otherwise a
-                    // scheduled-only order (the app-side default) is
-                    // invisible on the map even though it's real and open.
-                    offers: [
-                      ...repository.availableNow,
-                      ...repository.availableScheduled,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 2),
-              sliver: SliverToBoxAdapter(
-                child: _TodayStrip(repository: repository),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Nearby requests',
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      '${repository.availableNow.length} available',
-                      style: const TextStyle(
-                        color: AppColors.blue,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (!repository.online)
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
-                sliver: SliverToBoxAdapter(child: _EmptyOnlineState()),
-              )
-            else ...[
+      builder: (context, _) {
+        final offers = [
+          ...repository.availableNow,
+          ...repository.availableScheduled,
+        ];
+
+        return SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                sliver: SliverList.separated(
-                  itemCount: repository.availableNow.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final order = repository.availableNow[index];
-                    return JobOfferCard(
-                      order: order,
-                      onTap: () => _showOffer(context, order),
-                    );
-                  },
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _Header(
+                    repository: repository,
+                    location: location,
+                    onLocationTap: _chooseLocation,
+                    onToggleOnline: _toggleAvailability,
+                  ),
                 ),
               ),
-              if (repository.availableScheduled.isNotEmpty) ...[
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Scheduled requests',
-                          style: TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          '${repository.availableScheduled.length} available',
-                          style: const TextStyle(
-                            color: AppColors.blue,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                sliver: SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 410,
+                    child: DriverMap(
+                      online: repository.online,
+                      borderRadius: BorderRadius.circular(30),
+                      center: location.coordinates,
+                      offers: offers,
                     ),
                   ),
                 ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                sliver: SliverToBoxAdapter(
+                  child: _TodayStrip(repository: repository),
+                ),
+              ),
+              if (!repository.online)
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  sliver: SliverToBoxAdapter(child: _EmptyOnlineState()),
+                )
+              else if (offers.isEmpty)
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
+                  sliver: SliverToBoxAdapter(child: _EmptyRequestsState()),
+                )
+              else
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                   sliver: SliverList.separated(
-                    itemCount: repository.availableScheduled.length,
+                    itemCount: offers.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final order = repository.availableScheduled[index];
+                      final order = offers[index];
                       return JobOfferCard(
                         order: order,
                         onTap: () => _showOffer(context, order),
@@ -160,15 +100,10 @@ class _DriverHomePageState extends State<DriverHomePage> {
                     },
                   ),
                 ),
-              ] else
-                const SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
-                  sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
-                ),
             ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -189,16 +124,18 @@ class _DriverHomePageState extends State<DriverHomePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        ActiveDeliveryPage(repository: repository, order: order),
+                    builder: (_) => ActiveDeliveryPage(
+                      repository: repository,
+                      order: order,
+                    ),
                   ),
                 );
               }
             },
             onFailure: (failure) {
-              ScaffoldMessenger.of(sheetContext).showSnackBar(
-                SnackBar(content: Text(failure.message)),
-              );
+              ScaffoldMessenger.of(
+                sheetContext,
+              ).showSnackBar(SnackBar(content: Text(failure.message)));
             },
           );
         },
@@ -335,93 +272,160 @@ class _Header extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => Column(
     children: [
-      Expanded(
-        child: InkWell(
-          onTap: onLocationTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                const Icon(
+      InkWell(
+        onTap: onLocationTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.royalBlue.withAlpha(18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
                   Icons.location_on_rounded,
                   color: AppColors.royalBlue,
                   size: 20,
                 ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        location.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      location.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
-                      Text(
-                        location.subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10,
-                        ),
+                    ),
+                    Text(
+                      location.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textSecondary,
+              ),
+            ],
           ),
         ),
       ),
+      const SizedBox(height: 12),
       Semantics(
         label: repository.online ? 'Go offline' : 'Go online',
         button: true,
-        child: InkWell(
-          onTap: onToggleOnline,
-          borderRadius: BorderRadius.circular(30),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: repository.online ? AppColors.green : Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: repository.online ? AppColors.green : AppColors.line,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onToggleOnline,
+            borderRadius: BorderRadius.circular(20),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                color: repository.online ? AppColors.green : AppColors.deepNavy,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (repository.online
+                                ? AppColors.green
+                                : AppColors.deepNavy)
+                            .withAlpha(35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: repository.online ? Colors.white : AppColors.muted,
-                    shape: BoxShape.circle,
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(28),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.power_settings_new_rounded,
+                      color: Colors.white,
+                      size: 23,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  repository.online ? 'Online' : 'Offline',
-                  style: TextStyle(
-                    color: repository.online ? Colors.white : AppColors.ink,
-                    fontWeight: FontWeight.w800,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          repository.online
+                              ? 'You are online'
+                              : 'You are offline',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          repository.online
+                              ? 'Tap to stop receiving requests'
+                              : 'Tap when you are ready to deliver',
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(185),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  Container(
+                    width: 46,
+                    height: 28,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(48),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: AnimatedAlign(
+                      duration: const Duration(milliseconds: 250),
+                      alignment: repository.online
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -515,6 +519,36 @@ class _EmptyOnlineState extends StatelessWidget {
   );
 }
 
+class _EmptyRequestsState extends StatelessWidget {
+  const _EmptyRequestsState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: AppColors.line),
+    ),
+    child: const Row(
+      children: [
+        Icon(Icons.notifications_active_outlined, color: AppColors.blue),
+        SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'You are online. New delivery requests will appear here.',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class _OfferSheet extends StatelessWidget {
   final TruckOrder order;
   final VoidCallback onAccept;
@@ -598,9 +632,10 @@ class _OfferSheet extends StatelessWidget {
           AppColors.blue,
           'PICKUP',
           order.pickupAddress,
-          [order.pickupWilaya, order.pickupCommune]
-              .whereType<String>()
-              .join(', '),
+          [
+            order.pickupWilaya,
+            order.pickupCommune,
+          ].whereType<String>().join(', '),
         ),
         Padding(
           padding: const EdgeInsets.only(left: 17),

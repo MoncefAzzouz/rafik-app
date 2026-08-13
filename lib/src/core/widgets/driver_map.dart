@@ -229,7 +229,7 @@ class _DriverMapState extends State<DriverMap> {
                 color: Colors.white.withAlpha(190),
                 child: const Center(
                   child: Text(
-                    'Go online to see nearby requests',
+                    'Go online to see delivery requests',
                     style: TextStyle(
                       color: AppColors.deepNavy,
                       fontWeight: FontWeight.w800,
