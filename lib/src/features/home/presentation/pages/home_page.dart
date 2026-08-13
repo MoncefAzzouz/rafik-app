@@ -57,7 +57,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
                   child: DriverMap(
                     online: repository.online,
                     center: location.coordinates,
-                    offers: repository.availableNow,
+                    // Every open order the driver could grab — "now" and
+                    // "scheduled" alike — should show as a pin, otherwise a
+                    // scheduled-only order (the app-side default) is
+                    // invisible on the map even though it's real and open.
+                    offers: [
+                      ...repository.availableNow,
+                      ...repository.availableScheduled,
+                    ],
                   ),
                 ),
               ),

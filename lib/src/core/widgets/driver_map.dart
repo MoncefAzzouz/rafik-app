@@ -89,8 +89,16 @@ class _DriverMapState extends State<DriverMap> {
   void _fitToFocusPoints() {
     if (!mounted) return;
     final points = _focusPoints();
-    if (points.length < 2) return;
+    if (points.isEmpty) return;
     try {
+      if (points.length == 1) {
+        // Only one real coordinate to show (e.g. a tracked order whose
+        // destination has no coordinates yet) — center on it directly
+        // instead of silently doing nothing, which is what a bounds-fit
+        // needs at least 2 points for.
+        _controller.move(points.first, 15);
+        return;
+      }
       _controller.fitCamera(
         CameraFit.bounds(
           bounds: LatLngBounds.fromPoints(points),
@@ -190,8 +198,7 @@ class _DriverMapState extends State<DriverMap> {
               child: IconButton(
                 tooltip: 'Recenter map',
                 onPressed: () {
-                  final points = _focusPoints();
-                  if (points.length >= 2) {
+                  if (_focusPoints().isNotEmpty) {
                     _fitToFocusPoints();
                   } else {
                     _controller.move(_center, _defaultZoom);

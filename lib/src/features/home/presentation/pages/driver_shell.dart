@@ -45,30 +45,45 @@ class _DriverShellState extends State<DriverShell> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppColors.backgroundLight,
-    extendBody: true,
-    body: Stack(
-      children: [
-        IndexedStack(index: index, children: pages),
-        if (repository.active.isNotEmpty)
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 104,
-            child: _ActiveDeliveryBanner(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ActiveDeliveryPage(
-                    repository: repository,
-                    order: repository.active.first,
+  Widget build(BuildContext context) {
+    // Prefer an in-progress job; fall back to one already accepted but
+    // scheduled for later — both need somewhere tappable, otherwise a
+    // scheduled job (the default when booking from rafik-app) is accepted
+    // with real coordinates but never reachable in this app.
+    final bannerOrder = repository.active.isNotEmpty
+        ? repository.active.first
+        : (repository.scheduled.isNotEmpty
+              ? repository.scheduled.first
+              : null);
+    final isScheduled = repository.active.isEmpty;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
+      extendBody: true,
+      body: Stack(
+        children: [
+          IndexedStack(index: index, children: pages),
+          if (bannerOrder != null)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 104,
+              child: _ActiveDeliveryBanner(
+                label: isScheduled
+                    ? 'Upcoming scheduled delivery'
+                    : 'Continue active delivery',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ActiveDeliveryPage(
+                      repository: repository,
+                      order: bannerOrder,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
     ),
     bottomNavigationBar: SafeArea(
       top: false,
@@ -119,6 +134,7 @@ class _DriverShellState extends State<DriverShell> {
       ),
     ),
   );
+  }
 
   void _select(int value) {
     if (value != index) setState(() => index = value);
@@ -186,9 +202,10 @@ class _NavItem extends StatelessWidget {
 }
 
 class _ActiveDeliveryBanner extends StatelessWidget {
+  final String label;
   final VoidCallback onTap;
 
-  const _ActiveDeliveryBanner({required this.onTap});
+  const _ActiveDeliveryBanner({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) => Material(
@@ -198,22 +215,22 @@ class _ActiveDeliveryBanner extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         child: Row(
           children: [
-            Icon(Icons.navigation_rounded, color: AppColors.cyan),
-            SizedBox(width: 11),
+            const Icon(Icons.navigation_rounded, color: AppColors.cyan),
+            const SizedBox(width: 11),
             Expanded(
               child: Text(
-                'Continue active delivery',
-                style: TextStyle(
+                label,
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, color: Colors.white70),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white70),
           ],
         ),
       ),
