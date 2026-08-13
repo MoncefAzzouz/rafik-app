@@ -298,28 +298,41 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ],
                         ),
-                        child: GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 4,
-                                mainAxisSpacing: 20,
-                                childAspectRatio: 0.8,
-                              ),
-                          itemCount: _content.modules.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == _content.modules.length) {
-                              return _buildServiceItem(null, _moreLabel());
-                            }
-                            final module = _content.modules[index];
-                            return _buildServiceItem(
-                              module,
-                              _moduleLabel(module),
-                              badgeCount: module.isTruck
-                                  ? _parcelOrders.activeCount
-                                  : 0,
-                              onTap: _moduleOnTap(module),
+                        // A Wrap sizes each row to its own tallest tile
+                        // instead of forcing every row to a fixed
+                        // aspect-ratio height (GridView's approach) — so
+                        // the container's total height always matches how
+                        // many modules actually exist instead of growing
+                        // padding along with every extra row.
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            const spacing = 8.0;
+                            final tileWidth =
+                                (constraints.maxWidth - 3 * spacing) / 4;
+                            return Wrap(
+                              spacing: spacing,
+                              runSpacing: 20,
+                              children: [
+                                for (final module in _content.modules)
+                                  SizedBox(
+                                    width: tileWidth,
+                                    child: _buildServiceItem(
+                                      module,
+                                      _moduleLabel(module),
+                                      badgeCount: module.isTruck
+                                          ? _parcelOrders.activeCount
+                                          : 0,
+                                      onTap: _moduleOnTap(module),
+                                    ),
+                                  ),
+                                SizedBox(
+                                  width: tileWidth,
+                                  child: _buildServiceItem(
+                                    null,
+                                    _moreLabel(),
+                                  ),
+                                ),
+                              ],
                             );
                           },
                         ),
@@ -394,144 +407,6 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ],
-                    // Reorder Section
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.refresh_rounded,
-                              color: AppColors.royalBlue,
-                              size: 22,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Reorder your favorite meals',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        GestureDetector(
-                          onTap: () {},
-                          child: const Row(
-                            children: [
-                              Text(
-                                'View all',
-                                style: TextStyle(
-                                  color: AppColors.royalBlue,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                color: AppColors.royalBlue,
-                                size: 16,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.grey.shade100,
-                          width: 1.0,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(8),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: CachedImage(
-                              url:
-                                  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200',
-                              width: 72,
-                              height: 72,
-                              errorBuilder: (context) => Container(
-                                width: 72,
-                                height: 72,
-                                color: Colors.grey.shade200,
-                                child: const Icon(
-                                  Icons.restaurant_rounded,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Pizzeria Apollino',
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  '2 items',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'May 12, 2024 at 18:45',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () {},
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFEFF5FF),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.shopping_cart_outlined,
-                                color: AppColors.royalBlue,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                     const SizedBox(
                       height: 120,
                     ), // Spacing for floating bottom nav
