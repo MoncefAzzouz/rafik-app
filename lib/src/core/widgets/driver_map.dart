@@ -9,6 +9,7 @@ class DriverMap extends StatefulWidget {
   final bool online;
   final BorderRadius borderRadius;
   final LatLng? center;
+  final double controlsTop;
 
   /// Nearby open orders to show as pins (home screen). Ignored when
   /// [activeOrder] is set.
@@ -23,6 +24,7 @@ class DriverMap extends StatefulWidget {
     required this.online,
     this.borderRadius = const BorderRadius.all(Radius.circular(28)),
     this.center,
+    this.controlsTop = 16,
     this.offers = const [],
     this.activeOrder,
   });
@@ -189,7 +191,7 @@ class _DriverMapState extends State<DriverMap> {
             ],
           ),
           Positioned(
-            top: 16,
+            top: widget.controlsTop,
             right: 16,
             child: Material(
               color: Colors.white,
@@ -223,21 +225,6 @@ class _DriverMapState extends State<DriverMap> {
               ),
             ),
           ),
-          if (!widget.online && order == null)
-            Positioned.fill(
-              child: ColoredBox(
-                color: Colors.white.withAlpha(190),
-                child: const Center(
-                  child: Text(
-                    'Go online to see delivery requests',
-                    style: TextStyle(
-                      color: AppColors.deepNavy,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

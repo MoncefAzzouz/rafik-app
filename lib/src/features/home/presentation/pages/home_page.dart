@@ -9,7 +9,6 @@ import '../../../orders/data/truck_repository.dart';
 import '../../../orders/domain/truck_order.dart';
 import '../../domain/driver_location.dart';
 import '../widgets/job_offer_card.dart';
-import 'location_picker_page.dart';
 
 class DriverHomePage extends StatefulWidget {
   final TruckRepository repository;
@@ -20,8 +19,10 @@ class DriverHomePage extends StatefulWidget {
   State<DriverHomePage> createState() => _DriverHomePageState();
 }
 
-class _DriverHomePageState extends State<DriverHomePage> {
+class _DriverHomePageState extends State<DriverHomePage>
+    with WidgetsBindingObserver {
   bool _locationRequestInProgress = false;
+  Future<bool>? _locationLookup;
   DriverLocation location = const DriverLocation(
     label: 'Sétif, Algeria',
     subtitle: 'Tap to change work location',
@@ -29,6 +30,28 @@ class _DriverHomePageState extends State<DriverHomePage> {
   );
 
   TruckRepository get repository => widget.repository;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshCurrentLocation();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshCurrentLocation(requestPermission: false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,68 +63,70 @@ class _DriverHomePageState extends State<DriverHomePage> {
           ...repository.availableScheduled,
         ];
 
-        return SafeArea(
-          bottom: false,
-          child: CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                sliver: SliverToBoxAdapter(
-                  child: _Header(
-                    repository: repository,
-                    location: location,
-                    onLocationTap: _chooseLocation,
-                    onToggleOnline: _toggleAvailability,
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final maxOffersHeight = (constraints.maxHeight * .40).clamp(
+              190.0,
+              300.0,
+            );
+
+            return SizedBox.expand(
+              child: Stack(
+                fit: StackFit.expand,
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  DriverMap(
+                    online: repository.online,
+                    borderRadius: BorderRadius.zero,
+                    center: location.coordinates,
+                    offers: offers,
+                    controlsTop: 82,
                   ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-                sliver: SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 410,
-                    child: DriverMap(
-                      online: repository.online,
-                      borderRadius: BorderRadius.circular(30),
-                      center: location.coordinates,
-                      offers: offers,
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10, right: 14),
+                        child: _AvailabilityControl(
+                          online: repository.online,
+                          onTap: _toggleAvailability,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  if (repository.online)
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      bottom: 14,
+                      child: offers.isEmpty
+                          ? const _WaitingForRequests()
+                          : ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: maxOffersHeight,
+                              ),
+                              child: ListView.separated(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: offers.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (context, index) {
+                                  final order = offers[index];
+                                  return JobOfferCard(
+                                    order: order,
+                                    onTap: () => _showOffer(context, order),
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                ],
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                sliver: SliverToBoxAdapter(
-                  child: _TodayStrip(repository: repository),
-                ),
-              ),
-              if (!repository.online)
-                const SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
-                  sliver: SliverToBoxAdapter(child: _EmptyOnlineState()),
-                )
-              else if (offers.isEmpty)
-                const SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 120),
-                  sliver: SliverToBoxAdapter(child: _EmptyRequestsState()),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-                  sliver: SliverList.separated(
-                    itemCount: offers.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final order = offers[index];
-                      return JobOfferCard(
-                        order: order,
-                        onTap: () => _showOffer(context, order),
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -141,16 +166,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
         },
       ),
     );
-  }
-
-  Future<void> _chooseLocation() async {
-    final selected = await Navigator.push<DriverLocation>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(initialLocation: location),
-      ),
-    );
-    if (selected != null && mounted) setState(() => location = selected);
   }
 
   Future<void> _toggleAvailability() async {
@@ -222,23 +237,11 @@ class _DriverHomePageState extends State<DriverHomePage> {
       return;
     }
 
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 12),
-        ),
-      );
-      if (!mounted) return;
-      final coordinates = LatLng(position.latitude, position.longitude);
-      setState(() {
-        location = DriverLocation(
-          label: 'Current location',
-          subtitle:
-              '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
-          coordinates: coordinates,
-        );
-      });
+    final locationUpdated = await _refreshCurrentLocation(
+      requestPermission: false,
+    );
+    if (!mounted) return;
+    if (locationUpdated) {
       final result = await repository.toggleOnline();
       if (!mounted) return;
       result.fold(
@@ -247,8 +250,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
           context,
         ).showSnackBar(SnackBar(content: Text(failure.message))),
       );
-    } catch (_) {
-      if (!mounted) return;
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not get your current GPS location. Try again.'),
@@ -256,8 +258,129 @@ class _DriverHomePageState extends State<DriverHomePage> {
       );
     }
   }
+
+  Future<bool> _refreshCurrentLocation({bool requestPermission = true}) async {
+    final activeLookup = _locationLookup;
+    if (activeLookup != null) return activeLookup;
+
+    final lookup = _resolveCurrentLocation(
+      requestPermission: requestPermission,
+    );
+    _locationLookup = lookup;
+    try {
+      return await lookup;
+    } finally {
+      if (identical(_locationLookup, lookup)) _locationLookup = null;
+    }
+  }
+
+  Future<bool> _resolveCurrentLocation({
+    required bool requestPermission,
+  }) async {
+    if (!await Geolocator.isLocationServiceEnabled()) return false;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied && requestPermission) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      return false;
+    }
+
+    var locationUpdated = false;
+    try {
+      final cachedPosition = await Geolocator.getLastKnownPosition();
+      if (cachedPosition != null) {
+        _applyCurrentPosition(cachedPosition);
+        locationUpdated = true;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+      _applyCurrentPosition(position);
+      return true;
+    } catch (_) {
+      return locationUpdated;
+    }
+  }
+
+  void _applyCurrentPosition(Position position) {
+    if (!mounted) return;
+    setState(() {
+      location = DriverLocation(
+        label: 'Current location',
+        subtitle:
+            '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+        coordinates: LatLng(position.latitude, position.longitude),
+      );
+    });
+  }
 }
 
+class _AvailabilityControl extends StatelessWidget {
+  final bool online;
+  final Future<void> Function() onTap;
+
+  const _AvailabilityControl({required this.online, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: online ? 'Go offline' : 'Go online',
+    button: true,
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          width: 68,
+          height: 48,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: online ? AppColors.green : AppColors.deepNavy,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(45),
+                blurRadius: 16,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            alignment: online ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.power_settings_new_rounded,
+                color: online ? AppColors.green : AppColors.deepNavy,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Kept temporarily as a reference for the former full-width availability
+// treatment while the compact map control is used above.
+// ignore: unused_element
 class _Header extends StatelessWidget {
   final TruckRepository repository;
   final DriverLocation location;
@@ -434,6 +557,7 @@ class _Header extends StatelessWidget {
   );
 }
 
+// ignore: unused_element
 class _TodayStrip extends StatelessWidget {
   final TruckRepository repository;
 
@@ -490,6 +614,7 @@ class _TodayStrip extends StatelessWidget {
   );
 }
 
+// ignore: unused_element
 class _EmptyOnlineState extends StatelessWidget {
   const _EmptyOnlineState();
 
@@ -519,16 +644,22 @@ class _EmptyOnlineState extends StatelessWidget {
   );
 }
 
-class _EmptyRequestsState extends StatelessWidget {
-  const _EmptyRequestsState();
+class _WaitingForRequests extends StatelessWidget {
+  const _WaitingForRequests();
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: AppColors.line),
+      color: Colors.white.withAlpha(245),
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.deepNavy.withAlpha(28),
+          blurRadius: 18,
+          offset: const Offset(0, 7),
+        ),
+      ],
     ),
     child: const Row(
       children: [
@@ -536,7 +667,7 @@ class _EmptyRequestsState extends StatelessWidget {
         SizedBox(width: 12),
         Expanded(
           child: Text(
-            'You are online. New delivery requests will appear here.',
+            'You are online. New delivery requests will appear on the map.',
             style: TextStyle(
               color: AppColors.ink,
               fontWeight: FontWeight.w700,
@@ -583,29 +714,35 @@ class _OfferSheet extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Delivery request · ${order.orderNumber}',
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w600,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Delivery request · ${order.orderNumber}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${order.estimatedPrice ?? 0} DA',
-                  style: const TextStyle(
-                    color: AppColors.green,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
+                  const SizedBox(height: 4),
+                  Text(
+                    '${order.estimatedPrice ?? 0} DA',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.green,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            if (order.distanceKm != null) const SizedBox(width: 10),
             if (order.distanceKm != null)
               Container(
                 padding: const EdgeInsets.symmetric(
