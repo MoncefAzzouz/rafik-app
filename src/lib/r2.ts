@@ -99,3 +99,12 @@ export function memoryUpload() {
     fileFilter: (_req, file, cb) => cb(null, IMAGE_MIME.test(file.mimetype)),
   });
 }
+
+// Documents (driver licence, vehicle registration): image OR PDF.
+export const DOC_MIME = /^(image\/|application\/pdf)/;
+export function memoryUploadDoc() {
+  return multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (_req, file, cb) => cb(null, DOC_MIME.test(file.mimetype)),
+  });
+}

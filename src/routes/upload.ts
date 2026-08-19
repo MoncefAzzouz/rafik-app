@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import { authenticateToken } from '../middlewares/auth';
-import { memoryUpload, storeUpload } from '../lib/r2';
+import { memoryUpload, memoryUploadDoc, storeUpload } from '../lib/r2';
 
 const router = Router();
 
-const ALLOWED_TYPES = ['categories', 'bookings', 'professionals', 'profiles', 'chat'];
+const ALLOWED_TYPES = ['categories', 'bookings', 'professionals', 'profiles', 'chat', 'documents'];
 
 function resolveType(req: Request): string {
   const type = req.query.type as string;
@@ -37,6 +37,19 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
       console.error(e);
       res.status(500).json({ error: 'Upload failed' });
     }
+  });
+});
+
+// Upload a verification document (image OR PDF) → returns { url }.
+const docUpload = memoryUploadDoc();
+router.post('/document', authenticateToken, (req: Request, res: Response) => {
+  docUpload.single('file')(req, res, async (err) => {
+    if (err) { res.status(400).json({ error: `Upload failed: ${err.message || 'unknown error'}` }); return; }
+    if (!req.file) { res.status(400).json({ error: 'No file received (image or PDF only).' }); return; }
+    try {
+      const url = await storeUpload(req.file, 'documents');
+      res.json({ url });
+    } catch (e) { console.error(e); res.status(500).json({ error: 'Upload failed' }); }
   });
 });
 

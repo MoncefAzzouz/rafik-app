@@ -44,6 +44,10 @@ distance and price are calculated (free, no Google billing).
 → `200 { "token": "...", "user": {...} }`
 - `401` invalid credentials · `403` if the account is banned/suspended (message says until when).
 
+**Ban enforcement (log out on the fly):** every authenticated request checks the account. If it was
+banned or deleted **after** login, the API returns `403 { "code": "banned" }` or `401 { "code": "no_account" }`.
+When the app sees either code, **discard the token and send the user to the login screen.**
+
 ### Current user
 `GET /api/auth/me` (Bearer) → the user object.
 
@@ -197,7 +201,10 @@ Example: B = Alger (base 5000), 300 km, perKm 10, base 0, multiplier 1 → `5000
   "invoiceStatus": "NOT_REQUIRED",         // HAS_INVOICE | NO_INVOICE | NOT_REQUIRED
   "scheduledType": "now",                  // "now" or "scheduled"
   "scheduledDate": null,                   // required if scheduled, e.g. "2026-09-01"
-  "promoCode": "WELCOME20"                 // optional
+  "promoCode": "WELCOME20",                // optional
+  "featureSel": [                          // optional required options (e.g. Size = 20T)
+    { "featureId":"…","featureName":"Size","optionId":"…","optionLabel":"20T","image":"…" }
+  ]
 }
 ```
 - If `distanceKm` is omitted, it's computed from the coords (OSRM).
@@ -210,8 +217,34 @@ Example: B = Alger (base 5000), 300 km, perKm 10, base 0, multiplier 1 → `5000
 
 ## 8. Truck: driver app (Tawsil-style)
 
-Driver logs in (role `TRUCKER`) and uses these. Self-registration:
-`POST /api/truck/register` `{ name, phone, email?, password, truckTypeId, plate? }`.
+### Sign up (self-registration)
+`POST /api/truck/register` (public)
+```json
+{
+  "driverName": "Ali", "phone": "0550...", "email": "ali@x.com", "password": "secret",
+  "truckTypeId": "…", "plate": "00111-119-19",
+  "featureSel": [ { "featureId":"…", "featureName":"Size", "optionId":"…", "optionLabel":"10T", "image":"…" } ],
+  "licenseDoc": "https://…/licence.pdf",        // optional at signup, can upload after login
+  "registrationDoc": "https://…/carte-grise.jpg"
+}
+```
+- **`featureSel`** — for each feature of the chosen truck type (from `GET /api/truck/types`), the driver
+  must pick one option (e.g. **Size → 10T**). Send the chosen `{featureId,featureName,optionId,optionLabel,image}`.
+- Account starts **unverified** and `offline`. Admins are alerted to verify it.
+
+### Upload / update verification documents (after login)
+1. Upload each file → `POST /api/upload/document` (Bearer, `multipart/form-data`, field `file`, **image OR PDF**) → `{ "url": "…" }`.
+2. Save the URLs → `PUT /api/truck/trucks/me/documents` (Bearer)
+```json
+{ "licenseDoc": "https://…/licence.pdf", "registrationDoc": "https://…/carte-grise.jpg" }
+```
+(You can also re-send `featureSel` here to change the truck's option.)
+
+### Verification gate
+Until an admin verifies the driver, they **can't work**:
+- `GET /driver/dashboard` returns `{ "verified": false, "needsDocuments": { "license": true/false, "registration": … }, "message": "…", available/active/... empty }`.
+- Going online (`/driver/status`) and accepting orders return `403 { "code": "not_verified" }`.
+Show the "pending verification" screen and let them (re)upload documents.
 
 ### Go online / offline
 `PATCH /api/truck/driver/status` (Bearer)
@@ -224,8 +257,8 @@ Driver logs in (role `TRUCKER`) and uses these. Self-registration:
 `GET /api/truck/driver/dashboard` (Bearer) →
 ```json
 {
-  "truck": { "id","truckCode","driverName","status","isVerified","truckTypeId","rating","totalTrips" },
-  "online": true,
+  "truck": { "id","truckCode","driverName","status","isVerified","truckTypeId","rating","totalTrips","licenseDoc","registrationDoc","featureSel" },
+  "online": true, "verified": true,
   "available": { "now": [order…], "scheduled": [order…] },  // open jobs he can accept (only when online)
   "active":    [order…],   // in-progress / accepted "now" jobs  →  show on the MAP
   "scheduled": [order…],   // his accepted jobs for another day  →  show as a LIST
@@ -237,8 +270,12 @@ Driver logs in (role `TRUCKER`) and uses these. Self-registration:
 - **`scheduled`** = his own future-day jobs → render as a list ("another day").
 
 ### Accept an open order (no admin — first driver wins)
-`POST /api/truck/orders/:id/accept` (Bearer, must be online)
+`POST /api/truck/orders/:id/accept` (Bearer, must be online & verified)
 → the order (now `accepted`, assigned to his truck). `409` if another driver already took it.
+
+**Feature matching:** a driver only sees / can accept orders his truck can fulfil. If a truck is
+**Size = 10T** and an order requires **Size = 20T**, that order is filtered out of the dashboard and
+`accept` is refused. (Match = the order's `featureSel` option ids are all among the truck's.)
 
 ### Move the job forward
 | Call | Effect |

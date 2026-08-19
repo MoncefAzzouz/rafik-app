@@ -152,6 +152,23 @@ function featureImages(features: any): string[] {
   return features.flatMap((f: any) => (Array.isArray(f?.options) ? f.options : []).map((o: any) => o?.image).filter(Boolean));
 }
 
+// A truck's/order's chosen feature options, e.g. [{featureName:"Size",optionLabel:"20T",optionId,...}].
+function normalizeFeatureSel(sel: any): any[] {
+  if (!Array.isArray(sel)) return [];
+  return sel.filter((x: any) => x && x.optionId).map((x: any) => ({
+    featureId: x.featureId ?? null, featureName: x.featureName ?? null,
+    optionId: String(x.optionId), optionLabel: x.optionLabel ?? null, image: x.image ?? null,
+  }));
+}
+function selOptionIds(sel: any): string[] {
+  return Array.isArray(sel) ? sel.filter((x: any) => x?.optionId).map((x: any) => String(x.optionId)) : [];
+}
+// Does a truck (its selected option ids) satisfy an order's required option ids?
+function truckSatisfiesOrder(truckSel: any, orderSel: any): boolean {
+  const truckIds = selOptionIds(truckSel);
+  return selOptionIds(orderSel).every((id) => truckIds.includes(id));
+}
+
 router.get('/types', async (req: Request, res: Response) => {
   const { active } = req.query;
   try {
@@ -392,7 +409,7 @@ router.get('/trucks/me', authenticateToken, requireRole('TRUCKER'), async (req: 
 });
 
 router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified, profileImage, truckImage } = req.body;
+  const { driverName, phone, email, plate, truckTypeId, wilaya, commune, password, isVerified, profileImage, truckImage, licenseDoc, registrationDoc, featureSel } = req.body;
   if (!driverName || !phone) { res.status(400).json({ error: 'driverName and phone are required' }); return; }
   try {
     const truckCode = await nextTruckCode();
@@ -408,6 +425,9 @@ router.post('/trucks', authenticateToken, requireRole('ADMIN'), async (req: Requ
         wilaya: (wilaya as string) || null, commune: (commune as string) || null, isVerified: !!isVerified,
         profileImage: (profileImage as string) || null,
         truckImage: (truckImage as string) || null,
+        licenseDoc: (licenseDoc as string) || null,
+        registrationDoc: (registrationDoc as string) || null,
+        featureSel: normalizeFeatureSel(featureSel),
       },
       include: { truckType: { select: { name: true } } },
     });
@@ -440,6 +460,9 @@ router.put('/trucks/:id', authenticateToken, async (req: Request, res: Response)
         ...(d.lng !== undefined && { lng: d.lng === null ? null : parseFloat(d.lng) }),
         ...(d.profileImage !== undefined && { profileImage: d.profileImage || null }),
         ...(d.truckImage !== undefined && { truckImage: d.truckImage || null }),
+        ...(d.licenseDoc !== undefined && { licenseDoc: d.licenseDoc || null }),
+        ...(d.registrationDoc !== undefined && { registrationDoc: d.registrationDoc || null }),
+        ...(d.featureSel !== undefined && { featureSel: normalizeFeatureSel(d.featureSel) }),
         ...(d.notes !== undefined && { notes: d.notes }),
         ...(isAdmin && d.isVerified !== undefined && { isVerified: !!d.isVerified }),
         ...(isAdmin && d.isActive !== undefined && { isActive: !!d.isActive }),
@@ -447,12 +470,18 @@ router.put('/trucks/:id', authenticateToken, async (req: Request, res: Response)
       },
       include: { truckType: { select: { name: true } } },
     });
-    // Remove replaced photos from R2
+    // Remove replaced photos / documents from R2
     if (d.profileImage !== undefined && existing.profileImage && existing.profileImage !== (d.profileImage || null)) {
       await deleteUpload(existing.profileImage);
     }
     if (d.truckImage !== undefined && existing.truckImage && existing.truckImage !== (d.truckImage || null)) {
       await deleteUpload(existing.truckImage);
+    }
+    if (d.licenseDoc !== undefined && existing.licenseDoc && existing.licenseDoc !== (d.licenseDoc || null)) {
+      await deleteUpload(existing.licenseDoc);
+    }
+    if (d.registrationDoc !== undefined && existing.registrationDoc && existing.registrationDoc !== (d.registrationDoc || null)) {
+      await deleteUpload(existing.registrationDoc);
     }
     res.json(truck);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
@@ -498,7 +527,7 @@ router.delete('/trucks/:id', authenticateToken, requireRole('ADMIN'), async (req
 // They then only receive orders their truck type can handle. Starts unverified;
 // an admin verifies before they can be dispatched.
 router.post('/register', async (req: Request, res: Response) => {
-  const { fullName, driverName, phone, email, password, plate, truckTypeId, wilaya, commune } = req.body;
+  const { fullName, driverName, phone, email, password, plate, truckTypeId, wilaya, commune, featureSel, licenseDoc, registrationDoc } = req.body;
   const name = (driverName || fullName) as string;
   if (!name || !phone || !password) {
     res.status(400).json({ error: 'driverName, phone and password are required' });
@@ -509,8 +538,17 @@ router.post('/register', async (req: Request, res: Response) => {
     return;
   }
   try {
-    const type = await prisma.truckType.findUnique({ where: { id: truckTypeId as string } });
+    const type = await prisma.truckType.findUnique({ where: { id: truckTypeId as string }, include: typeFeatureInclude });
     if (!type) { res.status(404).json({ error: 'Truck type not found' }); return; }
+
+    // Each of the type's features must have an option chosen (e.g. Size → 10T).
+    const sel = normalizeFeatureSel(featureSel);
+    for (const f of (type as any).features || []) {
+      if ((f.options || []).length && !sel.some((s) => s.featureName === f.name || (f.options as any[]).some((o) => o.id === s.optionId))) {
+        res.status(400).json({ error: `Please choose a "${f.name}" for your truck` });
+        return;
+      }
+    }
 
     const truckCode = await nextTruckCode();
     const truckEmail = (email as string) || `${truckCode.toLowerCase()}@rafik.app`;
@@ -524,14 +562,52 @@ router.post('/register', async (req: Request, res: Response) => {
         plate: (plate as string) || null, truckTypeId: truckTypeId as string,
         wilaya: (wilaya as string) || null, commune: (commune as string) || null,
         isVerified: false, status: 'offline',
+        featureSel: sel,
+        licenseDoc: (licenseDoc as string) || null,
+        registrationDoc: (registrationDoc as string) || null,
       },
       include: { truckType: { select: { name: true } } },
+    });
+    // Tell admins a new driver needs verifying (bell + email).
+    void adminAlert({
+      title: `🚚 New driver awaiting verification — ${name}`,
+      body: `${name} · ${phone} · ${truck.truckCode}`,
+      type: 'trucker_verify', vertical: 'truck', event: 'verify', refId: truck.id, link: '/truck/trucks',
+      emailHtml: lead('A new driver signed up and is waiting to be verified.') + infoTable([
+        pRow('Driver', name), pRow('Phone', phone), pRow('Truck', truck.truckCode),
+        pRow('Type', (truck as any).truckType?.name),
+        pRow('Licence', licenseDoc ? 'uploaded' : 'missing'),
+        pRow('Registration', registrationDoc ? 'uploaded' : 'missing'),
+      ]),
     });
     res.status(201).json({ truck, message: 'Account created — an admin will verify your truck before you receive orders' });
   } catch (err: any) {
     if (err?.code === 'P2002') { res.status(409).json({ error: 'Email or phone already exists' }); return; }
     console.error(err); res.status(500).json({ error: 'Server error' });
   }
+});
+
+// Driver uploads / updates their verification documents after login (image or PDF URLs).
+router.put('/trucks/me/documents', authenticateToken, requireRole('TRUCKER'), async (req: Request, res: Response) => {
+  const user = getUser(req);
+  const { licenseDoc, registrationDoc, featureSel } = req.body;
+  try {
+    const truck = await getOwnTruck(user.userId);
+    if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    // Clean up any replaced document from R2.
+    if (licenseDoc !== undefined && truck.licenseDoc && truck.licenseDoc !== (licenseDoc || null)) await deleteUpload(truck.licenseDoc);
+    if (registrationDoc !== undefined && truck.registrationDoc && truck.registrationDoc !== (registrationDoc || null)) await deleteUpload(truck.registrationDoc);
+    const updated = await prisma.truck.update({
+      where: { id: truck.id },
+      data: {
+        ...(licenseDoc !== undefined && { licenseDoc: licenseDoc || null }),
+        ...(registrationDoc !== undefined && { registrationDoc: registrationDoc || null }),
+        ...(featureSel !== undefined && { featureSel: normalizeFeatureSel(featureSel) }),
+      },
+      include: { truckType: { select: { name: true } } },
+    });
+    res.json(updated);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ══════════════════ PRICE QUOTE (public — mobile app calls before ordering) ══════════════════
@@ -572,14 +648,15 @@ router.get('/orders', authenticateToken, async (req: Request, res: Response) => 
   const user = getUser(req);
   try {
     let scope: any = {};
+    let ownTruck: any = null;
     if (user.role === 'TRUCKER') {
-      const truck = await getOwnTruck(user.userId);
+      ownTruck = await getOwnTruck(user.userId);
       // A trucker sees his own jobs + only OPEN requests he can actually do:
       // orders that need his truck type, or that don't require a specific type.
       scope = {
         OR: [
-          { truckId: truck?.id ?? '—' },
-          { status: 'requested', OR: [{ truckTypeId: truck?.truckTypeId ?? '—' }, { truckTypeId: null }] },
+          { truckId: ownTruck?.id ?? '—' },
+          { status: 'requested', OR: [{ truckTypeId: ownTruck?.truckTypeId ?? '—' }, { truckTypeId: null }] },
         ],
       };
     } else if (user.role === 'CLIENT') {
@@ -602,7 +679,11 @@ router.get('/orders', authenticateToken, async (req: Request, res: Response) => 
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    res.json(orders.map(withMaps));
+    // Hide OPEN requests the trucker can't fulfil by feature (e.g. 10T truck vs 20T order).
+    const visible = user.role === 'TRUCKER'
+      ? orders.filter((o) => o.truckId === ownTruck?.id || truckSatisfiesOrder(ownTruck?.featureSel, o.featureSel))
+      : orders;
+    res.json(visible.map(withMaps));
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -625,7 +706,7 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
     clientName, clientPhone, categoryId, truckTypeId,
     pickupAddress, pickupWilaya, pickupCommune, pickupLat, pickupLng,
     destinationAddress, destinationWilaya, destinationLat, destinationLng, distanceKm,
-    description, invoiceStatus, scheduledType, scheduledDate, promoCode,
+    description, invoiceStatus, scheduledType, scheduledDate, promoCode, featureSel,
   } = req.body;
   const user = getUser(req);
 
@@ -690,6 +771,7 @@ router.post('/orders', authenticateToken, requireRole('ADMIN', 'CLIENT'), async 
         destinationLat: destinationLat != null ? parseFloat(destinationLat) : null, destinationLng: destinationLng != null ? parseFloat(destinationLng) : null,
         distanceKm: km, description: description as string,
         invoiceStatus: (invoiceStatus as any) || 'NOT_REQUIRED',
+        featureSel: normalizeFeatureSel(featureSel),
         scheduledType: scheduledType === 'scheduled' ? 'scheduled' : 'now',
         scheduledDate: scheduledType === 'scheduled' ? (scheduledDate as string) || null : null,
         estimatedPrice, promoDiscount, promoCodeId: promoValidation?.promo?.id ?? null, agreedPrice,
@@ -736,6 +818,7 @@ router.post('/orders/:id/accept', authenticateToken, requireRole('TRUCKER'), asy
   try {
     const truck = await getOwnTruck(user.userId);
     if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    if (!truck.isVerified) { res.status(403).json({ error: 'Your account is not verified yet', code: 'not_verified' }); return; }
     if (truck.status === 'suspended' || !truck.isActive) { res.status(403).json({ error: 'Your account is suspended or inactive' }); return; }
     if (truck.status === 'offline') { res.status(400).json({ error: 'Go online before accepting orders' }); return; }
     const order = await prisma.truckOrder.findUnique({ where: { id } });
@@ -743,6 +826,10 @@ router.post('/orders/:id/accept', authenticateToken, requireRole('TRUCKER'), asy
     if (order.status !== 'requested' || order.truckId) { res.status(409).json({ error: 'This order was already taken by another driver' }); return; }
     if (order.truckTypeId && truck.truckTypeId && order.truckTypeId !== truck.truckTypeId) {
       res.status(400).json({ error: 'This order needs a different truck type' }); return;
+    }
+    // Feature match: e.g. a 10T truck can't take a 20T order.
+    if (!truckSatisfiesOrder(truck.featureSel, order.featureSel)) {
+      res.status(400).json({ error: 'Your truck does not match what this order requires' }); return;
     }
     // Atomic claim: only succeeds if it is still open — prevents two drivers taking it.
     const claim = await prisma.truckOrder.updateMany({
@@ -860,6 +947,7 @@ router.patch('/driver/status', authenticateToken, requireRole('TRUCKER'), async 
     const truck = await getOwnTruck(user.userId);
     if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
     if (truck.status === 'suspended') { res.status(403).json({ error: 'Your account is suspended' }); return; }
+    if (!truck.isVerified) { res.status(403).json({ error: 'Your account is not verified yet', code: 'not_verified' }); return; }
     const online = req.body?.online === true || req.body?.online === 'true';
     // If mid-delivery, going "online" keeps busy; otherwise available/offline.
     const hasActive = await prisma.truckOrder.count({ where: { truckId: truck.id, status: { in: ['arrived', 'loading', 'in_transit'] } } });
@@ -882,19 +970,36 @@ router.get('/driver/dashboard', authenticateToken, requireRole('TRUCKER'), async
   try {
     const truck = await getOwnTruck(user.userId);
     if (!truck) { res.status(404).json({ error: 'No truck linked to this account' }); return; }
+    const truckInfo = {
+      id: truck.id, truckCode: truck.truckCode, driverName: truck.driverName, status: truck.status,
+      isVerified: truck.isVerified, truckTypeId: truck.truckTypeId, rating: truck.rating, totalTrips: truck.totalTrips,
+      licenseDoc: truck.licenseDoc, registrationDoc: truck.registrationDoc, featureSel: truck.featureSel,
+    };
+    // Unverified drivers can't work yet — show status + what documents are missing.
+    if (!truck.isVerified) {
+      res.json({
+        truck: truckInfo, online: false, verified: false,
+        needsDocuments: { license: !truck.licenseDoc, registration: !truck.registrationDoc },
+        message: 'Your account is pending verification by an admin.',
+        available: { now: [], scheduled: [] }, active: [], scheduled: [], completed: [],
+      });
+      return;
+    }
     const online = truck.status !== 'offline' && truck.status !== 'suspended';
     const typeMatch = { OR: [{ truckTypeId: truck.truckTypeId ?? '—' }, { truckTypeId: null }] };
-    const [availableRaw, mine, completed] = await Promise.all([
+    const [availableRawAll, mine, completed] = await Promise.all([
       online
         ? prisma.truckOrder.findMany({ where: { status: 'requested', truckId: null, ...typeMatch }, include: orderInclude, orderBy: { createdAt: 'desc' }, take: 100 })
         : Promise.resolve([]),
       prisma.truckOrder.findMany({ where: { truckId: truck.id, status: { in: ['accepted', 'arrived', 'loading', 'in_transit'] } }, include: orderInclude, orderBy: { createdAt: 'asc' } }),
       prisma.truckOrder.findMany({ where: { truckId: truck.id, status: 'delivered' }, include: orderInclude, orderBy: { deliveredAt: 'desc' }, take: 30 }),
     ]);
+    // Feature match: e.g. a 10T truck never sees a 20T order.
+    const availableRaw = availableRawAll.filter((o) => truckSatisfiesOrder(truck.featureSel, o.featureSel));
     const isNow = (o: any) => o.scheduledType !== 'scheduled';
     res.json({
-      truck: { id: truck.id, truckCode: truck.truckCode, driverName: truck.driverName, status: truck.status, isVerified: truck.isVerified, truckTypeId: truck.truckTypeId, rating: truck.rating, totalTrips: truck.totalTrips },
-      online,
+      truck: truckInfo,
+      online, verified: true,
       available: {
         now: availableRaw.filter(isNow).map(withMaps),
         scheduled: availableRaw.filter((o) => !isNow(o)).map(withMaps),

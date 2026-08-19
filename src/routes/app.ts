@@ -140,13 +140,14 @@ router.get('/admin/status', ...admin, async (_req: Request, res: Response) => {
 // Per-vertical count of orders still waiting on someone (drives the sidebar red dot).
 router.get('/admin/pending-counts', ...admin, async (_req: Request, res: Response) => {
   try {
-    const [truck, food, taxi, services] = await Promise.all([
+    const [truck, food, taxi, services, trucksToVerify] = await Promise.all([
       prisma.truckOrder.count({ where: { status: 'requested' } }),
       prisma.foodOrder.count({ where: { status: 'pending' } }),
       prisma.taxiRide.count({ where: { status: 'requested' } }),
       prisma.booking.count({ where: { status: { in: ['pending_review', 'awaiting_worker'] } } }),
+      prisma.truck.count({ where: { isVerified: false, isActive: true } }),
     ]);
-    res.json({ truck, food, taxi, services });
+    res.json({ truck, food, taxi, services, trucksToVerify });
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

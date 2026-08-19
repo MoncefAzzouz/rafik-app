@@ -737,6 +737,9 @@ model Truck {
   cancellationCount Int          @default(0)
   profileImage      String?      // driver's photo
   truckImage        String?      // photo of the truck itself
+  licenseDoc        String?      // driver's licence (image or PDF) — for verification
+  registrationDoc   String?      // vehicle registration / carte grise (image or PDF)
+  featureSel        Json?        // chosen feature options, e.g. [{featureId,featureName,optionId,optionLabel,image}]
   notes             String?
   orders            TruckOrder[]
   createdAt         DateTime     @default(now())
@@ -753,6 +756,7 @@ model TruckOrder {
   category           TruckCategory  @relation(fields: [categoryId], references: [id])
   truckTypeId        String?
   truckType          TruckType?     @relation(fields: [truckTypeId], references: [id])
+  featureSel         Json?          // required feature options the client chose (e.g. Size = 20T)
   // Positions: current + next move (destination)
   pickupAddress      String
   pickupWilaya       String?
