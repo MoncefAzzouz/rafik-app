@@ -50,9 +50,12 @@ function ImageUploadField({ label, value, onChange }: { label: string; value: st
 
 // ══════════════════ TYPES ══════════════════
 
+interface TruckTypeFeatureOption { id?: string; label: string; image?: string | null; }
+interface TruckTypeFeature { id?: string; name: string; options: TruckTypeFeatureOption[]; }
 interface TruckType {
   id: string; name: string; description?: string | null; capacityLabel?: string | null;
   priceMultiplier: number; isActive: boolean; image?: string | null;
+  features?: TruckTypeFeature[];
   _count?: { trucks: number };
 }
 interface TruckCategory {
@@ -748,6 +751,19 @@ function TypesPage({ types, onSave, onDelete }: {
               <span className="text-[9px] font-black uppercase px-2 py-1 bg-teal-50 text-teal-700 rounded-lg">× {t.priceMultiplier} price</span>
               <span className="text-[9px] font-black uppercase px-2 py-1 bg-slate-100 text-slate-500 rounded-lg">{t._count?.trucks ?? 0} trucks</span>
             </div>
+            {(t.features ?? []).filter(f => (f.options ?? []).length).map((f, i) => (
+              <div key={i} className="mt-2.5">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{f.name}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {f.options.map((o, oi) => (
+                    <span key={oi} className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-1.5 py-1 bg-slate-50 border border-slate-100 text-slate-600 rounded-lg">
+                      {o.image ? <img src={o.image.startsWith("/uploads") ? `${API_URL}${o.image}` : o.image} alt={o.label} className="w-4 h-4 rounded object-cover" /> : null}
+                      {o.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -763,6 +779,12 @@ function TypeModal({ type, onClose, onSave }: { type: TruckType | null; onClose:
   const [priceMultiplier, setPriceMultiplier] = useState(String(type?.priceMultiplier ?? 1));
   const [image, setImage] = useState(type?.image ?? "");
   const [isActive, setIsActive] = useState(type?.isActive ?? true);
+  // Custom features (e.g. "Size" → 10T / 20T, each with its own picture)
+  const [features, setFeatures] = useState<TruckTypeFeature[]>(
+    () => (type?.features ?? []).map(f => ({ name: f.name, options: (f.options ?? []).map(o => ({ label: o.label, image: o.image ?? "" })) }))
+  );
+  const patchFeatures = (fn: (draft: TruckTypeFeature[]) => void) => setFeatures(prev => { const next = prev.map(f => ({ ...f, options: f.options.map(o => ({ ...o })) })); fn(next); return next; });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-5 relative text-left">
@@ -779,8 +801,40 @@ function TypeModal({ type, onClose, onSave }: { type: TruckType | null; onClose:
             <input type="number" step="0.1" value={priceMultiplier} onChange={e => setPriceMultiplier(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white" /></div>
         </div>
         <ImageUploadField label="Truck Type Picture" value={image} onChange={setImage} />
+
+        {/* Features — named attributes like "Size" with picture options (10T / 20T…) */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Features (e.g. Size)</label>
+            <button type="button" onClick={() => patchFeatures(d => { d.push({ name: "", options: [] }); })} className="text-[10px] font-black text-teal-600 hover:text-teal-700 uppercase tracking-wider flex items-center gap-1 cursor-pointer"><Plus size={12} /> Add feature</button>
+          </div>
+          {features.length === 0 && <p className="text-[11px] text-slate-400 font-inter">No features. Add one like “Size”, then add options (10T, 20T…), each with a picture.</p>}
+          {features.map((f, fi) => (
+            <div key={fi} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <input value={f.name} onChange={e => patchFeatures(d => { d[fi].name = e.target.value; })} placeholder="Feature name (e.g. Size)" className="flex-1 px-3 py-2.5 bg-white border border-slate-100 rounded-xl text-xs font-black outline-none focus:border-teal-200" />
+                <button type="button" onClick={() => patchFeatures(d => { d.splice(fi, 1); })} className="w-8 h-8 rounded-lg border border-slate-100 bg-white flex items-center justify-center text-rose-500 hover:bg-rose-50 cursor-pointer shrink-0"><Trash2 size={13} /></button>
+              </div>
+              <div className="space-y-2">
+                {f.options.map((o, oi) => (
+                  <div key={oi} className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl p-2">
+                    <ImageUploadField label="" value={o.image ?? ""} onChange={url => patchFeatures(d => { d[fi].options[oi].image = url; })} />
+                    <input value={o.label} onChange={e => patchFeatures(d => { d[fi].options[oi].label = e.target.value; })} placeholder="e.g. 10T" className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold outline-none focus:bg-white min-w-0" />
+                    <button type="button" onClick={() => patchFeatures(d => { d[fi].options.splice(oi, 1); })} className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-rose-500 hover:bg-rose-50 cursor-pointer shrink-0"><X size={13} /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => patchFeatures(d => { d[fi].options.push({ label: "", image: "" }); })} className="text-[10px] font-black text-slate-500 hover:text-teal-600 uppercase tracking-wider flex items-center gap-1 cursor-pointer"><Plus size={11} /> Add option</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-[10px] font-black text-slate-600 uppercase">Active</span></label>
-        <button onClick={() => { if (!name) { alert("Name required"); return; } onSave({ name, description, capacityLabel, priceMultiplier: parseFloat(priceMultiplier) || 1, image, isActive }); }}
+        <button onClick={() => {
+          if (!name) { alert("Name required"); return; }
+          const cleanFeatures = features.filter(f => f.name.trim()).map(f => ({ name: f.name.trim(), options: f.options.filter(o => o.label.trim()).map(o => ({ label: o.label.trim(), image: o.image || null })) }));
+          onSave({ name, description, capacityLabel, priceMultiplier: parseFloat(priceMultiplier) || 1, image, isActive, features: cleanFeatures });
+        }}
           className="w-full py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-2"><Check size={14} /> {type ? "Save" : "Create"}</button>
       </div>
     </div>
