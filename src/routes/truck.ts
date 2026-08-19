@@ -124,12 +124,40 @@ async function isOrderTrucker(req: Request, order: { truckId: string | null }): 
 // ══════════════════ TRUCK TYPES ══════════════════
 
 // Public list (mobile app needs it to show choices)
+// Include a type's features (e.g. "Size") with their options (10T/20T…), ordered.
+const typeFeatureInclude = {
+  features: {
+    orderBy: { sortOrder: 'asc' as const },
+    include: { options: { orderBy: { sortOrder: 'asc' as const } } },
+  },
+};
+// Build the nested Prisma `create` for a features payload from the admin UI.
+function featureCreateNested(features: any) {
+  if (!Array.isArray(features)) return undefined;
+  return {
+    create: features.filter((f: any) => f?.name).map((f: any, fi: number) => ({
+      name: String(f.name),
+      sortOrder: fi,
+      options: {
+        create: (Array.isArray(f.options) ? f.options : []).filter((o: any) => o?.label).map((o: any, oi: number) => ({
+          label: String(o.label), image: (o.image as string) || null, sortOrder: oi,
+        })),
+      },
+    })),
+  };
+}
+// All option image URLs in a features payload (for R2 cleanup).
+function featureImages(features: any): string[] {
+  if (!Array.isArray(features)) return [];
+  return features.flatMap((f: any) => (Array.isArray(f?.options) ? f.options : []).map((o: any) => o?.image).filter(Boolean));
+}
+
 router.get('/types', async (req: Request, res: Response) => {
   const { active } = req.query;
   try {
     const types = await prisma.truckType.findMany({
       where: active === 'true' ? { isActive: true } : undefined,
-      include: { _count: { select: { trucks: true } } },
+      include: { _count: { select: { trucks: true } }, ...typeFeatureInclude },
       orderBy: { name: 'asc' },
     });
     res.json(types);
@@ -137,7 +165,7 @@ router.get('/types', async (req: Request, res: Response) => {
 });
 
 router.post('/types', authenticateToken, requireRole('ADMIN'), async (req: Request, res: Response) => {
-  const { name, description, image, capacityLabel, priceMultiplier, isActive } = req.body;
+  const { name, description, image, capacityLabel, priceMultiplier, isActive, features } = req.body;
   if (!name) { res.status(400).json({ error: 'name is required' }); return; }
   try {
     const type = await prisma.truckType.create({
@@ -148,7 +176,9 @@ router.post('/types', authenticateToken, requireRole('ADMIN'), async (req: Reque
         capacityLabel: (capacityLabel as string) || null,
         priceMultiplier: priceMultiplier != null ? parseFloat(priceMultiplier) : 1,
         isActive: isActive !== undefined ? !!isActive : true,
+        ...(features !== undefined && { features: featureCreateNested(features) }),
       },
+      include: typeFeatureInclude,
     });
     res.status(201).json(type);
   } catch (err: any) {
@@ -178,7 +208,32 @@ router.put('/types/:id', authenticateToken, requireRole('ADMIN'), async (req: Re
     if (d.image !== undefined && existing.image && existing.image !== (d.image || null)) {
       await deleteUpload(existing.image);
     }
-    res.json(type);
+    // Replace the features (Size etc.) if the payload includes them.
+    if (d.features !== undefined) {
+      const oldFeatures = await prisma.truckTypeFeature.findMany({ where: { truckTypeId: id }, include: { options: true } });
+      const oldImages = oldFeatures.flatMap((f) => f.options.map((o) => o.image).filter(Boolean) as string[]);
+      await prisma.truckTypeFeature.deleteMany({ where: { truckTypeId: id } });
+      const feats = Array.isArray(d.features) ? d.features : [];
+      for (let fi = 0; fi < feats.length; fi++) {
+        const f = feats[fi];
+        if (!f?.name) continue;
+        await prisma.truckTypeFeature.create({
+          data: {
+            truckTypeId: id, name: String(f.name), sortOrder: fi,
+            options: {
+              create: (Array.isArray(f.options) ? f.options : []).filter((o: any) => o?.label).map((o: any, oi: number) => ({
+                label: String(o.label), image: (o.image as string) || null, sortOrder: oi,
+              })),
+            },
+          },
+        });
+      }
+      // Delete option images that are no longer used.
+      const newImages = featureImages(feats);
+      for (const img of oldImages) if (!newImages.includes(img)) await deleteUpload(img);
+    }
+    const full = await prisma.truckType.findUnique({ where: { id }, include: typeFeatureInclude });
+    res.json(full);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 

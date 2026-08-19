@@ -123,7 +123,7 @@ All public (no auth). These drive the app's home screen and info pages.
 |---|---|---|
 | `GET /api/truck/wilayas` | public | All 58 wilayas with their base freight `price` (DZD). |
 | `GET /api/truck/categories` | public | Freight categories (House moving, Towing…), each with its `allowedTypes` (truck types usable for it) and `image`. |
-| `GET /api/truck/types` | public | Truck types: `name`, `capacityLabel`, `priceMultiplier`, `image`. |
+| `GET /api/truck/types` | public | Truck types: `name`, `capacityLabel`, `priceMultiplier`, `image`, and `features[]` — each `{ name, options: [{ label, image }] }` (e.g. **Size** → 10T / 20T, each with its own picture) for the app to show as selectable variants. |
 | `GET /api/truck/config` | Bearer | Pricing config: `truckPerKm`, `truckMinFare`, `truckBaseFare`, commission mode/percent/subscription. |
 
 **Client order flow:** pick a **category** → pick an allowed **truck type** → pick **A** and **B** on the map → get a **quote** → **create the order**.

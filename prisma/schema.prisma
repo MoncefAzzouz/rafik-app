@@ -661,8 +661,33 @@ model TruckType {
   categories      TruckCategoryType[]
   trucks          Truck[]
   orders          TruckOrder[]
+  features        TruckTypeFeature[]  // custom attributes like "Size" with options 10T/20T
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+}
+
+// A named attribute on a truck type, e.g. "Size". Holds a set of options.
+model TruckTypeFeature {
+  id          String   @id @default(cuid())
+  truckTypeId String
+  truckType   TruckType @relation(fields: [truckTypeId], references: [id], onDelete: Cascade)
+  name        String   // "Size"
+  sortOrder   Int      @default(0)
+  options     TruckTypeFeatureOption[]
+
+  @@index([truckTypeId])
+}
+
+// One option of a feature, e.g. "10T", each with its own picture.
+model TruckTypeFeatureOption {
+  id        String   @id @default(cuid())
+  featureId String
+  feature   TruckTypeFeature @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  label     String   // "10T"
+  image     String?  // its own picture
+  sortOrder Int      @default(0)
+
+  @@index([featureId])
 }
 
 // A freight service category (House moving, Towing, Construction materials…)
