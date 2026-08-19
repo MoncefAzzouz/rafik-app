@@ -15,7 +15,7 @@ function MainRoutingShell() {
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === "ADMIN") {
-        router.push("/services/dashboard");
+        router.push("/truck/dashboard");
       } else if (user.role === "WORKER") {
         router.push("/worker/dashboard");
       }
