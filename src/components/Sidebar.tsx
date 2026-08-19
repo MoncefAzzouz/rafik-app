@@ -125,7 +125,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-100 p-6 h-full sticky top-0 shrink-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-100 p-6 h-[calc(100vh-5rem)] sticky top-20 shrink-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       {/* Brand Header */}
       <div className="flex items-center gap-4 mb-12 group cursor-pointer">
         <div
