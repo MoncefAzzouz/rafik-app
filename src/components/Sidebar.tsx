@@ -89,12 +89,12 @@ interface SidebarProps {
   onNavigate: (pageId: string) => void;
 }
 
-// Which nav item shows the "pending orders" red dot, per vertical.
-const PENDING_NAV: Partial<Record<ServiceType, { navId: string; key: string }>> = {
-  truck: { navId: "orders", key: "truck" },
-  food: { navId: "orders", key: "food" },
-  taxi: { navId: "rides", key: "taxi" },
-  services: { navId: "bookings", key: "services" },
+// Which nav item(s) show a red dot + count, per vertical.
+const PENDING_NAV: Partial<Record<ServiceType, { navId: string; key: string }[]>> = {
+  truck: [{ navId: "orders", key: "truck" }, { navId: "trucks", key: "trucksToVerify" }],
+  food: [{ navId: "orders", key: "food" }],
+  taxi: [{ navId: "rides", key: "taxi" }],
+  services: [{ navId: "bookings", key: "services" }],
 };
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
@@ -118,8 +118,11 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
     window.addEventListener("focus", onFocus);
     return () => { clearInterval(t); window.removeEventListener("focus", onFocus); };
   }, [fetchPending]);
-  const pendingNav = PENDING_NAV[activeService];
-  const pendingCount = pendingNav ? (pending[pendingNav.key] || 0) : 0;
+  const pendingNav = PENDING_NAV[activeService] || [];
+  const pendingFor = (navId: string) => {
+    const m = pendingNav.find((x) => x.navId === navId);
+    return m ? (pending[m.key] || 0) : 0;
+  };
 
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-slate-100 p-6 h-full sticky top-0 shrink-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -152,7 +155,8 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
-          const showPending = !!pendingNav && item.id === pendingNav.navId && pendingCount > 0;
+          const pendingCount = pendingFor(item.id);
+          const showPending = pendingCount > 0;
 
           return (
             <button

@@ -48,6 +48,77 @@ function ImageUploadField({ label, value, onChange }: { label: string; value: st
   );
 }
 
+// Document picker (driver licence / registration): accepts image OR PDF.
+function DocUploadField({ label, value, onChange }: { label: string; value: string; onChange: (url: string) => void }) {
+  const { token } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const isPdf = value ? /\.pdf(\?|$)/i.test(value) : false;
+  const src = value ? (value.startsWith("/uploads") ? `${API_URL}${value}` : value) : "";
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API_URL}/api/upload/document`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form });
+      if (res.ok) { const d = await res.json(); onChange(d.url); }
+      else { const e = await res.json().catch(() => ({})); alert(e.error || "Upload failed"); }
+    } catch (e) { console.error(e); alert("Upload failed"); }
+    finally { setUploading(false); }
+  };
+  return (
+    <div>
+      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">{label}</label>
+      <div className="flex items-center gap-3">
+        <label className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-200 hover:border-teal-300 bg-slate-50 flex items-center justify-center cursor-pointer overflow-hidden shrink-0">
+          {value ? (isPdf ? <FileText size={24} className="text-rose-500" /> : <img src={src} alt="doc" className="w-full h-full object-cover" />) : <ImagePlus size={22} className="text-slate-300" />}
+          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+        </label>
+        <div className="text-[10px] font-bold text-slate-400 font-inter">
+          {uploading ? <span className="text-teal-600 animate-pulse">Uploading…</span> : value ? <a href={src} target="_blank" rel="noreferrer" className="text-teal-600 hover:underline">View file</a> : "Image or PDF"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pick one option per feature of a truck type (e.g. Size → 10T / 20T), each with a picture.
+function FeatureSelect({ type, value, onChange }: { type?: TruckType | null; value: any[]; onChange: (sel: any[]) => void }) {
+  const features = (type?.features ?? []).filter(f => (f.options ?? []).length);
+  if (!features.length) return null;
+  const selectedFor = (fName: string) => (value || []).find((v: any) => v.featureName === fName)?.optionId;
+  const pick = (f: any, o: any) => {
+    const others = (value || []).filter((v: any) => v.featureName !== f.name);
+    onChange([...others, { featureId: f.id ?? null, featureName: f.name, optionId: o.id, optionLabel: o.label, image: o.image ?? null }]);
+  };
+  return (
+    <div className="space-y-3">
+      {features.map((f, fi) => (
+        <div key={fi}>
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">{f.name} *</label>
+          <div className="flex flex-wrap gap-2">
+            {f.options.map((o: any, oi: number) => {
+              const active = selectedFor(f.name) === o.id;
+              return (
+                <button key={oi} type="button" onClick={() => pick(f, o)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-black cursor-pointer ${active ? "bg-teal-600 text-white border-teal-600" : "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100"}`}>
+                  {o.image ? <img src={o.image.startsWith("/uploads") ? `${API_URL}${o.image}` : o.image} alt={o.label} className="w-5 h-5 rounded object-cover" /> : null}
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// A small "view document" link (or a "missing" hint).
+function DocLink({ label, url }: { label: string; url?: string | null }) {
+  if (!url) return <span className="text-[10px] font-bold text-rose-400">{label}: missing</span>;
+  const href = url.startsWith("/uploads") ? `${API_URL}${url}` : url;
+  return <a href={href} target="_blank" rel="noreferrer" className="text-[10px] font-black text-teal-600 hover:underline inline-flex items-center gap-1"><FileText size={11} /> {label}</a>;
+}
+
 // ══════════════════ TYPES ══════════════════
 
 interface TruckTypeFeatureOption { id?: string; label: string; image?: string | null; }
@@ -66,6 +137,7 @@ interface TruckVehicle {
   id: string; truckCode: string; driverName: string; phone: string; plate?: string | null;
   truckTypeId?: string | null; truckType?: { name: string } | null;
   profileImage?: string | null; truckImage?: string | null;
+  licenseDoc?: string | null; registrationDoc?: string | null; featureSel?: any[];
   status: string; isVerified: boolean; isActive: boolean; rating: number; totalTrips: number;
   wilaya?: string | null; commune?: string | null;
 }
@@ -76,6 +148,7 @@ interface TruckOrder {
   pickupAddress: string; pickupWilaya?: string | null; pickupCommune?: string | null;
   destinationAddress: string; destinationWilaya?: string | null; distanceKm?: number | null;
   description: string; invoiceStatus: string; scheduledType: string; scheduledDate?: string | null;
+  featureSel?: any[];
   estimatedPrice?: number | null; promoDiscount?: number | null; agreedPrice?: number | null;
   commissionPercentSnapshot?: number | null; commissionAmount?: number | null; driverEarnings?: number | null;
   status: string;
@@ -392,6 +465,18 @@ function OrderDrawer({ order, trucks, onClose, onAction }: {
           </div>
         </div>
 
+        {/* Required features (e.g. Size: 20T) */}
+        {(order.featureSel ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {order.featureSel!.map((s: any, i: number) => (
+              <span key={i} className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-xl">
+                {s.image ? <img src={s.image.startsWith("/uploads") ? `${API_URL}${s.image}` : s.image} alt={s.optionLabel} className="w-4 h-4 rounded object-cover" /> : null}
+                <span className="text-teal-400 uppercase">{s.featureName}:</span> {s.optionLabel}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Cargo details */}
         <div className="space-y-3">
           <div className="bg-white border border-slate-100 p-4 rounded-2xl">
@@ -509,10 +594,13 @@ function NewOrderModal({ categories, types, config, wilayas, onClose, onSubmit }
   const [scheduledDate, setScheduledDate] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [quote, setQuote] = useState<number | null>(null);
+  const [featureSel, setFeatureSel] = useState<any[]>([]);
 
   // Truck types allowed in the chosen category
   const selectedCat = categories.find(c => c.id === categoryId);
   const allowedTypes = selectedCat?.truckTypes ?? [];
+  // Full type record (with features) for the chosen truck type
+  const selType = types.find(t => t.id === truckTypeId);
   const destPrice = wilayas.find(w => w.name === destinationWilaya)?.price ?? null;
 
   // Live price quote whenever inputs change
@@ -552,11 +640,16 @@ function NewOrderModal({ categories, types, config, wilayas, onClose, onSubmit }
               {categories.filter(c => c.isActive).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select></div>
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Truck Type</label>
-            <select value={truckTypeId} onChange={e => setTruckTypeId(e.target.value)} disabled={!categoryId} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white disabled:opacity-50">
+            <select value={truckTypeId} onChange={e => { setTruckTypeId(e.target.value); setFeatureSel([]); }} disabled={!categoryId} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white disabled:opacity-50">
               <option value="">{categoryId ? "Any allowed truck" : "Pick a category first"}</option>
               {allowedTypes.filter(t => t.isActive).map(t => <option key={t.id} value={t.id}>{t.name}{t.capacityLabel ? ` — ${t.capacityLabel}` : ""}</option>)}
             </select></div>
         </div>
+
+        {/* Required features for the chosen truck type (e.g. Size → 10T / 20T) */}
+        {selType && (selType.features ?? []).some(f => (f.options ?? []).length) && (
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4"><FeatureSelect type={selType} value={featureSel} onChange={setFeatureSel} /></div>
+        )}
 
         {/* Pickup */}
         <div className="grid grid-cols-2 gap-4">
@@ -628,6 +721,7 @@ function NewOrderModal({ categories, types, config, wilayas, onClose, onSubmit }
               ...(km && { distanceKm: parseFloat(km) }),
               description, invoiceStatus, scheduledType, ...(scheduledType === "scheduled" && { scheduledDate }),
               ...(promoCode && { promoCode }),
+              ...(featureSel.length && { featureSel }),
             });
           }}
           className="w-full py-4 bg-teal-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-teal-700 shadow-lg shadow-teal-600/20 transition-all cursor-pointer">
@@ -859,7 +953,8 @@ function TrucksPage({ trucks, types, onCreate, onUpdate, onSetStatus, onDelete }
       </div>
       <div className="space-y-4">
         {trucks.map(t => (
-          <div key={t.id} className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div key={t.id} className={`bg-white border rounded-[2rem] p-6 shadow-sm ${!t.isVerified ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-100"}`}>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               {/* Driver photo (round) */}
               {t.profileImage
@@ -886,6 +981,16 @@ function TrucksPage({ trucks, types, onCreate, onUpdate, onSetStatus, onDelete }
               )}
               <button onClick={() => { if (confirm(`Delete ${t.driverName}?`)) onDelete(t.id); }} className="w-8 h-8 rounded-lg hover:bg-rose-50 flex items-center justify-center border border-slate-100 text-rose-500 cursor-pointer"><Trash2 size={13} /></button>
             </div>
+            </div>
+            {/* Features chosen + verification documents */}
+            <div className="mt-4 pt-4 border-t border-slate-50 flex flex-wrap items-center gap-x-5 gap-y-2">
+              {!t.isVerified && <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⏳ Pending verification</span>}
+              {(t.featureSel ?? []).map((s: any, i: number) => (
+                <span key={i} className="inline-flex items-center gap-1 text-[10px] font-black text-slate-600"><span className="text-slate-400 uppercase">{s.featureName}:</span> {s.optionLabel}</span>
+              ))}
+              <DocLink label="Licence" url={t.licenseDoc} />
+              <DocLink label="Registration" url={t.registrationDoc} />
+            </div>
           </div>
         ))}
         {trucks.length === 0 && <p className="text-xs text-slate-400 font-bold font-inter text-center py-10 bg-white border border-slate-100 rounded-[2rem]">No trucks yet.</p>}
@@ -904,7 +1009,11 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
   const [truckTypeId, setTruckTypeId] = useState(truck?.truckTypeId ?? "");
   const [profileImage, setProfileImage] = useState(truck?.profileImage ?? "");
   const [truckImage, setTruckImage] = useState(truck?.truckImage ?? "");
+  const [licenseDoc, setLicenseDoc] = useState(truck?.licenseDoc ?? "");
+  const [registrationDoc, setRegistrationDoc] = useState(truck?.registrationDoc ?? "");
+  const [featureSel, setFeatureSel] = useState<any[]>(truck?.featureSel ?? []);
   const [isVerified, setIsVerified] = useState(truck?.isVerified ?? true);
+  const selType = types.find(t => t.id === truckTypeId);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-4">
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl p-8 max-w-md w-full max-h-[90vh] overflow-y-auto space-y-5 relative text-left">
@@ -916,19 +1025,29 @@ function TruckModal({ truck, types, onClose, onSave }: { truck: TruckVehicle | n
           <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+213 …" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Truck Type</label>
-            <select value={truckTypeId ?? ""} onChange={e => setTruckTypeId(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
+            <select value={truckTypeId ?? ""} onChange={e => { setTruckTypeId(e.target.value); setFeatureSel([]); }} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black outline-none focus:bg-white">
               <option value="">—</option>{types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
           <div><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Plate</label>
             <input value={plate ?? ""} onChange={e => setPlate(e.target.value)} placeholder="00111-119-19" className="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white" /></div>
         </div>
+        {/* Feature selection for the chosen type (e.g. Size → 10T / 20T) */}
+        <FeatureSelect type={selType} value={featureSel} onChange={setFeatureSel} />
         <div className="grid grid-cols-2 gap-4">
           <ImageUploadField label="Driver Photo" value={profileImage} onChange={setProfileImage} />
           <ImageUploadField label="Truck Photo" value={truckImage} onChange={setTruckImage} />
         </div>
+        {/* Verification documents */}
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Verification documents</p>
+          <div className="grid grid-cols-2 gap-4">
+            <DocUploadField label="Driver licence" value={licenseDoc} onChange={setLicenseDoc} />
+            <DocUploadField label="Registration (carte grise)" value={registrationDoc} onChange={setRegistrationDoc} />
+          </div>
+        </div>
         <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={isVerified} onChange={e => setIsVerified(e.target.checked)} className="w-4 h-4 accent-teal-600" /><span className="text-xs font-bold text-slate-600 font-inter">Documents checked — verified</span></label>
         <button onClick={() => {
             if (!driverName || !phone) { alert("Name and phone required"); return; }
-            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, profileImage: profileImage || null, truckImage: truckImage || null, isVerified };
+            const fields: Record<string, unknown> = { driverName, phone, plate, truckTypeId: truckTypeId || null, profileImage: profileImage || null, truckImage: truckImage || null, licenseDoc: licenseDoc || null, registrationDoc: registrationDoc || null, featureSel, isVerified };
             if (!editMode) { fields.wilaya = "Sétif"; fields.commune = "Sétif"; }
             onSave(fields);
           }}
