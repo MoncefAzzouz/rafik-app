@@ -8,11 +8,17 @@ import '../../../core/widgets/cached_image.dart';
 import '../../restaurant/pages/food_page.dart';
 import '../../taxi/pages/taxi_booking_page.dart';
 import '../../parcel_transport/pages/parcel_dashboard_page.dart';
+import '../../parcel_transport/pages/parcel_category_select_page.dart';
 import '../../parcel_transport/data/parcel_order_repository.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../auth/pages/login_page.dart';
 import '../data/content_repository.dart';
 import '../domain/app_module.dart';
 import '../domain/app_slide.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../../core/location/picked_location.dart';
+import '../../../core/location/location_picker_page.dart';
+import '../../taxi/data/datasources/device_location_data_source.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,8 +31,15 @@ class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController();
   final ParcelOrderRepository _parcelOrders = ParcelOrderRepository.instance;
   final ContentRepository _content = ContentRepository.instance;
+  final DeviceLocationDataSource _deviceLocation = DeviceLocationDataSource();
   int _currentBannerIndex = 0;
   Timer? _bannerTimer;
+
+  /// The delivery location shown in the header. Null until the user picks one
+  /// (or GPS resolves), which is when the fallback city label below is
+  /// replaced by a real address.
+  PickedLocation? _location;
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -101,9 +114,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Tapping the Truck tile should go straight into booking a new order,
+  /// not the dashboard (new/archive tabs) — that's still reachable from the
+  /// "active orders" banner below when there's something to actually manage.
+  void _startNewParcelOrder() {
+    if (!AuthRepository.instance.isAuthenticated) {
+      Navigator.push(context, SmoothPageRoute(page: const LoginPage()));
+      return;
+    }
+    Navigator.push(
+      context,
+      SmoothPageRoute(page: const ParcelCategorySelectPage()),
+    );
+  }
+
   VoidCallback? _moduleOnTap(AppModule module) {
     if (!module.isTappable) return null;
-    if (module.isTruck) return _openParcelDashboard;
+    if (module.isTruck) return _startNewParcelOrder;
     switch (module.type) {
       case 'taxi':
         return () => Navigator.push(
@@ -177,25 +204,33 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 4),
                       GestureDetector(
                         onTap: _showLocationSheet,
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.location_on_rounded,
                               color: AppColors.cyan,
                               size: 12,
                             ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Setif, Algeria',
-                              style: TextStyle(
-                                color: AppColors.cyan,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width - 100,
+                              ),
+                              child: Text(
+                                _location?.address ?? _fallbackLocationLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.cyan,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            SizedBox(width: 2),
-                            Icon(
+                            const SizedBox(width: 2),
+                            const Icon(
                               Icons.keyboard_arrow_right_rounded,
                               color: AppColors.cyan,
                               size: 16,
@@ -418,72 +453,148 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Label shown before any location has been resolved or picked.
+  static const String _fallbackLocationLabel = 'Setif, Algeria';
+
   void _showLocationSheet() {
+    final s = AppStrings(AppLanguage.instance.value);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 84,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8E5EE),
-                    borderRadius: BorderRadius.circular(4),
+      builder: (sheetContext) {
+        // StatefulBuilder so the "Locating…" subtitle and the selected-row
+        // check mark update while the sheet is still open.
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Directionality(
+              textDirection: s.lang == AppLang.ar
+                  ? TextDirection.rtl
+                  : TextDirection.ltr,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 84,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8E5EE),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        s.locationSheetTitle,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Divider(height: 1, color: Color(0xFFE8E8E8)),
+                      const SizedBox(height: 20),
+                      _buildLocationRow(
+                        icon: Icons.my_location_rounded,
+                        title: s.locationUseCurrent,
+                        subtitle: _isLocating
+                            ? s.locationDetecting
+                            : _location?.address,
+                        trailing: _location == null
+                            ? Icons.chevron_right_rounded
+                            : Icons.check_rounded,
+                        onTap: _isLocating
+                            ? null
+                            : () => _useCurrentLocation(
+                                sheetContext,
+                                setSheetState,
+                                s,
+                              ),
+                      ),
+                      const SizedBox(height: 26),
+                      _buildLocationRow(
+                        icon: Icons.map_outlined,
+                        title: s.locationChooseOnMap,
+                        trailing: Icons.chevron_right_rounded,
+                        onTap: () => _pickLocationOnMap(sheetContext),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Location',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Divider(height: 1, color: Color(0xFFE8E8E8)),
-                const SizedBox(height: 20),
-                _buildLocationRow(
-                  icon: Icons.my_location_rounded,
-                  title: 'Use my current location',
-                  subtitle: 'Avenue des Frères Meslem, Sétif, Algérie',
-                  trailing: Icons.check_rounded,
-                  onTap: () => Navigator.pop(context),
-                ),
-                const SizedBox(height: 26),
-                _buildLocationRow(
-                  icon: Icons.map_outlined,
-                  title: 'Choose another location',
-                  trailing: Icons.chevron_right_rounded,
-                  onTap: () {},
-                ),
-                const SizedBox(height: 26),
-                _buildLocationRow(
-                  icon: Icons.add_rounded,
-                  title: 'Add a new address',
-                  trailing: Icons.chevron_right_rounded,
-                  onTap: () {},
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  /// Resolves the device position, reverse-geocodes it, and adopts it as the
+  /// delivery location.
+  Future<void> _useCurrentLocation(
+    BuildContext sheetContext,
+    StateSetter setSheetState,
+    AppStrings s,
+  ) async {
+    setState(() => _isLocating = true);
+    setSheetState(() {});
+
+    final point = await _deviceLocation.currentPosition();
+    String? address;
+    if (point != null) {
+      try {
+        address = await _deviceLocation.reverseGeocode(point);
+      } catch (_) {
+        // Keep the coordinate — an un-named point is still a usable one.
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isLocating = false;
+      if (point != null) {
+        _location = PickedLocation(
+          coordinate: point,
+          address: address?.trim().isNotEmpty == true
+              ? address!.trim()
+              : '${point.latitude.toStringAsFixed(5)}, '
+                    '${point.longitude.toStringAsFixed(5)}',
+        );
+      }
+    });
+
+    if (!sheetContext.mounted) return;
+    if (point == null) {
+      setSheetState(() {});
+      ScaffoldMessenger.of(
+        sheetContext,
+      ).showSnackBar(SnackBar(content: Text(s.locationUnavailable)));
+      return;
+    }
+    Navigator.pop(sheetContext);
+  }
+
+  /// Opens the full-screen map picker and adopts whatever the user confirms.
+  Future<void> _pickLocationOnMap(BuildContext sheetContext) async {
+    Navigator.pop(sheetContext);
+    final picked = await Navigator.push<PickedLocation>(
+      context,
+      SmoothPageRoute<PickedLocation>(
+        page: LocationPickerPage(initialLocation: _location),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _location = picked);
   }
 
   Widget _buildLocationRow({
@@ -491,7 +602,7 @@ class _HomePageState extends State<HomePage> {
     required String title,
     String? subtitle,
     required IconData trailing,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return InkWell(
       onTap: onTap,

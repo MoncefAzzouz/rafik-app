@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../onboarding/pages/onboarding_page.dart';
 import 'edit_profile_page.dart';
+import 'help_support_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -286,28 +290,27 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         _buildMenuDivider(),
                         _buildMenuTile(
-                          icon: Icons.add_circle_outline_rounded,
-                          label: 'Rafik Plus',
-                          iconColor: Colors.pink,
-                          badgeText: lang == AppLang.ar
-                              ? 'اشترك ووفّر'
-                              : lang == AppLang.fr
-                              ? 'Abonnez & économisez'
-                              : 'Subscribe & save',
-                          badgeColor: const Color(0xFFFFECEF),
-                          badgeTextColor: Colors.pink,
-                        ),
-                        _buildMenuDivider(),
-                        _buildMenuTile(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: s.profileHelp,
                           showArrow: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            SmoothPageRoute(page: const HelpSupportPage()),
+                          ),
+                        ),
+                        _buildMenuDivider(),
+                        _buildMenuTile(
+                          icon: Icons.privacy_tip_outlined,
+                          label: s.profilePrivacy,
+                          showArrow: true,
+                          onTap: () => _openPrivacyPolicy(context, s),
                         ),
                         _buildMenuDivider(),
                         _buildMenuTile(
                           icon: Icons.exit_to_app_rounded,
                           label: s.profileLogout,
                           iconColor: Colors.red.shade400,
+                          onTap: () => _confirmLogout(context, s),
                         ),
                       ],
                     ),
@@ -370,6 +373,70 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
+    );
+  }
+
+  static final Uri _privacyPolicyUrl = Uri.parse(
+    'https://rafik-algerie.com/privacy-policy',
+  );
+
+  Future<void> _openPrivacyPolicy(BuildContext context, AppStrings s) async {
+    final opened = await launchUrl(
+      _privacyPolicyUrl,
+      mode: LaunchMode.externalApplication,
+    );
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          s.lang == AppLang.ar
+              ? 'تعذّر فتح الرابط'
+              : s.lang == AppLang.fr
+              ? 'Impossible d\'ouvrir le lien'
+              : 'Could not open the link',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context, AppStrings s) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(s.profileLogout),
+        content: Text(
+          s.lang == AppLang.ar
+              ? 'هل أنت متأكد من رغبتك في تسجيل الخروج؟'
+              : s.lang == AppLang.fr
+              ? 'Voulez-vous vraiment vous déconnecter ?'
+              : 'Are you sure you want to log out?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(s.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(
+              s.profileLogout,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await AuthRepository.instance.logout();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardingPage()),
+      (route) => false,
     );
   }
 

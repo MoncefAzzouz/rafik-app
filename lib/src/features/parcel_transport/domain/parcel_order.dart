@@ -9,8 +9,12 @@ class ParcelOrder {
   final String? truckTypeName;
   final String pickupAddress;
   final String? pickupWilaya;
+  final double? pickupLat;
+  final double? pickupLng;
   final String destinationAddress;
   final String? destinationWilaya;
+  final double? destinationLat;
+  final double? destinationLng;
   final double? distanceKm;
   final String description;
   final String? invoiceStatus;
@@ -33,8 +37,12 @@ class ParcelOrder {
     this.truckTypeName,
     required this.pickupAddress,
     this.pickupWilaya,
+    this.pickupLat,
+    this.pickupLng,
     required this.destinationAddress,
     this.destinationWilaya,
+    this.destinationLat,
+    this.destinationLng,
     this.distanceKm,
     required this.description,
     this.invoiceStatus,
@@ -65,8 +73,12 @@ class ParcelOrder {
       truckTypeName: truckType?['name']?.toString(),
       pickupAddress: json['pickupAddress']?.toString() ?? '',
       pickupWilaya: json['pickupWilaya']?.toString(),
+      pickupLat: (json['pickupLat'] as num?)?.toDouble(),
+      pickupLng: (json['pickupLng'] as num?)?.toDouble(),
       destinationAddress: json['destinationAddress']?.toString() ?? '',
       destinationWilaya: json['destinationWilaya']?.toString(),
+      destinationLat: (json['destinationLat'] as num?)?.toDouble(),
+      destinationLng: (json['destinationLng'] as num?)?.toDouble(),
       distanceKm: (json['distanceKm'] as num?)?.toDouble(),
       description: json['description']?.toString() ?? '',
       invoiceStatus: json['invoiceStatus']?.toString(),

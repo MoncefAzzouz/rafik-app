@@ -103,7 +103,24 @@ class AppStrings {
       _s('الإشعارات', 'Notifications', 'Notifications');
   String get profileHelp =>
       _s('مساعدة ودعم', 'Aide & support', 'Help & Support');
+  String get profilePrivacy =>
+      _s('سياسة الخصوصية', 'Politique de confidentialité', 'Privacy Policy');
   String get profileLogout => _s('تسجيل الخروج', 'Déconnexion', 'Log Out');
+
+  // Help & Support
+  String get helpContactUs => _s('تواصل معنا', 'Contactez-nous', 'Contact Us');
+  String get helpContactSubtitle => _s(
+    'نحن هنا لمساعدتك، تواصل معنا عبر إحدى الطرق التالية',
+    'Nous sommes là pour vous aider, contactez-nous via l\'un des moyens suivants',
+    'We\'re here to help — reach us through any of the options below',
+  );
+  String get helpEmail => _s('البريد الإلكتروني', 'E-mail', 'Email');
+  String get helpPhone => _s('رقم الهاتف', 'Téléphone', 'Phone');
+  String get helpWebsite =>
+      _s('الموقع الإلكتروني', 'Site web', 'Website');
+
+  String get profileDeleteAccount =>
+      _s('حذف الحساب', 'Supprimer le compte', 'Delete Account');
 
   // Edit Profile
   String get editProfile =>
@@ -201,6 +218,38 @@ class AppStrings {
   String get vehFourgon => _s('فورغون', 'Fourgon', 'Fourgon');
   String get vehTruck => _s('شاحنة مغلقة', 'Camion', 'Truck');
   String get vehMoto => _s('دراجة نارية', 'Moto', 'Motorcycle');
+
+  // ── Location picker ───────────────────────────────────────────
+  String get locationSheetTitle => _s('الموقع', 'Localisation', 'Location');
+  String get locationUseCurrent => _s(
+    'استخدم موقعي الحالي',
+    'Utiliser ma position actuelle',
+    'Use my current location',
+  );
+  String get locationChooseOnMap => _s(
+    'اختر موقعاً على الخريطة',
+    'Choisir un lieu sur la carte',
+    'Choose another location',
+  );
+  String get locationDetecting =>
+      _s('جارٍ تحديد موقعك...', 'Localisation en cours...', 'Locating…');
+  String get locationUnavailable => _s(
+    'تعذّر تحديد موقعك الحالي',
+    'Impossible de déterminer votre position',
+    'Could not determine your location',
+  );
+  String get locationPickerHint => _s(
+    'حرّك الخريطة لتحديد الموقع',
+    'Déplacez la carte pour choisir le lieu',
+    'Move the map to pick a location',
+  );
+  String get locationPickerResolving => _s(
+    'جارٍ تحديد العنوان...',
+    'Recherche de l\'adresse...',
+    'Finding address…',
+  );
+  String get locationPickerConfirm =>
+      _s('تأكيد الموقع', 'Confirmer le lieu', 'Confirm location');
 
   // ── Language names ────────────────────────────────────────────
   String get langArabic => _s('العربية', 'Arabe', 'Arabic');

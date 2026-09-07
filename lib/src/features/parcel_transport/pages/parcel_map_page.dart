@@ -9,7 +9,7 @@ import 'parcel_details_page.dart';
 import 'parcel_vehicle_select_page.dart'; // import TruckTypeOption
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
-import '../domain/picked_location.dart';
+import '../../../core/location/picked_location.dart';
 
 class ParcelMapPage extends StatefulWidget {
   final String categoryId;

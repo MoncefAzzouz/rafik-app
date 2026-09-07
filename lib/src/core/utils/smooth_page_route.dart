@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class SmoothPageRoute extends PageRouteBuilder {
+class SmoothPageRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
 
   SmoothPageRoute({required this.page, super.settings})

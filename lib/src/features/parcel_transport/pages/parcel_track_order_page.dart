@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../data/parcel_order_repository.dart';
 import '../domain/parcel_order.dart';
@@ -22,6 +24,8 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
   late ParcelOrder _order;
   bool _isCancelling = false;
   Timer? _pollTimer;
+  final MapController _mapController = MapController();
+  bool _hasFitMapCamera = false;
 
   @override
   void initState() {
@@ -53,6 +57,7 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -289,6 +294,11 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
 
                         const SizedBox(height: 20),
 
+                        // ── Route Map ───────────────────────────────
+                        _buildRouteMapCard(),
+
+                        const SizedBox(height: 20),
+
                         // ── Map / Navigation Actions ───────────────────
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -508,6 +518,118 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
       default:
         return s.parcelStatusCancelled;
     }
+  }
+
+  Widget _buildRouteMapCard() {
+    final pickupLat = _order.pickupLat;
+    final pickupLng = _order.pickupLng;
+    final destLat = _order.destinationLat;
+    final destLng = _order.destinationLng;
+    final hasBothPoints =
+        pickupLat != null &&
+        pickupLng != null &&
+        destLat != null &&
+        destLng != null;
+
+    if (!hasBothPoints) {
+      return Container(
+        width: double.infinity,
+        height: 100,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Text(
+          'الخريطة غير متوفرة لهذا الطلب',
+          style: TextStyle(
+            color: Colors.grey.shade500,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      );
+    }
+
+    final pickupPoint = LatLng(pickupLat, pickupLng);
+    final destPoint = LatLng(destLat, destLng);
+
+    // Fit the camera to both points once — not on every poll-triggered
+    // rebuild, or the map would keep snapping back under the user's finger
+    // while they're panning around it.
+    if (!_hasFitMapCamera) {
+      _hasFitMapCamera = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          _mapController.fitCamera(
+            CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints([pickupPoint, destPoint]),
+              padding: const EdgeInsets.all(30),
+            ),
+          );
+        } catch (_) {
+          // Controller not attached yet — harmless, the map still renders
+          // centered on the pickup point via initialCenter below.
+        }
+      });
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: 180,
+        child: FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: pickupPoint,
+            initialZoom: 12,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.rafik_app',
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(
+                  points: [pickupPoint, destPoint],
+                  strokeWidth: 4,
+                  color: Colors.blue.shade600,
+                ),
+              ],
+            ),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: pickupPoint,
+                  width: 34,
+                  height: 34,
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.primary,
+                    size: 32,
+                  ),
+                ),
+                Marker(
+                  point: destPoint,
+                  width: 34,
+                  height: 34,
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Colors.black,
+                    size: 32,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMapActionButton({
