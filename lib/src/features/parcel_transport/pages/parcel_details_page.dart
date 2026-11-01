@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'parcel_vehicle_select_page.dart'; // import TruckTypeOption
 import 'parcel_summary_page.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../../core/widgets/cached_image.dart';
 
 class ParcelDetailsPage extends StatefulWidget {
   final String categoryId;
@@ -135,8 +136,9 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                     // Illustration of loading van
                     SizedBox(
                       height: 160,
-                      child: Image.network(
-                        'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400', // cargo loading mockup van
+                      child: CachedImage(
+                        url:
+                            'https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400', // cargo loading mockup van
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -510,6 +512,11 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                   fontWeight: FontWeight.w600,
                                 ),
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                filled: false,
                               ),
                               style: const TextStyle(
                                 color: Colors.black,
@@ -738,6 +745,11 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                                             fontWeight: FontWeight.w600,
                                           ),
                                           border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          errorBorder: InputBorder.none,
+                                          disabledBorder: InputBorder.none,
+                                          filled: false,
                                           isDense: true,
                                           contentPadding: EdgeInsets.zero,
                                         ),

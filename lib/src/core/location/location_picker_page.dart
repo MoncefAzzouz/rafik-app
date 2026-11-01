@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
 
 import '../l10n/app_strings.dart';
@@ -30,7 +30,7 @@ class LocationPickerPage extends StatefulWidget {
 }
 
 class _LocationPickerPageState extends State<LocationPickerPage> {
-  final MapController _mapController = MapController();
+  gmaps.GoogleMapController? _mapController;
   final DeviceLocationDataSource _deviceLocation = DeviceLocationDataSource();
 
   LatLng _center = LocationPickerPage.fallbackCenter;
@@ -61,8 +61,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   @override
   void dispose() {
     _geocodeDebounce?.cancel();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  gmaps.LatLng _toG(LatLng p) => gmaps.LatLng(p.latitude, p.longitude);
+
+  void _moveTo(LatLng point) {
+    _mapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(_toG(point), 16),
+    );
   }
 
   Future<void> _startAtDeviceLocation() async {
@@ -73,7 +81,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _isLocating = false;
       _center = location ?? LocationPickerPage.fallbackCenter;
     });
-    if (_mapReady) _mapController.move(_center, 16);
+    _moveTo(_center);
     _scheduleGeocode(_center);
   }
 
@@ -88,7 +96,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       ).showSnackBar(SnackBar(content: Text(s.locationUnavailable)));
       return;
     }
-    _mapController.move(location, 16);
+    _moveTo(location);
   }
 
   Future<String> _reverseGeocode(LatLng point) async {
@@ -123,14 +131,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     });
   }
 
-  void _onMapEvent(MapEvent event) {
+  /// Fires continuously while the map is dragged; the centre is only recorded
+  /// here and geocoded once the camera goes idle.
+  void _onCameraMove(gmaps.CameraPosition position) {
+    _center = LatLng(position.target.latitude, position.target.longitude);
+  }
+
+  void _onCameraIdle() {
     if (!_mapReady) return;
-    _center = _mapController.camera.center;
     _scheduleGeocode(_center);
   }
 
   Future<void> _confirm() async {
-    final center = _mapReady ? _mapController.camera.center : _center;
+    final center = _center;
     String address;
     if (_lastGeocodedPoint == center && _address != null) {
       address = _address!;
@@ -163,26 +176,29 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             body: Stack(
               children: [
                 Positioned.fill(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _center,
-                      initialZoom: 16,
-                      minZoom: 4,
-                      maxZoom: 19,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                      ),
-                      onMapReady: () => _mapReady = true,
-                      onMapEvent: _onMapEvent,
+                  child: gmaps.GoogleMap(
+                    initialCameraPosition: gmaps.CameraPosition(
+                      target: _toG(_center),
+                      zoom: 16,
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.rafik_app',
-                      ),
-                    ],
+                    minMaxZoomPreference: const gmaps.MinMaxZoomPreference(
+                      4,
+                      19,
+                    ),
+                    rotateGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                    mapToolbarEnabled: false,
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                      _mapReady = true;
+                      // The device fix may have landed before the map existed.
+                      _moveTo(_center);
+                    },
+                    onCameraMove: _onCameraMove,
+                    onCameraIdle: _onCameraIdle,
                   ),
                 ),
 
@@ -242,10 +258,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           const SizedBox(width: 12),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),

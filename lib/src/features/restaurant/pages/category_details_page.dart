@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 import 'restaurant_details_page.dart';
 
 class CategoryDetailsPage extends StatelessWidget {
@@ -174,12 +175,12 @@ class CategoryDetailsPage extends StatelessWidget {
                                     topLeft: Radius.circular(16),
                                     bottomLeft: Radius.circular(16),
                                   ),
-                                  child: Image.network(
-                                    store['image'],
+                                  child: CachedImage(
+                                    url: store['image'],
                                     width: 110,
                                     height: 120,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
+                                    errorBuilder: (context) {
                                       return Container(
                                         width: 110,
                                         color: Colors.grey.shade100,

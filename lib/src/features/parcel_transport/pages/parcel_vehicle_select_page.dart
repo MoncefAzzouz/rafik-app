@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'parcel_map_page.dart';
+import 'parcel_features_page.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/result/result.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../../core/widgets/cached_image.dart';
 
 /// A truck type nested under a [TruckCategory] (`GET /api/truck/categories`)
 /// — this is what gates which `truckTypeId` a `POST /api/truck/orders` call
@@ -51,6 +55,31 @@ class ParcelVehicleSelectPage extends StatefulWidget {
 
 class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
   String? _selectedTruckTypeId;
+  Map<String, List<TruckFeature>> _featuresByType = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeatures();
+  }
+
+  /// Features (e.g. Size) live on `GET /api/truck/types`, not on the nested
+  /// types of `/api/truck/categories`, so they're fetched separately.
+  Future<void> _loadFeatures() async {
+    final result = await ApiClient.instance.get('/api/truck/types');
+    if (result case Success(value: final data) when data is List) {
+      final map = <String, List<TruckFeature>>{};
+      for (final e in data) {
+        if (e is! Map<String, dynamic>) continue;
+        final features = (e['features'] as List? ?? const [])
+            .map((f) => TruckFeature.fromJson(f as Map<String, dynamic>))
+            .where((f) => f.options.isNotEmpty)
+            .toList();
+        map[e['id'].toString()] = features;
+      }
+      if (mounted) setState(() => _featuresByType = map);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,9 +206,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                             ),
                           )
                         : Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: GridView.builder(
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
@@ -201,9 +228,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                     });
                                   },
                                   child: AnimatedContainer(
-                                    duration: const Duration(
-                                      milliseconds: 200,
-                                    ),
+                                    duration: const Duration(milliseconds: 200),
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? AppColors.primary.withAlpha(12)
@@ -253,23 +278,20 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                                             BorderRadius.circular(
                                                               12,
                                                             ),
-                                                        child: Image.network(
-                                                          truckType.image!,
+                                                        child: CachedImage(
+                                                          url: truckType.image!,
                                                           width:
                                                               double.infinity,
                                                           fit: BoxFit.contain,
                                                           errorBuilder:
-                                                              (
-                                                                context,
-                                                                error,
-                                                                stackTrace,
-                                                              ) => const Icon(
-                                                                Icons
-                                                                    .local_shipping_outlined,
-                                                                size: 40,
-                                                                color: AppColors
-                                                                    .primary,
-                                                              ),
+                                                              (context) =>
+                                                                  const Icon(
+                                                                    Icons
+                                                                        .local_shipping_outlined,
+                                                                    size: 40,
+                                                                    color: AppColors
+                                                                        .primary,
+                                                                  ),
                                                         ),
                                                       )
                                                     : const Icon(
@@ -285,8 +307,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                                 truckType.name,
                                                 textAlign: TextAlign.center,
                                                 maxLines: 2,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: isSelected
                                                       ? AppColors.primary
@@ -308,11 +329,9 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
-                                                    color:
-                                                        Colors.grey.shade500,
+                                                    color: Colors.grey.shade500,
                                                     fontSize: 11,
-                                                    fontWeight:
-                                                        FontWeight.w600,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                               ],
@@ -324,9 +343,7 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                             top: 8,
                                             left: 8,
                                             child: Container(
-                                              padding: const EdgeInsets.all(
-                                                4,
-                                              ),
+                                              padding: const EdgeInsets.all(4),
                                               decoration: const BoxDecoration(
                                                 color: AppColors.primary,
                                                 shape: BoxShape.circle,
@@ -360,15 +377,23 @@ class _ParcelVehicleSelectPageState extends State<ParcelVehicleSelectPage> {
                                 final selected = widget.truckTypes.firstWhere(
                                   (t) => t.id == _selectedTruckTypeId,
                                 );
+                                final features =
+                                    _featuresByType[selected.id] ?? const [];
+                                final next = features.isEmpty
+                                    ? ParcelMapPage(
+                                        categoryId: widget.categoryId,
+                                        categoryName: widget.categoryName,
+                                        truckType: selected,
+                                      )
+                                    : ParcelFeaturesPage(
+                                        categoryId: widget.categoryId,
+                                        categoryName: widget.categoryName,
+                                        truckType: selected,
+                                        features: features,
+                                      );
                                 Navigator.push(
                                   context,
-                                  SmoothPageRoute(
-                                    page: ParcelMapPage(
-                                      categoryId: widget.categoryId,
-                                      categoryName: widget.categoryName,
-                                      truckType: selected,
-                                    ),
-                                  ),
+                                  SmoothPageRoute(page: next),
                                 );
                               },
                         style: ElevatedButton.styleFrom(

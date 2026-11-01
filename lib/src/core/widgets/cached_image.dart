@@ -7,7 +7,7 @@ import 'package:shimmer/shimmer.dart';
 /// placeholder while it's in flight instead of a blank box.
 class CachedImage extends StatelessWidget {
   final String url;
-  final Widget Function(BuildContext context) errorBuilder;
+  final Widget Function(BuildContext context)? errorBuilder;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -15,7 +15,7 @@ class CachedImage extends StatelessWidget {
   const CachedImage({
     super.key,
     required this.url,
-    required this.errorBuilder,
+    this.errorBuilder,
     this.fit = BoxFit.cover,
     this.width,
     this.height,
@@ -33,7 +33,9 @@ class CachedImage extends StatelessWidget {
         highlightColor: Colors.grey.shade100,
         child: Container(width: width, height: height, color: Colors.white),
       ),
-      errorWidget: (context, url, error) => errorBuilder(context),
+      errorWidget: (context, url, error) => errorBuilder != null
+          ? errorBuilder!(context)
+          : const Icon(Icons.broken_image_outlined, color: Colors.grey),
     );
   }
 }

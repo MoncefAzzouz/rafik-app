@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 import 'food_item_sheet.dart';
 import 'cart_page.dart';
 
@@ -121,12 +122,12 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                 // Top Cover Image
                 Stack(
                   children: [
-                    Image.network(
-                      widget.restaurantImage,
+                    CachedImage(
+                      url: widget.restaurantImage,
                       height: 220,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
+                      errorBuilder: (context) {
                         return Container(
                           height: 220,
                           color: Colors.grey.shade100,
@@ -694,12 +695,12 @@ class _RestaurantDetailsPageState extends State<RestaurantDetailsPage> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    item['image'],
+                                  child: CachedImage(
+                                    url: item['image'],
                                     width: 80,
                                     height: 80,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
+                                    errorBuilder: (context) {
                                       return Container(
                                         width: 80,
                                         height: 80,

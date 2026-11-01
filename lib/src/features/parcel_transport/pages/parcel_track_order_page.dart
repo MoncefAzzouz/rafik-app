@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../data/parcel_order_repository.dart';
 import '../domain/parcel_order.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/map/map_utils.dart';
 
 class ParcelTrackOrderPage extends StatefulWidget {
   final ParcelOrder order;
@@ -24,19 +27,31 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
   late ParcelOrder _order;
   bool _isCancelling = false;
   Timer? _pollTimer;
-  final MapController _mapController = MapController();
-  bool _hasFitMapCamera = false;
+  gmaps.GoogleMapController? _mapController;
+  gmaps.BitmapDescriptor? _pickupIcon;
+  gmaps.BitmapDescriptor? _destinationIcon;
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    _loadMarkerIcons();
     // The backend has no realtime push — poll while tracking this order so
     // status changes the driver makes (accepted/arrived/delivered/...) show
     // up here without the customer having to leave and reopen the screen.
     if (!_order.isArchived) {
       _pollTimer = Timer.periodic(_pollInterval, (_) => _refreshStatus());
     }
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final pickup = await MapIcons.pin(AppColors.primary, size: 34);
+    final destination = await MapIcons.pin(Colors.black, size: 34);
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = pickup;
+      _destinationIcon = destination;
+    });
   }
 
   Future<void> _refreshStatus() async {
@@ -57,7 +72,7 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
   @override
   void dispose() {
     _pollTimer?.cancel();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -555,78 +570,65 @@ class _ParcelTrackOrderPageState extends State<ParcelTrackOrderPage> {
     final pickupPoint = LatLng(pickupLat, pickupLng);
     final destPoint = LatLng(destLat, destLng);
 
-    // Fit the camera to both points once — not on every poll-triggered
-    // rebuild, or the map would keep snapping back under the user's finger
-    // while they're panning around it.
-    if (!_hasFitMapCamera) {
-      _hasFitMapCamera = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          _mapController.fitCamera(
-            CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints([pickupPoint, destPoint]),
-              padding: const EdgeInsets.all(30),
-            ),
-          );
-        } catch (_) {
-          // Controller not attached yet — harmless, the map still renders
-          // centered on the pickup point via initialCenter below.
-        }
-      });
-    }
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: SizedBox(
         height: 180,
-        child: FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: pickupPoint,
-            initialZoom: 12,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-            ),
+        child: gmaps.GoogleMap(
+          initialCameraPosition: gmaps.CameraPosition(
+            target: pickupPoint.g,
+            zoom: 12,
           ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.rafik_app',
+          // The card sits in a scrolling list — claim drags that start on the
+          // map so panning it doesn't scroll the page instead.
+          gestureRecognizers: {
+            Factory<OneSequenceGestureRecognizer>(
+              () => EagerGestureRecognizer(),
             ),
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: [pickupPoint, destPoint],
-                  strokeWidth: 4,
-                  color: Colors.blue.shade600,
-                ),
-              ],
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: pickupPoint,
-                  width: 34,
-                  height: 34,
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: AppColors.primary,
-                    size: 32,
+          },
+          rotateGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          myLocationButtonEnabled: false,
+          // Fit both points once on creation — not on every poll-triggered
+          // rebuild, or the map would snap back under the user's finger.
+          onMapCreated: (controller) {
+            _mapController = controller;
+            controller
+                .moveCamera(
+                  gmaps.CameraUpdate.newLatLngBounds(
+                    boundsOf([pickupPoint, destPoint]),
+                    30,
                   ),
-                ),
-                Marker(
-                  point: destPoint,
-                  width: 34,
-                  height: 34,
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: Colors.black,
-                    size: 32,
-                  ),
-                ),
-              ],
+                )
+                .catchError((_) {
+                  // Not laid out yet — the map still shows the pickup point
+                  // via its initial camera.
+                });
+          },
+          polylines: {
+            gmaps.Polyline(
+              polylineId: const gmaps.PolylineId('route'),
+              points: [pickupPoint.g, destPoint.g],
+              width: 4,
+              color: Colors.blue.shade600,
             ),
-          ],
+          },
+          markers: {
+            gmaps.Marker(
+              markerId: const gmaps.MarkerId('pickup'),
+              position: pickupPoint.g,
+              anchor: const Offset(0.5, 0.9),
+              icon: _pickupIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+            ),
+            gmaps.Marker(
+              markerId: const gmaps.MarkerId('destination'),
+              position: destPoint.g,
+              anchor: const Offset(0.5, 0.9),
+              icon: _destinationIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+            ),
+          },
         ),
       ),
     );

@@ -54,9 +54,9 @@ class AuthRepository extends ChangeNotifier {
             // Token really is invalid/expired — clear the session.
             await _clearSession();
           }
-          // Any other failure (no network, timeout, server hiccup) — keep
-          // the optimistic session; don't force logout just because the
-          // phone has no signal at launch.
+        // Any other failure (no network, timeout, server hiccup) — keep
+        // the optimistic session; don't force logout just because the
+        // phone has no signal at launch.
       }
     } finally {
       _isBootstrapping = false;
@@ -79,7 +79,9 @@ class AuthRepository extends ChangeNotifier {
     required String password,
     required String fullName,
   }) async {
-    debugPrint('[Auth] register → POST /api/auth/register (email: $email, phone: $phone)');
+    debugPrint(
+      '[Auth] register → POST /api/auth/register (email: $email, phone: $phone)',
+    );
     final result = await ApiClient.instance.post(
       '/api/auth/register',
       body: {
@@ -112,7 +114,9 @@ class AuthRepository extends ChangeNotifier {
         await _persistSession(token, user);
         return Success(user);
       case Failure(failure: final failure):
-        debugPrint('[Auth] $action ← failure (${failure.runtimeType}: ${failure.message})');
+        debugPrint(
+          '[Auth] $action ← failure (${failure.runtimeType}: ${failure.message})',
+        );
         return Failure(failure);
     }
   }

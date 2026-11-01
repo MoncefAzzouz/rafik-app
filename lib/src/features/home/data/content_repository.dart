@@ -55,10 +55,7 @@ class ContentRepository extends ChangeNotifier {
   Future<void> refreshPromos() async {
     final results = await Future.wait([
       ApiClient.instance.get('/api/app/promos'),
-      ApiClient.instance.get(
-        '/api/app/slides',
-        query: const {'type': 'promo'},
-      ),
+      ApiClient.instance.get('/api/app/slides', query: const {'type': 'promo'}),
     ]);
 
     var changed = false;

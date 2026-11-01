@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 
 class CartItem {
   final String name;
@@ -467,12 +468,12 @@ class _CartPageState extends State<CartPage>
         // Item Image
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            item.image,
+          child: CachedImage(
+            url: item.image,
             width: 56,
             height: 56,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
+            errorBuilder: (context) {
               return Container(
                 width: 56,
                 height: 56,

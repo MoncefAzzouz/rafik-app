@@ -280,16 +280,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                         _buildMenuDivider(),
                         _buildMenuTile(
-                          icon: Icons.star_border_rounded,
-                          label: lang == AppLang.ar
-                              ? 'المفضلة'
-                              : lang == AppLang.fr
-                              ? 'Favoris'
-                              : 'Favorites',
-                          showArrow: true,
-                        ),
-                        _buildMenuDivider(),
-                        _buildMenuTile(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: s.profileHelp,
                           showArrow: true,

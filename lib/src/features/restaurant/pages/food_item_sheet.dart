@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 
 class FoodItemSheet extends StatefulWidget {
   final String name;
@@ -94,12 +95,12 @@ class _FoodItemSheetState extends State<FoodItemSheet> {
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(20),
                         ),
-                        child: Image.network(
-                          widget.image,
+                        child: CachedImage(
+                          url: widget.image,
                           height: 240,
                           width: double.infinity,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
+                          errorBuilder: (context) {
                             return Container(
                               height: 240,
                               color: Colors.grey.shade100,

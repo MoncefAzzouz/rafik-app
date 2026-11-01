@@ -53,8 +53,11 @@ class AppStrings {
   String get search => _s('بحث', 'Rechercher', 'Search');
   String get noResults => _s('لا توجد نتائج', 'Aucun résultat', 'No results');
   String get retry => _s('إعادة المحاولة', 'Réessayer', 'Retry');
-  String get errorGeneric =>
-      _s('حدث خطأ ما، حاول مجدداً', 'Une erreur est survenue', 'Something went wrong');
+  String get errorGeneric => _s(
+    'حدث خطأ ما، حاول مجدداً',
+    'Une erreur est survenue',
+    'Something went wrong',
+  );
 
   // ── Bottom Nav ────────────────────────────────────────────────
   String get navHome => _s('الرئيسية', 'Accueil', 'Home');
@@ -116,8 +119,7 @@ class AppStrings {
   );
   String get helpEmail => _s('البريد الإلكتروني', 'E-mail', 'Email');
   String get helpPhone => _s('رقم الهاتف', 'Téléphone', 'Phone');
-  String get helpWebsite =>
-      _s('الموقع الإلكتروني', 'Site web', 'Website');
+  String get helpWebsite => _s('الموقع الإلكتروني', 'Site web', 'Website');
 
   String get profileDeleteAccount =>
       _s('حذف الحساب', 'Supprimer le compte', 'Delete Account');
@@ -163,19 +165,32 @@ class AppStrings {
   String get parcelReorder => _s('إعادة الطلب', 'Re-commander', 'Reorder');
 
   // ── Parcel Tracking ───────────────────────────────────────────
-  String get parcelTrackTitle => _s('تتبع الطلب', 'Suivi de commande', 'Track Order');
-  String get parcelStatusAssigned => _s('تم تعيين السائق', 'Chauffeur assigné', 'Driver assigned');
-  String get parcelStatusInTransit => _s('في الطريق إليك', 'En transit', 'In transit');
-  String get parcelStatusDelivering => _s('جاري التوصيل', 'En cours de livraison', 'Out for delivery');
-  String get parcelStatusDelivered => _s('تم التوصيل بنجاح', 'Livré avec succès', 'Delivered successfully');
-  String get parcelStepCreated => _s('تم إنشاء الطلب', 'Commande créée', 'Order created');
-  String get parcelStepAssigned => _s('تم قبول الطلب', 'Accepté par le chauffeur', 'Accepted by driver');
-  String get parcelStepPickedUp => _s('تم استلام الشحنة', 'Colis récupéré', 'Package picked up');
-  String get parcelStepDelivering => _s('جاري التوصيل', 'En cours de livraison', 'Delivering');
-  String get parcelStepCompleted => _s('تم التسليم بنجاح', 'Livré', 'Delivered');
-  String get parcelCallDriver => _s('الاتصال بالسائق', 'Appeler', 'Call driver');
-  String get parcelMessageDriver => _s('مراسلة السائق', 'Message', 'Message driver');
-  String get parcelDriverInfo => _s('معلومات السائق', 'Chauffeur', 'Driver details');
+  String get parcelTrackTitle =>
+      _s('تتبع الطلب', 'Suivi de commande', 'Track Order');
+  String get parcelStatusAssigned =>
+      _s('تم تعيين السائق', 'Chauffeur assigné', 'Driver assigned');
+  String get parcelStatusInTransit =>
+      _s('في الطريق إليك', 'En transit', 'In transit');
+  String get parcelStatusDelivering =>
+      _s('جاري التوصيل', 'En cours de livraison', 'Out for delivery');
+  String get parcelStatusDelivered =>
+      _s('تم التوصيل بنجاح', 'Livré avec succès', 'Delivered successfully');
+  String get parcelStepCreated =>
+      _s('تم إنشاء الطلب', 'Commande créée', 'Order created');
+  String get parcelStepAssigned =>
+      _s('تم قبول الطلب', 'Accepté par le chauffeur', 'Accepted by driver');
+  String get parcelStepPickedUp =>
+      _s('تم استلام الشحنة', 'Colis récupéré', 'Package picked up');
+  String get parcelStepDelivering =>
+      _s('جاري التوصيل', 'En cours de livraison', 'Delivering');
+  String get parcelStepCompleted =>
+      _s('تم التسليم بنجاح', 'Livré', 'Delivered');
+  String get parcelCallDriver =>
+      _s('الاتصال بالسائق', 'Appeler', 'Call driver');
+  String get parcelMessageDriver =>
+      _s('مراسلة السائق', 'Message', 'Message driver');
+  String get parcelDriverInfo =>
+      _s('معلومات السائق', 'Chauffeur', 'Driver details');
   String get parcelStatusCancelled =>
       _s('تم إلغاء الطلب', 'Commande annulée', 'Order cancelled');
   String get parcelOpenDirections =>
@@ -199,21 +214,22 @@ class AppStrings {
       _s('مواد البناء', 'Matériaux de construction', 'Construction materials');
   String get catHeavyEquipment =>
       _s('معدات ثقيلة', 'Équipement lourd', 'Heavy equipment');
-  String get catRefrigerated => _s(
-      'بضائع مبرّدة', 'Marchandise réfrigérée', 'Refrigerated merchandise');
+  String get catRefrigerated =>
+      _s('بضائع مبرّدة', 'Marchandise réfrigérée', 'Refrigerated merchandise');
   String get catWater => _s('مياه وخزانات', 'Eau', 'Water');
-  String get catFuelsChemicals => _s(
-      'وقود ومواد كيميائية', 'Carburants & chimie', 'Fuels and chemicals');
+  String get catFuelsChemicals =>
+      _s('وقود ومواد كيميائية', 'Carburants & chimie', 'Fuels and chemicals');
   String get catOther => _s('أخرى', 'Autre', 'Other');
 
   // ── Parcel Vehicles ───────────────────────────────────────────
+  String get truckFeatures => _s('المميزات', 'Caractéristiques', 'Features');
   String get vehicleTypeTitle =>
       _s('نوع المركبة', 'Type de véhicule', 'Vehicle type');
   String get vehicleTypeSubtitle => _s(
-        'اختر نوع الشاحنة المناسب لشحنتك',
-        'Choisissez le véhicule adapté à votre cargaison',
-        'Choose the vehicle suitable for your cargo',
-      );
+    'اختر نوع الشاحنة المناسب لشحنتك',
+    'Choisissez le véhicule adapté à votre cargaison',
+    'Choose the vehicle suitable for your cargo',
+  );
   String get vehHarbin => _s('هاربين', 'Harbin', 'Harbin');
   String get vehFourgon => _s('فورغون', 'Fourgon', 'Fourgon');
   String get vehTruck => _s('شاحنة مغلقة', 'Camion', 'Truck');

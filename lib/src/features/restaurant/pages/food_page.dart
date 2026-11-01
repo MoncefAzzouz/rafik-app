@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 import 'category_details_page.dart';
 import 'restaurant_details_page.dart';
 
@@ -267,20 +268,19 @@ class _FoodPageState extends State<FoodPage> {
                                           ],
                                         ),
                                         child: ClipOval(
-                                          child: Image.network(
-                                            cat['image']!,
+                                          child: CachedImage(
+                                            url: cat['image']!,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Container(
-                                                    color: Colors.grey.shade200,
-                                                    child: const Icon(
-                                                      Icons.fastfood_rounded,
-                                                      color: AppColors
-                                                          .textSecondary,
-                                                    ),
-                                                  );
-                                                },
+                                            errorBuilder: (context) {
+                                              return Container(
+                                                color: Colors.grey.shade200,
+                                                child: const Icon(
+                                                  Icons.fastfood_rounded,
+                                                  color: AppColors
+                                                      .textSecondary,
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ),
                                       ),
@@ -465,26 +465,23 @@ class _FoodPageState extends State<FoodPage> {
                                                 const BorderRadius.vertical(
                                                   top: Radius.circular(20),
                                                 ),
-                                            child: Image.network(
-                                              offer['image'],
+                                            child: CachedImage(
+                                              url: offer['image'],
                                               height: 120,
                                               width: double.infinity,
                                               fit: BoxFit.cover,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                    return Container(
-                                                      height: 120,
-                                                      color:
-                                                          Colors.grey.shade200,
-                                                      child: const Icon(
-                                                        Icons
-                                                            .restaurant_rounded,
-                                                        color: AppColors
-                                                            .textSecondary,
-                                                        size: 40,
-                                                      ),
-                                                    );
-                                                  },
+                                              errorBuilder: (context) {
+                                                return Container(
+                                                  height: 120,
+                                                  color: Colors.grey.shade200,
+                                                  child: const Icon(
+                                                    Icons.restaurant_rounded,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    size: 40,
+                                                  ),
+                                                );
+                                              },
                                             ),
                                           ),
                                           Positioned(
@@ -729,24 +726,22 @@ class _FoodPageState extends State<FoodPage> {
                                   children: [
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        item['image'],
+                                      child: CachedImage(
+                                        url: item['image'],
                                         height: 72,
                                         width: 72,
                                         fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                              return Container(
-                                                height: 72,
-                                                width: 72,
-                                                color: Colors.grey.shade200,
-                                                child: const Icon(
-                                                  Icons.storefront_rounded,
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                ),
-                                              );
-                                            },
+                                        errorBuilder: (context) {
+                                          return Container(
+                                            height: 72,
+                                            width: 72,
+                                            color: Colors.grey.shade200,
+                                            child: const Icon(
+                                              Icons.storefront_rounded,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ),
                                     const SizedBox(width: 14),

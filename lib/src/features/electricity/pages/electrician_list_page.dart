@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 import 'electrician_detail_page.dart';
 
 class Electrician {
@@ -229,8 +230,8 @@ class _ElectricianListPageState extends State<ElectricianListPage> {
                                 // Electrician Photo
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  child: Image.network(
-                                    electrician.image,
+                                  child: CachedImage(
+                                    url: electrician.image,
                                     width: 80,
                                     height: 90,
                                     fit: BoxFit.cover,

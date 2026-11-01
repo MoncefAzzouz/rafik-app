@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cached_image.dart';
 import 'electrician_list_page.dart'; // import Electrician model
 
 class ElectricianDetailPage extends StatefulWidget {
@@ -121,8 +122,8 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
                 // Hero Image & Gradient Overlay
                 Stack(
                   children: [
-                    Image.network(
-                      e.image,
+                    CachedImage(
+                      url: e.image,
                       width: double.infinity,
                       height: 320,
                       fit: BoxFit.cover,
@@ -296,8 +297,8 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
                             },
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: Image.network(
-                                e.workImages[index],
+                              child: CachedImage(
+                                url: e.workImages[index],
                                 fit: BoxFit.cover,
                               ),
                             ),
@@ -451,8 +452,8 @@ class _ElectricianDetailPageState extends State<ElectricianDetailPage> {
               child: InteractiveViewer(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    imageUrl,
+                  child: CachedImage(
+                    url: imageUrl,
                     fit: BoxFit.contain,
                     width: double.infinity,
                     height: double.infinity,

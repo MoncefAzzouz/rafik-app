@@ -93,8 +93,7 @@ class ParcelOrder {
       mapsPickupUrl: maps?['pickupMapUrl']?.toString(),
       mapsDestinationUrl: maps?['destinationMapUrl']?.toString(),
       createdAt: json['createdAt'] != null
-          ? (DateTime.tryParse(json['createdAt'].toString()) ??
-              DateTime.now())
+          ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
           : DateTime.now(),
     );
   }

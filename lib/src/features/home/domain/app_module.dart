@@ -34,7 +34,10 @@ class AppModule {
   /// [refId]) — it's still the truck/parcel feature, just finer-grained, so
   /// it routes to the same place as a plain `truck` module.
   bool get hasWiredDestination =>
-      type == 'truck' || type == 'truck_category' || type == 'taxi' || type == 'food';
+      type == 'truck' ||
+      type == 'truck_category' ||
+      type == 'taxi' ||
+      type == 'food';
 
   /// `truck` and `truck_category` both open the parcel/truck flow.
   bool get isTruck => type == 'truck' || type == 'truck_category';

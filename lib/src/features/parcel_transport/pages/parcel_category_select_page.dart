@@ -5,6 +5,7 @@ import '../../../core/result/result.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/utils/smooth_page_route.dart';
+import '../../../core/widgets/cached_image.dart';
 
 /// A truck category from `GET /api/truck/categories`, with its nested,
 /// allowed `truckTypes` — booking requires picking a category first since
@@ -231,10 +232,7 @@ class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
 
     if (_categories.isEmpty) {
       return Center(
-        child: Text(
-          s.noResults,
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
+        child: Text(s.noResults, style: TextStyle(color: Colors.grey.shade600)),
       );
     }
 
@@ -283,15 +281,14 @@ class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
                   child: category.image != null && category.image!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            category.image!,
+                          child: CachedImage(
+                            url: category.image!,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Icon(
-                                  Icons.local_shipping_rounded,
-                                  color: colors[0],
-                                  size: 28,
-                                ),
+                            errorBuilder: (context) => Icon(
+                              Icons.local_shipping_rounded,
+                              color: colors[0],
+                              size: 28,
+                            ),
                           ),
                         )
                       : Icon(

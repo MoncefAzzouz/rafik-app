@@ -177,10 +177,7 @@ class _OffersPageState extends State<OffersPage> {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withAlpha(160),
-                        Colors.transparent,
-                      ],
+                      colors: [Colors.black.withAlpha(160), Colors.transparent],
                     ),
                   ),
                 ),
@@ -224,7 +221,6 @@ class _OffersPageState extends State<OffersPage> {
       ),
     );
   }
-
 
   Widget _buildServiceCard({
     required IconData icon,

@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:latlong2/latlong.dart' show LatLng;
+import '../../../core/map/map_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/taxi_location_service.dart';
 
@@ -29,7 +30,13 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   bool _pickingSource = false; // true if picking source, false if destination
 
   // Real map & location state
-  final MapController _mapController = MapController();
+  gmaps.GoogleMapController? _mapController;
+  // Latest camera centre, tracked from the map's camera callbacks.
+  LatLng _mapCenter = kSetifCenter;
+  gmaps.BitmapDescriptor? _taxiIcon;
+  gmaps.BitmapDescriptor? _userDotIcon;
+  gmaps.BitmapDescriptor? _sourceIcon;
+  gmaps.BitmapDescriptor? _destinationIcon;
   final TaxiLocationService _locationService = TaxiLocationService();
   String _sourceAddress = "";
   String _destinationAddress = "";
@@ -75,12 +82,37 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
       duration: const Duration(milliseconds: 600),
     )..repeat(reverse: true);
 
+    _loadMarkerIcons();
     _initLocation();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final icons = await Future.wait([
+      MapIcons.asset('assets/icons/tAxos.png', size: 34),
+      MapIcons.dot(AppColors.electricBlue, size: 22),
+      MapIcons.ring(AppColors.cyan),
+      MapIcons.ring(AppColors.primary),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _taxiIcon = icons[0];
+      _userDotIcon = icons[1];
+      _sourceIcon = icons[2];
+      _destinationIcon = icons[3];
+    });
+  }
+
+  void _moveCamera(LatLng point, double zoom) {
+    _mapCenter = point;
+    _mapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(point.g, zoom),
+    );
   }
 
   @override
   void dispose() {
     _geocodeDebounce?.cancel();
+    _mapController?.dispose();
     _pulseAnimationController.dispose();
     _pinHoverController.dispose();
     _destinationInputController.dispose();
@@ -100,7 +132,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
       _sourceAddress = address;
       _scatterTaxis(center);
     });
-    _mapController.move(center, 15);
+    _moveCamera(center, 15);
   }
 
   // Place mock taxis at small random offsets around a point
@@ -116,11 +148,15 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
   }
 
   // Reverse-geocode the map center while the user pans the picker (debounced)
-  void _onMapEvent(MapEvent event) {
+  void _onCameraMove(gmaps.CameraPosition position) {
+    _mapCenter = position.target.app;
+  }
+
+  void _onCameraIdle() {
     if (_currentState != TaxiState.mapPicker) return;
     _geocodeDebounce?.cancel();
     _geocodeDebounce = Timer(const Duration(milliseconds: 400), () async {
-      final center = _mapController.camera.center;
+      final center = _mapCenter;
       final address = await _locationService.reverseGeocode(center);
       if (mounted && _currentState == TaxiState.mapPicker) {
         setState(() => _pickerAddress = address);
@@ -143,12 +179,12 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     final target = isSource
         ? _sourceCoord
         : (_destinationCoord ?? _sourceCoord);
-    _mapController.move(target, 16);
+    _moveCamera(target, 16);
   }
 
   // Handle Map Picker Confirm
   Future<void> _confirmLocation() async {
-    final pickedCoord = _mapController.camera.center;
+    final pickedCoord = _mapCenter;
     final address =
         _pickerAddress ?? await _locationService.reverseGeocode(pickedCoord);
     if (!mounted) return;
@@ -185,10 +221,10 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
       _routeDistanceMeters = route.distanceMeters;
       _routeDurationSeconds = route.durationSeconds;
     });
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: LatLngBounds.fromPoints([_sourceCoord, destination]),
-        padding: const EdgeInsets.fromLTRB(50, 140, 50, 330),
+    _mapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngBounds(
+        boundsOf([_sourceCoord, destination]),
+        50,
       ),
     );
   }
@@ -244,7 +280,7 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
       _routeDistanceMeters = null;
       _routeDurationSeconds = null;
     });
-    _mapController.move(_sourceCoord, 15);
+    _moveCamera(_sourceCoord, 15);
   }
 
   // Recenter the map on the device's real GPS position
@@ -253,9 +289,9 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
     if (!mounted) return;
     if (position != null) {
       setState(() => _userLocation = position);
-      _mapController.move(position, 16);
+      _moveCamera(position, 16);
     } else {
-      _mapController.move(_sourceCoord, 15);
+      _moveCamera(_sourceCoord, 15);
     }
   }
 
@@ -328,114 +364,81 @@ class _TaxiBookingPageState extends State<TaxiBookingPage>
             _currentState == TaxiState.searching ||
             _currentState == TaxiState.driverFound);
 
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _sourceCoord,
-        initialZoom: 15,
-        minZoom: 4,
-        maxZoom: 19,
-        interactionOptions: InteractionOptions(
-          flags: interactive
-              ? InteractiveFlag.all & ~InteractiveFlag.rotate
-              : InteractiveFlag.none,
-        ),
-        onMapEvent: _onMapEvent,
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.rafik_app',
-        ),
-        if (showRoute && _routePoints.isNotEmpty)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: _routePoints,
-                strokeWidth: 10,
-                color: AppColors.primary.withAlpha(45),
-              ),
-              Polyline(
-                points: _routePoints,
-                strokeWidth: 6,
-                color: AppColors.primary,
-              ),
-            ],
-          ),
-        MarkerLayer(
-          markers: [
-            for (final taxi in _nearbyTaxis)
-              Marker(
-                point: taxi,
-                width: 34,
-                height: 34,
-                child: Image.asset(
-                  'assets/icons/tAxos.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            if (_userLocation != null)
-              Marker(
-                point: _userLocation!,
-                width: 22,
-                height: 22,
-                child: _buildUserLocationDot(),
-              ),
-            if (showRoute) ...[
-              Marker(
-                point: _sourceCoord,
-                width: 24,
-                height: 24,
-                child: _buildRingPin(AppColors.cyan),
-              ),
-              Marker(
-                point: destination,
-                width: 24,
-                height: 24,
-                child: _buildRingPin(AppColors.primary),
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
+    // Leave room for the top bar and the bottom sheet when fitting the route.
+    final bool hasSheet =
+        _currentState == TaxiState.rideDetails ||
+        _currentState == TaxiState.searching ||
+        _currentState == TaxiState.driverFound;
 
-  Widget _buildUserLocationDot() {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.electricBlue,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+    return gmaps.GoogleMap(
+      initialCameraPosition: gmaps.CameraPosition(
+        target: _sourceCoord.g,
+        zoom: 15,
       ),
-    );
-  }
-
-  Widget _buildRingPin(Color color) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-      ),
-      child: Center(
-        child: Container(
-          width: 14,
-          height: 14,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
+      padding: hasSheet
+          ? const EdgeInsets.fromLTRB(0, 140, 0, 330)
+          : EdgeInsets.zero,
+      minMaxZoomPreference: const gmaps.MinMaxZoomPreference(4, 19),
+      scrollGesturesEnabled: interactive,
+      zoomGesturesEnabled: interactive,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      myLocationButtonEnabled: false,
+      onMapCreated: (controller) {
+        _mapController = controller;
+        // The GPS fix may have arrived before the map existed.
+        _moveCamera(_sourceCoord, 15);
+      },
+      onCameraMove: _onCameraMove,
+      onCameraIdle: _onCameraIdle,
+      polylines: {
+        if (showRoute && _routePoints.isNotEmpty) ...{
+          gmaps.Polyline(
+            polylineId: const gmaps.PolylineId('route-halo'),
+            points: [for (final p in _routePoints) p.g],
+            width: 10,
+            color: AppColors.primary.withAlpha(45),
           ),
-          child: Center(
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-            ),
+          gmaps.Polyline(
+            polylineId: const gmaps.PolylineId('route'),
+            points: [for (final p in _routePoints) p.g],
+            width: 6,
+            color: AppColors.primary,
           ),
-        ),
-      ),
+        },
+      },
+      markers: {
+        for (final (i, taxi) in _nearbyTaxis.indexed)
+          gmaps.Marker(
+            markerId: gmaps.MarkerId('taxi-$i'),
+            position: taxi.g,
+            anchor: const Offset(0.5, 0.5),
+            icon: _taxiIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+          ),
+        if (_userLocation != null)
+          gmaps.Marker(
+            markerId: const gmaps.MarkerId('user'),
+            position: _userLocation!.g,
+            anchor: const Offset(0.5, 0.5),
+            icon: _userDotIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+          ),
+        if (showRoute) ...{
+          gmaps.Marker(
+            markerId: const gmaps.MarkerId('source'),
+            position: _sourceCoord.g,
+            anchor: const Offset(0.5, 0.5),
+            icon: _sourceIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+          ),
+          gmaps.Marker(
+            markerId: const gmaps.MarkerId('destination'),
+            position: destination.g,
+            anchor: const Offset(0.5, 0.5),
+            icon: _destinationIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+          ),
+        },
+      },
     );
   }
 

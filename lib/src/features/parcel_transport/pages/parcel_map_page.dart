@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,6 +10,7 @@ import 'parcel_vehicle_select_page.dart'; // import TruckTypeOption
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/smooth_page_route.dart';
 import '../../../core/location/picked_location.dart';
+import '../../../core/map/map_utils.dart';
 
 class ParcelMapPage extends StatefulWidget {
   final String categoryId;
@@ -32,8 +33,10 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
   // and neither point has been picked yet.
   static const _fallbackCenter = LatLng(36.75, 3.06);
 
-  final MapController _overviewMapController = MapController();
-  final MapController _pickerMapController = MapController();
+  gmaps.GoogleMapController? _overviewMapController;
+  gmaps.GoogleMapController? _pickerMapController;
+  gmaps.BitmapDescriptor? _pickupIcon;
+  gmaps.BitmapDescriptor? _destinationIcon;
   final Geocoding _geocoder = Geocoding();
 
   PickedLocation? _pickup;
@@ -46,14 +49,31 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
   LatLng? _lastGeocodedPoint;
   bool _isGeocoding = false;
   bool _isLocating = false;
+  bool _pickerCameraMoved = false;
   int _geocodeRequestId = 0;
   Timer? _geocodeDebounce;
 
   @override
+  void initState() {
+    super.initState();
+    _loadMarkerIcons();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final pickup = await MapIcons.pin(AppColors.primary);
+    final destination = await MapIcons.pin(Colors.black);
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = pickup;
+      _destinationIcon = destination;
+    });
+  }
+
+  @override
   void dispose() {
     _geocodeDebounce?.cancel();
-    _overviewMapController.dispose();
-    _pickerMapController.dispose();
+    _overviewMapController?.dispose();
+    _pickerMapController?.dispose();
     super.dispose();
   }
 
@@ -162,13 +182,12 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
       _pickerCenter = startCenter;
       _pickerAddress = existing?.address;
       _lastGeocodedPoint = existing?.coordinate;
+      _pickerCameraMoved = false;
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _pickerMapController.move(startCenter, 15);
-      if (existing == null) _scheduleGeocode(startCenter);
-    });
+    // The picker map opens on [startCenter] (its initial camera), so only the
+    // address lookup is left to do.
+    if (existing == null) _scheduleGeocode(startCenter);
   }
 
   Future<void> _recenterPickerOnDevice() async {
@@ -177,22 +196,29 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
     if (!mounted) return;
     setState(() => _isLocating = false);
     if (location == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تحديد موقعك الحالي')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذر تحديد موقعك الحالي')));
       return;
     }
-    _pickerMapController.move(location, 16);
+    _pickerMapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(location.g, 16),
+    );
   }
 
-  void _onPickerMapEvent(MapEvent event) {
+  void _onPickerCameraMove(gmaps.CameraPosition position) {
     if (!_isPicking) return;
-    _pickerCenter = _pickerMapController.camera.center;
+    _pickerCameraMoved = true;
+    _pickerCenter = position.target.app;
+  }
+
+  void _onPickerCameraIdle() {
+    if (!_isPicking || !_pickerCameraMoved) return;
     _scheduleGeocode(_pickerCenter);
   }
 
   Future<void> _confirmPicker() async {
-    final center = _pickerMapController.camera.center;
+    final center = _pickerCenter;
     String address;
     if (_lastGeocodedPoint == center && _pickerAddress != null) {
       address = _pickerAddress!;
@@ -228,16 +254,20 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (pickup != null && destination != null) {
-        _overviewMapController.fitCamera(
-          CameraFit.bounds(
-            bounds: LatLngBounds.fromPoints([pickup, destination]),
-            padding: const EdgeInsets.fromLTRB(50, 100, 50, 360),
+        _overviewMapController?.animateCamera(
+          gmaps.CameraUpdate.newLatLngBounds(
+            boundsOf([pickup, destination]),
+            50,
           ),
         );
       } else if (pickup != null) {
-        _overviewMapController.move(pickup, 13);
+        _overviewMapController?.animateCamera(
+          gmaps.CameraUpdate.newLatLngZoom(pickup.g, 13),
+        );
       } else if (destination != null) {
-        _overviewMapController.move(destination, 13);
+        _overviewMapController?.animateCamera(
+          gmaps.CameraUpdate.newLatLngZoom(destination.g, 13),
+        );
       }
     });
   }
@@ -270,56 +300,46 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
     return Stack(
       children: [
         Positioned.fill(
-          child: FlutterMap(
-            mapController: _overviewMapController,
-            options: const MapOptions(
-              initialCenter: _fallbackCenter,
-              initialZoom: 11,
-              minZoom: 4,
-              maxZoom: 19,
+          child: gmaps.GoogleMap(
+            initialCameraPosition: gmaps.CameraPosition(
+              target: _fallbackCenter.g,
+              zoom: 11,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.rafik_app',
-              ),
+            // Keeps pins and the route clear of the top bar and bottom card.
+            padding: const EdgeInsets.fromLTRB(0, 100, 0, 360),
+            minMaxZoomPreference: const gmaps.MinMaxZoomPreference(4, 19),
+            rotateGesturesEnabled: false,
+            tiltGesturesEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            myLocationButtonEnabled: false,
+            onMapCreated: (controller) => _overviewMapController = controller,
+            polylines: {
               if (routePoints.length == 2)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: routePoints,
-                      strokeWidth: 6,
-                      color: Colors.blue.shade600,
-                    ),
-                  ],
+                gmaps.Polyline(
+                  polylineId: const gmaps.PolylineId('route'),
+                  points: [for (final p in routePoints) p.g],
+                  width: 6,
+                  color: Colors.blue.shade600,
                 ),
-              MarkerLayer(
-                markers: [
-                  if (pickupPoint != null)
-                    Marker(
-                      point: pickupPoint,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.location_on_rounded,
-                        color: AppColors.primary,
-                        size: 38,
-                      ),
-                    ),
-                  if (destinationPoint != null)
-                    Marker(
-                      point: destinationPoint,
-                      width: 40,
-                      height: 40,
-                      child: const Icon(
-                        Icons.location_on_rounded,
-                        color: Colors.black,
-                        size: 38,
-                      ),
-                    ),
-                ],
-              ),
-            ],
+            },
+            markers: {
+              if (pickupPoint != null)
+                gmaps.Marker(
+                  markerId: const gmaps.MarkerId('pickup'),
+                  position: pickupPoint.g,
+                  anchor: const Offset(0.5, 0.9),
+                  icon: _pickupIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+                ),
+              if (destinationPoint != null)
+                gmaps.Marker(
+                  markerId: const gmaps.MarkerId('destination'),
+                  position: destinationPoint.g,
+                  anchor: const Offset(0.5, 0.9),
+                  icon:
+                      _destinationIcon ?? gmaps.BitmapDescriptor.defaultMarker,
+                ),
+            },
           ),
         ),
 
@@ -422,8 +442,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
                                     pickupAddress: _pickup!.address,
                                     pickupLat: _pickup!.coordinate.latitude,
                                     pickupLng: _pickup!.coordinate.longitude,
-                                    destinationAddress:
-                                        _destination!.address,
+                                    destinationAddress: _destination!.address,
                                     destinationLat:
                                         _destination!.coordinate.latitude,
                                     destinationLng:
@@ -518,24 +537,21 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
     return Stack(
       children: [
         Positioned.fill(
-          child: FlutterMap(
-            mapController: _pickerMapController,
-            options: MapOptions(
-              initialCenter: _pickerCenter,
-              initialZoom: 15,
-              minZoom: 4,
-              maxZoom: 19,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-              onMapEvent: _onPickerMapEvent,
+          child: gmaps.GoogleMap(
+            initialCameraPosition: gmaps.CameraPosition(
+              target: _pickerCenter.g,
+              zoom: 15,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.rafik_app',
-              ),
-            ],
+            minMaxZoomPreference: const gmaps.MinMaxZoomPreference(4, 19),
+            rotateGesturesEnabled: false,
+            tiltGesturesEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            onMapCreated: (controller) => _pickerMapController = controller,
+            onCameraMove: _onPickerCameraMove,
+            onCameraIdle: _onPickerCameraIdle,
           ),
         ),
 

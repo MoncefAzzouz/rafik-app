@@ -11,7 +11,6 @@ import '../../auth/data/auth_repository.dart';
 import '../../auth/pages/login_page.dart';
 import '../data/parcel_order_repository.dart';
 
-
 class ParcelDashboardPage extends StatefulWidget {
   const ParcelDashboardPage({super.key});
 
@@ -60,10 +59,9 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
 
   void _navigateToCreateRequest() {
     if (!AuthRepository.instance.isAuthenticated) {
-      Navigator.push(
-        context,
-        SmoothPageRoute(page: const LoginPage()),
-      ).then((_) {
+      Navigator.push(context, SmoothPageRoute(page: const LoginPage())).then((
+        _,
+      ) {
         if (mounted) setState(() {});
       });
       return;
@@ -481,9 +479,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     ),
                     _buildDetailBadge(
                       'الموعد',
-                      order.scheduledType == 'scheduled'
-                          ? 'مجدول'
-                          : 'الآن',
+                      order.scheduledType == 'scheduled' ? 'مجدول' : 'الآن',
                     ),
                   ],
                 ),
@@ -547,10 +543,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade600,
-                      side: BorderSide(
-                        color: Colors.red.shade100,
-                        width: 1.5,
-                      ),
+                      side: BorderSide(color: Colors.red.shade100, width: 1.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -654,9 +647,7 @@ class _ParcelDashboardPageState extends State<ParcelDashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    order.orderNumber.isNotEmpty
-                        ? order.orderNumber
-                        : order.id,
+                    order.orderNumber.isNotEmpty ? order.orderNumber : order.id,
                     style: const TextStyle(
                       color: Colors.black87,
                       fontSize: 14,

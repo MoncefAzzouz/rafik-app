@@ -190,8 +190,7 @@ class _ActivitiesPageState extends State<ActivitiesPage>
           : order.isDelivered
           ? 'Completed'
           : 'Scheduled',
-      storeName:
-          '📦 ${order.truckTypeName ?? order.categoryName} - نقل طرود',
+      storeName: '📦 ${order.truckTypeName ?? order.categoryName} - نقل طرود',
       pickupName: 'استلام البضائع',
       pickupAddress: order.pickupAddress,
       destinationName: 'مكان التفريغ',
