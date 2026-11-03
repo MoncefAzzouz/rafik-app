@@ -48,6 +48,7 @@ class _HomePageState extends State<HomePage> {
     _content.addListener(_onExternalStateChanged);
     _startBannerTimer();
     _content.refreshHome();
+    _detectLocationOnStart();
   }
 
   void _onExternalStateChanged() {
@@ -117,20 +118,25 @@ class _HomePageState extends State<HomePage> {
   /// Tapping the Truck tile should go straight into booking a new order,
   /// not the dashboard (new/archive tabs) — that's still reachable from the
   /// "active orders" banner below when there's something to actually manage.
-  void _startNewParcelOrder() {
+  void _startNewParcelOrder([AppModule? module]) {
     if (!AuthRepository.instance.isAuthenticated) {
       Navigator.push(context, SmoothPageRoute(page: const LoginPage()));
       return;
     }
     Navigator.push(
       context,
-      SmoothPageRoute(page: const ParcelCategorySelectPage()),
+      SmoothPageRoute(
+        page: ParcelCategorySelectPage(
+          preferredCategoryId: module?.refId,
+          preferredCategoryName: module?.label,
+        ),
+      ),
     );
   }
 
   VoidCallback? _moduleOnTap(AppModule module) {
     if (!module.isTappable) return null;
-    if (module.isTruck) return _startNewParcelOrder;
+    if (module.isTruck) return () => _startNewParcelOrder(module);
     switch (module.type) {
       case 'taxi':
         return () => Navigator.push(
@@ -172,7 +178,13 @@ class _HomePageState extends State<HomePage> {
       // reads as more of the same light background instead of exposed blue.
       backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
-        onRefresh: _content.refreshHome,
+        onRefresh: () async {
+          await Future.wait([
+            _content.refreshHome(),
+            if (AuthRepository.instance.isAuthenticated)
+              _parcelOrders.fetchAll(),
+          ]);
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(
             parent: ClampingScrollPhysics(),
@@ -361,10 +373,6 @@ class _HomePageState extends State<HomePage> {
                                       onTap: _moduleOnTap(module),
                                     ),
                                   ),
-                                SizedBox(
-                                  width: tileWidth,
-                                  child: _buildServiceItem(null, _moreLabel()),
-                                ),
                               ],
                             );
                           },
@@ -539,6 +547,40 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Fills the header with the user's own location as soon as the home page
+  /// opens, so it doesn't sit on the fallback city until they open the sheet.
+  /// Silent on failure (permission denied, GPS off): the fallback label stays,
+  /// and a location the user already picked in the meantime is never replaced.
+  Future<void> _detectLocationOnStart() async {
+    setState(() => _isLocating = true);
+    final location = await _resolveCurrentLocation();
+    if (!mounted) return;
+    setState(() {
+      _isLocating = false;
+      if (location != null && _location == null) _location = location;
+    });
+  }
+
+  /// Device position plus its reverse-geocoded address, or null when the
+  /// position can't be determined.
+  Future<PickedLocation?> _resolveCurrentLocation() async {
+    final point = await _deviceLocation.currentPosition();
+    if (point == null) return null;
+    String? address;
+    try {
+      address = await _deviceLocation.reverseGeocode(point);
+    } catch (_) {
+      // Keep the coordinate — an un-named point is still a usable one.
+    }
+    return PickedLocation(
+      coordinate: point,
+      address: address?.trim().isNotEmpty == true
+          ? address!.trim()
+          : '${point.latitude.toStringAsFixed(5)}, '
+                '${point.longitude.toStringAsFixed(5)}',
+    );
+  }
+
   /// Resolves the device position, reverse-geocodes it, and adopts it as the
   /// delivery location.
   Future<void> _useCurrentLocation(
@@ -549,32 +591,16 @@ class _HomePageState extends State<HomePage> {
     setState(() => _isLocating = true);
     setSheetState(() {});
 
-    final point = await _deviceLocation.currentPosition();
-    String? address;
-    if (point != null) {
-      try {
-        address = await _deviceLocation.reverseGeocode(point);
-      } catch (_) {
-        // Keep the coordinate — an un-named point is still a usable one.
-      }
-    }
+    final location = await _resolveCurrentLocation();
 
     if (!mounted) return;
     setState(() {
       _isLocating = false;
-      if (point != null) {
-        _location = PickedLocation(
-          coordinate: point,
-          address: address?.trim().isNotEmpty == true
-              ? address!.trim()
-              : '${point.latitude.toStringAsFixed(5)}, '
-                    '${point.longitude.toStringAsFixed(5)}',
-        );
-      }
+      if (location != null) _location = location;
     });
 
     if (!sheetContext.mounted) return;
-    if (point == null) {
+    if (location == null) {
       setSheetState(() {});
       ScaffoldMessenger.of(
         sheetContext,
@@ -862,16 +888,5 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
-  }
-
-  String _moreLabel() {
-    switch (AppLanguage.instance.value) {
-      case AppLang.ar:
-        return 'المزيد';
-      case AppLang.fr:
-        return 'Plus';
-      case AppLang.en:
-        return 'More';
-    }
   }
 }

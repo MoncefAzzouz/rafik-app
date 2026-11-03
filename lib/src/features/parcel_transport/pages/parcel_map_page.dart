@@ -35,6 +35,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
 
   gmaps.GoogleMapController? _overviewMapController;
   gmaps.GoogleMapController? _pickerMapController;
+  LatLng? _userLocation;
   gmaps.BitmapDescriptor? _pickupIcon;
   gmaps.BitmapDescriptor? _destinationIcon;
   final Geocoding _geocoder = Geocoding();
@@ -57,6 +58,25 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
   void initState() {
     super.initState();
     _loadMarkerIcons();
+    _centerOverviewOnUser();
+  }
+
+  /// Opens the overview on the user's own position rather than the Algiers
+  /// fallback. Skipped once a pickup or destination exists, since the camera
+  /// then belongs to the route.
+  Future<void> _centerOverviewOnUser() async {
+    final location = await _getDeviceLocation();
+    if (!mounted || location == null) return;
+    setState(() => _userLocation = location);
+    _moveOverviewToUser();
+  }
+
+  void _moveOverviewToUser() {
+    final location = _userLocation;
+    if (location == null || _pickup != null || _destination != null) return;
+    _overviewMapController?.animateCamera(
+      gmaps.CameraUpdate.newLatLngZoom(location.g, 14),
+    );
   }
 
   Future<void> _loadMarkerIcons() async {
@@ -313,7 +333,12 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             myLocationButtonEnabled: false,
-            onMapCreated: (controller) => _overviewMapController = controller,
+            myLocationEnabled: _userLocation != null,
+            onMapCreated: (controller) {
+              _overviewMapController = controller;
+              // The GPS fix may have landed before the map existed.
+              _moveOverviewToUser();
+            },
             polylines: {
               if (routePoints.length == 2)
                 gmaps.Polyline(
@@ -345,7 +370,7 @@ class _ParcelMapPageState extends State<ParcelMapPage> {
 
         Positioned(
           top: MediaQuery.of(context).padding.top + 16,
-          right: 16,
+          left: 16,
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(

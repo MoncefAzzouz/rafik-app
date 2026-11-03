@@ -43,7 +43,17 @@ class TruckCategory {
 }
 
 class ParcelCategorySelectPage extends StatefulWidget {
-  const ParcelCategorySelectPage({super.key});
+  /// When the entry point already names a category (a home tile scoped to one
+  /// via its `refId`, or one labelled the same as a category), that category's
+  /// vehicle types open directly instead of asking the user to pick it again.
+  final String? preferredCategoryId;
+  final String? preferredCategoryName;
+
+  const ParcelCategorySelectPage({
+    super.key,
+    this.preferredCategoryId,
+    this.preferredCategoryName,
+  });
 
   @override
   State<ParcelCategorySelectPage> createState() =>
@@ -91,6 +101,20 @@ class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
             .map((e) => TruckCategory.fromJson(e as Map<String, dynamic>))
             .where((c) => c.isActive)
             .toList();
+        final preferred = _preferredCategory(categories);
+        if (preferred != null) {
+          Navigator.pushReplacement(
+            context,
+            SmoothPageRoute(
+              page: ParcelVehicleSelectPage(
+                categoryId: preferred.id,
+                categoryName: preferred.name,
+                truckTypes: preferred.truckTypes,
+              ),
+            ),
+          );
+          return;
+        }
         setState(() {
           _categories = categories;
           _isLoading = false;
@@ -101,6 +125,21 @@ class _ParcelCategorySelectPageState extends State<ParcelCategorySelectPage> {
           _isLoading = false;
         });
     }
+  }
+
+  /// The category the caller asked for, but only when it has vehicle types to
+  /// show — otherwise fall back to the full list rather than a dead end.
+  TruckCategory? _preferredCategory(List<TruckCategory> categories) {
+    final id = widget.preferredCategoryId;
+    final name = widget.preferredCategoryName?.trim().toLowerCase();
+    final matches = categories.where((c) {
+      if (c.truckTypes.isEmpty) return false;
+      if (id != null && id.isNotEmpty) return c.id == id;
+      return name != null &&
+          name.isNotEmpty &&
+          c.name.trim().toLowerCase() == name;
+    }).toList();
+    return matches.length == 1 ? matches.first : null;
   }
 
   @override

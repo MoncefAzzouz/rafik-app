@@ -3,9 +3,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
-        android:label="rafik_app"
+        android:label="Rafik"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCHxc07EsLafEeE0lEtReRR68pxp5xaGoU"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

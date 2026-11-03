@@ -1,4 +1,4 @@
-package com.example.rafik_app
+package dz.rafik.customer
 
 import io.flutter.embedding.android.FlutterActivity
 

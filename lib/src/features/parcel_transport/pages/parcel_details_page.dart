@@ -39,6 +39,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
   );
   int _selectedInvoiceOption = 2; // Default: 'هذه الخدمة لا تحتاج إلى فاتورة.'
   bool _isLater = true; // Default: 'لاحقاً'
+  bool _hasDescError = false;
 
   final List<String> _invoiceOptions = [
     'نعم عندي.',
@@ -331,6 +332,28 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
     );
   }
 
+  void _handleContinue() {
+    if (_descController.text.trim().isEmpty) {
+      setState(() {
+        _hasDescError = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'يرجى كتابة وصف الشحنة أولاً للمتابعة',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    _navigateToSummary();
+  }
+
   void _navigateToSummary() {
     final timing = _isLater
         ? 'لاحقاً (${_dateController.text})'
@@ -499,11 +522,23 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.shade200),
+                              border: Border.all(
+                                color: _hasDescError
+                                    ? Colors.redAccent
+                                    : Colors.grey.shade200,
+                                width: _hasDescError ? 1.5 : 1,
+                              ),
                             ),
                             child: TextField(
                               controller: _descController,
                               maxLines: 3,
+                              onChanged: (_) {
+                                if (_hasDescError) {
+                                  setState(() {
+                                    _hasDescError = false;
+                                  });
+                                }
+                              },
                               decoration: const InputDecoration(
                                 hintText: 'أوصف الشحنة',
                                 hintStyle: TextStyle(
@@ -525,6 +560,20 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                               ),
                             ),
                           ),
+                          if (_hasDescError) ...[
+                            const SizedBox(height: 6),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                'يرجى كتابة وصف الشحنة للمتابعة',
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
 
                           const SizedBox(height: 24),
 
@@ -782,7 +831,7 @@ class _ParcelDetailsPageState extends State<ParcelDetailsPage> {
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _navigateToSummary,
+                        onPressed: _handleContinue,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/l10n/app_strings.dart';
 import 'home_page.dart';
@@ -8,6 +9,7 @@ import 'offers_page.dart';
 import 'activities_page.dart';
 import '../../profile/pages/profile_page.dart';
 import '../../parcel_transport/data/parcel_order_repository.dart';
+import '../../auth/data/auth_repository.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -16,7 +18,7 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _parcelOrders = ParcelOrderRepository.instance;
 
@@ -30,7 +32,20 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _parcelOrders.addListener(_onOrdersChanged);
+    _refreshOrders();
+  }
+
+  void _refreshOrders() {
+    if (AuthRepository.instance.isAuthenticated) {
+      _parcelOrders.fetchAll();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshOrders();
   }
 
   void _onOrdersChanged() {
@@ -39,6 +54,7 @@ class _MainPageState extends State<MainPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _parcelOrders.removeListener(_onOrdersChanged);
     super.dispose();
   }
@@ -122,6 +138,7 @@ class _MainPageState extends State<MainPage> {
         setState(() {
           _currentIndex = index;
         });
+        if (index == 0 || index == 2) _refreshOrders();
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
@@ -215,12 +232,28 @@ class _MainPageState extends State<MainPage> {
     }
 
     if (index == 1) {
-      return Icon(Icons.new_releases_outlined, color: color, size: 30);
+      return SizedBox(
+        width: 30,
+        height: 30,
+        child: Center(
+          child: SvgPicture.string(
+            '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 15l6 -6" />
+  <circle cx="9.5" cy="9.5" r="1.1" fill="black" stroke="none" />
+  <circle cx="14.5" cy="14.5" r="1.1" fill="black" stroke="none" />
+  <path d="M5 7.2a2.2 2.2 0 0 1 2.2 -2.2h1a2.2 2.2 0 0 0 1.55 -.64l.7 -.7a2.2 2.2 0 0 1 3.12 0l.7 .7a2.2 2.2 0 0 0 1.55 .64h1a2.2 2.2 0 0 1 2.2 2.2v1a2.2 2.2 0 0 0 .64 1.55l.7 .7a2.2 2.2 0 0 1 0 3.12l-.7 .7a2.2 2.2 0 0 0 -.64 1.55v1a2.2 2.2 0 0 1 -2.2 2.2h-1a2.2 2.2 0 0 0 -1.55 .64l-.7 .7a2.2 2.2 0 0 1 -3.12 0l-.7 -.7a2.2 2.2 0 0 0 -1.55 -.64h-1a2.2 2.2 0 0 1 -2.2 -2.2v-1a2.2 2.2 0 0 0 -.64 -1.55l-.7 -.7a2.2 2.2 0 0 1 0 -3.12l.7 -.7a2.2 2.2 0 0 0 .64 -1.55v-1" />
+</svg>''',
+            width: 27,
+            height: 27,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          ),
+        ),
+      );
     }
 
     final icons = [
       Icons.home_rounded,
-      Icons.new_releases_outlined,
+      Icons.discount_outlined,
       Icons.receipt_long_outlined,
       Icons.person_outline_rounded,
     ];

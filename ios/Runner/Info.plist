@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rafik uses your location to set your pickup point and show nearby taxis.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Rafik uses your location to set your pickup and delivery points and show nearby taxis.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
